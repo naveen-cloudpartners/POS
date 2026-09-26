@@ -1,0 +1,17 @@
+{
+  "name": "pos_backend",
+  "version": "1.0.0",
+  "description": "POS Backend with Zoho Books integration",
+  "main": "index.js",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.6.1",
+    "express": "^4.19.2",
+    "nodemailer": "^9.0.3",
+    "zcatalyst-sdk-node": "^3.4.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test tests/"
+  }
+}

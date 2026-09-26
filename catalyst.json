@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "targets": [
+      "pos_backend"
+    ],
+    "ignore": [],
+    "source": "functions"
+  },
+  "client": {
+    "source": "react-app/dist",
+    "url_prefix": "/app"
+  }
+}

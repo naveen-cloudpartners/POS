@@ -1,0 +1,60 @@
+# CloudHub POS — Build Validation (no deployment).
+#
+# Validates every push and pull request:
+#   1. Frontend type-check + production build (tsc -b && vite build)
+#   2. Backend syntax check (node --check on the Express entrypoint)
+#   3. Required project files present (catalyst.json, .catalystrc)
+#   4. Publishes react-app/dist as a build artifact for inspection
+#
+# This workflow NEVER deploys. Deployment lives in deploy-dev.yml.
+
+name: Build Validation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: Validate build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: react-app/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: react-app
+        run: npm ci
+
+      - name: Frontend validation (type-check + build)
+        working-directory: react-app
+        # Runs "tsc -b && vite build" — fails on TS errors or build errors.
+        # Output goes to react-app/dist/ (gitignored, rebuilt every run).
+        run: npm run build
+
+      - name: Backend validation (syntax check)
+        # No install needed: node --check only parses, never executes.
+        run: node --check functions/pos_backend/index.js
+
+      - name: Verify required project files
+        # catalyst.json maps functions + client for deploy;
+        # .catalystrc binds the project, domain, and environments.
+        run: |
+          test -f catalyst.json || (echo "Missing catalyst.json" && exit 1)
+          test -f .catalystrc || (echo "Missing .catalystrc" && exit 1)
+          test -d react-app/dist || (echo "Missing react-app/dist — build did not emit output" && exit 1)
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-dist
+          path: react-app/dist
+          retention-days: 7

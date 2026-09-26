@@ -1,0 +1,92 @@
+name: Deploy to Development
+
+on:
+  workflow_run:
+    workflows:
+      - Build Validation
+    types:
+      - completed
+
+jobs:
+  deploy-dev:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+
+    runs-on: ubuntu-latest
+
+    concurrency:
+      group: catalyst-dev-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Verify Catalyst Files
+        run: |
+          test -f catalyst.json || (echo "Missing catalyst.json" && exit 1)
+          test -f .catalystrc || (echo "Missing .catalystrc" && exit 1)
+
+      - name: Install Frontend Dependencies
+        working-directory: react-app
+        run: npm ci
+
+      - name: Build Frontend
+        working-directory: react-app
+        run: npm run build
+
+      - name: Backend Validation
+        run: node --check functions/pos_backend/index.js
+
+      - name: Verify Frontend Build Output
+        run: |
+          test -d react-app/dist || (echo "Missing dist folder" && exit 1)
+
+      - name: Install Catalyst CLI
+        run: npm install -g zcatalyst-cli
+
+      - name: Verify Secrets
+        env:
+          CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
+          CATALYST_DC: ${{ secrets.CATALYST_DC }}
+          CATALYST_PROJECT_ID: ${{ secrets.CATALYST_PROJECT_ID }}
+          CATALYST_ORG_ID: ${{ secrets.CATALYST_ORG_ID }}
+        run: |
+          test -n "$CATALYST_TOKEN" || (echo "Missing CATALYST_TOKEN" && exit 1)
+          test -n "$CATALYST_DC" || (echo "Missing CATALYST_DC" && exit 1)
+          test -n "$CATALYST_PROJECT_ID" || (echo "Missing CATALYST_PROJECT_ID" && exit 1)
+          test -n "$CATALYST_ORG_ID" || (echo "Missing CATALYST_ORG_ID" && exit 1)
+
+      - name: Deploy Functions
+        env:
+          CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
+          CATALYST_DC: ${{ secrets.CATALYST_DC }}
+          CATALYST_PROJECT_ID: ${{ secrets.CATALYST_PROJECT_ID }}
+          CATALYST_ORG_ID: ${{ secrets.CATALYST_ORG_ID }}
+        run: |
+          catalyst deploy \
+            --only functions:pos_backend \
+            --token "$CATALYST_TOKEN" \
+            --dc "$CATALYST_DC" \
+            --project "$CATALYST_PROJECT_ID" \
+            --org "$CATALYST_ORG_ID"
+
+      - name: Deploy Client
+        env:
+          CATALYST_TOKEN: ${{ secrets.CATALYST_TOKEN }}
+          CATALYST_DC: ${{ secrets.CATALYST_DC }}
+          CATALYST_PROJECT_ID: ${{ secrets.CATALYST_PROJECT_ID }}
+          CATALYST_ORG_ID: ${{ secrets.CATALYST_ORG_ID }}
+        run: |
+          catalyst deploy \
+            --only client \
+            --token "$CATALYST_TOKEN" \
+            --dc "$CATALYST_DC" \
+            --project "$CATALYST_PROJECT_ID" \
+            --org "$CATALYST_ORG_ID"

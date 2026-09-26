@@ -1,0 +1,8 @@
+.users-who { display: inline-flex; align-items: center; gap: 11px; }
+.users-actions { display: inline-flex; gap: 2px; }
+.users-danger { color: var(--ch-danger); }
+.users-danger:hover { background: var(--ch-danger-bg); color: var(--ch-danger); }
+
+/* Role pills refinement */
+.users-who .ch-avatar { width: 38px; height: 38px; border-radius: 13px; font-size: 13px; }
+.users-who .ch-cell-main { display: block; }

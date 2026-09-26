@@ -1,0 +1,87 @@
+/* Reports — airy tab layout. Fonts untouched; only shapes, gaps and alignment. */
+
+.reports-page { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.reports-tab { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+/* Equal columns top-align so side-by-side cards share a baseline instead of
+   stretching into each other. Outer rhythm comes from the flex gap above,
+   never from card margins. */
+.reports-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 0; align-items: start; }
+.reports-grid > * { min-width: 0; }
+.reports-grid.reports-single { grid-template-columns: 1fr; }
+.reports-page .ch-grid-stats.reports-stats { margin: 0; gap: 20px; }
+.reports-page .ch-stack { gap: 12px; }
+
+/* Slimmer stat shapes (icon + spark bars). Labels/values/deltas untouched. */
+.reports-page .ch-stat { padding: 14px 16px; gap: 12px; align-items: center; }
+.reports-page .ch-stat-icon { width: 38px; height: 38px; border-radius: 12px; }
+.reports-page .ch-stat-spark { height: 20px; gap: 2px; margin-top: 6px; }
+.reports-page .ch-stat-spark i { border-radius: 2px; min-height: 3px; }
+
+/* Card interiors breathe; tables never kiss headers/toolbars. */
+.reports-grid .ch-card-body { gap: 14px; padding: 16px 18px; }
+.reports-page .ch-toolbar { padding: 10px 12px; }
+
+/* Bars — slimmer track, fixed columns so values line up horizontally. */
+.reports-bars { display: flex; flex-direction: column; gap: 4px; }
+.reports-bar-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 128px auto;
+  gap: 12px; align-items: center;
+  font-size: 12.5px; padding: 6px 8px; border-radius: 8px;
+  transition: background 0.15s ease;
+}
+.reports-bar-row:hover { background: rgba(93,142,249,0.06); }
+.reports-day { color: var(--ch-muted); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reports-track { background: rgba(91,107,135,0.12); border-radius: 999px; height: 6px; overflow: hidden; min-width: 0; }
+.reports-fill {
+  display: block; height: 100%;
+  background: linear-gradient(90deg, var(--ch-primary), var(--ch-primary-dark));
+  border-radius: 999px; transition: width 0.4s var(--ch-ease);
+}
+.reports-val { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; min-width: 0; }
+.rep-trend { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 99px; white-space: nowrap; }
+.rep-trend.up { background: var(--ch-success-bg); color: var(--ch-success-ink); }
+.rep-trend.down { background: var(--ch-danger-bg); color: var(--ch-danger-ink); }
+
+/* Payment split — one horizontal row per method: label | meter | value. */
+.rep-pay {
+  background: var(--ch-bg);
+  border: 1px solid var(--ch-border-soft);
+  border-radius: 10px; padding: 10px 12px;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(72px, 148px) auto;
+  gap: 4px 12px; align-items: center;
+}
+.rep-pay-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.rep-pay-head b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rep-pay .ch-meter { height: 6px; min-width: 0; }
+.rep-pay-val { font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+
+/* Slim shared meters inside reports only (global height untouched). */
+.reports-page .ch-meter { height: 6px; }
+
+/* Summary rows — generous whitespace, values right-aligned. */
+.reports-summary { margin: 0; }
+.reports-summary div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 9px 2px; border-bottom: 1px solid var(--ch-border-soft); font-size: 13.5px; }
+.reports-summary div:last-child { border-bottom: none; }
+.reports-summary dt { color: var(--ch-muted); font-weight: 600; min-width: 0; }
+.reports-summary dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.rep-warn { color: var(--ch-danger-ink); background: var(--ch-danger-bg); padding: 2px 10px; border-radius: 99px; }
+.rep-ok { color: var(--ch-success-ink); background: var(--ch-success-bg); padding: 2px 10px; border-radius: 99px; }
+
+/* Trend pill base lives in styles/ui.css (shared primitives) */
+
+@media (max-width: 1024px) {
+  .reports-grid { grid-template-columns: 1fr; }
+  .reports-bar-row { grid-template-columns: 76px minmax(0, 1fr) 108px; }
+  .rep-trend { display: none; }
+  .rep-pay { grid-template-columns: minmax(0, 1fr) auto; }
+  .rep-pay .ch-meter { grid-column: 1 / -1; order: 2; }
+}
+
+@media (max-width: 640px) {
+  .reports-page, .reports-tab { gap: 16px; }
+  .reports-grid { gap: 16px; }
+  .reports-bar-row { padding: 5px 4px; gap: 8px; }
+  .rep-pay-val { font-size: 15px; }
+}

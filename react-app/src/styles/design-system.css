@@ -1,0 +1,196 @@
+:root {
+  /* CloudHub enterprise palette — shared with the app workspace */
+  --primary: #3a76f8;
+  --primary-hover: #2b5fe3;
+  --secondary: #64748b;
+  --background: #f5f7fc;
+  --foreground: #0f1b33;
+
+  --muted: #f8fafc;
+  --muted-foreground: #475569;
+
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+
+  --border: #e6eaf3;
+  --input: #eef1f7;
+  --ring: rgba(93, 142, 249, 0.22);
+
+  --success: #22b378;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+
+  /* Elevation - Layered Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  --shadow-premium: 0 0 0 1px rgba(15,27,51,0.04), 0 8px 30px rgba(15,27,51,0.08);
+
+  /* Modern Radii */
+  --radius-sm: 0.625rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Typography Scale */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --h1: clamp(2.5rem, 5vw, 3.75rem);
+  --h2: clamp(2rem, 4vw, 2.75rem);
+  --h3: clamp(1.5rem, 3vw, 1.875rem);
+  --body-lg: 1.125rem;
+  --body: 1rem;
+  --body-sm: 0.875rem;
+
+  /* Spacing System */
+  --space-unit: 1rem;
+  --section-padding: clamp(3rem, 6vw, 5rem);
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-all: all 0.25s var(--ease-out);
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #f8fafc;
+  --muted: #0f172a;
+  --muted-foreground: #94a3b8;
+  --accent: #1e293b;
+  --border: #1e293b;
+  --shadow-premium: 0 0 0 1px rgba(255,255,255,0.1), 0 12px 24px rgba(0,0,0,0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--background);
+  color: var(--foreground);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Typography Helpers — Muster: Sora SemiBold/Bold headings, Inter body */
+h1, h2, h3 {
+  font-family: 'Sora', 'Inter', var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Layout Utilities */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.section {
+  padding: var(--section-padding) 0;
+}
+
+/* Premium Surface */
+.surface {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-premium);
+  transition: var(--transition-all);
+}
+
+.surface:hover {
+  transform: translateY(-3px);
+  border-color: var(--primary);
+  box-shadow: 0 8px 30px rgba(15, 27, 51, 0.1);
+}
+
+/* Buttons System */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: var(--body-sm);
+  transition: var(--transition-all);
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #5d8ef9, var(--primary-hover));
+  color: white;
+  box-shadow: 0 6px 18px rgba(58, 118, 248, 0.32), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #6d9bfa, var(--primary-hover));
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(58, 118, 248, 0.42), 0 0 0 4px var(--ring);
+}
+
+.btn-secondary {
+  background: var(--muted);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--accent);
+  border-color: var(--muted-foreground);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+.btn-outline:hover {
+  background: var(--muted);
+  border-color: var(--primary);
+}
+
+.btn-lg {
+  padding: 0.875rem 1.75rem;
+  font-size: var(--body);
+}
+
+.btn:focus-visible,
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Badge Utility */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

@@ -1,0 +1,103 @@
+/* ==========================================================================
+   Muster scoped layer — FONTS, SIZES, CORNERS, TABLES ONLY.
+   No color, elevation, layout, or motion changes in this file.
+   Inter = interface · Sora SemiBold/Bold = headings + key numbers.
+   ========================================================================== */
+
+:root {
+  --muster-font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --muster-font-head: 'Sora', 'Inter', system-ui, sans-serif;
+}
+
+/* ---- Headings + important numbers: Sora SemiBold/Bold ---- */
+h1, h2, h3,
+.ch-page-title,
+.ch-card-title,
+.ch-modal-title,
+.ch-state-title,
+.ch-stat-value,
+.hero-title,
+.dash-hero-value,
+.org-hero-title,
+.org-modal-title,
+.login-headline,
+.mob-title,
+.pricing-price {
+  font-family: var(--muster-font-head);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ---- Interface text: Inter (body, forms, buttons, tables, nav) ---- */
+body,
+button, input, select, textarea, table,
+.ch-label, .ch-btn, .ch-badge, .ch-crumbs,
+.ch-panel-link, .ch-rail-lbl, .ch-page-sub, .ch-card-sub,
+.ch-cell-main, .ch-cell-sub {
+  font-family: var(--muster-font-ui);
+}
+
+/* ---- Icon sizes: 16 / 18 / 20 only ---- */
+.ch-btn svg, .ch-qa-item svg, .ch-panel-link svg,
+.ch-search svg, .ch-icon-btn svg, .ch-segmented svg,
+.ch-stat-delta svg, .sa-lbl svg, .dash-hero-eyebrow svg,
+.dash-hero-btn svg, .rep-trend svg, .dash-pill svg,
+.pos-live-cart svg, .pos-search svg, .pos-add svg,
+.ch-label svg, .pos-pay-btn svg, .prod-bulkbar svg,
+.ch-crumbs svg, .mob-features svg, .mob-actions svg,
+.footer-link svg, .el-proof svg, .hero-proof svg,
+.ch-cell-sub svg, .ch-hint svg, .cust-contact svg,
+.ch-alert svg, .ch-page-actions svg, .ws-quick svg,
+.ws-mini svg, .badge svg, .el-chip svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.ch-panel-ic svg, .ch-stat-icon svg, .ch-state-icon svg,
+.dash-insight-ic svg, .pos-empty svg, .feature-icon svg,
+.security-grid svg, svg.stat-check, .ch-header-title svg,
+.ch-card-head svg, .org-logo-mark svg, .org-kpi svg,
+.org-section-title svg, .org-benefit-icon svg, .org-modal-icon svg,
+.ch-rail-btn svg, .ch-rail-logo svg, .login-logo-mark svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* ---- Corners: 8 / 12 / 16 (clamp oversized containers) ---- */
+.ch-rail, .ch-modal, .ch-drawer,
+.hero-section, .demo-wrapper, .login-brand, .glass-login-card,
+.org-card, .org-side-card, .el-mock-window, .mob-card,
+.dash-hero, .pos-cart, .pos-panel, .stat-card, .shot-card,
+.pricing-card, .feature-card, .skytab-shot-arch img,
+.ch-skel-chart, .ch-state-icon, .mob-logo {
+  border-radius: 16px;
+}
+
+/* ---- Tables: consistent header type, readable density, alignment ---- */
+.ch-table thead th {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ch-table tbody td {
+  padding: 12px 14px;
+  font-size: 13.5px;
+}
+.ch-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ch-cell-main { font-weight: 600; }
+
+/* ---- Touch targets: 48px minimum on coarse pointers ---- */
+@media (pointer: coarse) {
+  .ch-btn, .ch-icon-btn, .ch-rail-btn, .ch-panel-link,
+  .ch-qa-item, .ch-segmented button, .pos-pay-btn, .pos-cat,
+  .ws-tabs button, .ch-modal-x, .ch-collapse-btn,
+  .sa-cell, .org-submit, .org-back, .login-submit, .mob-btn {
+    min-height: 48px;
+  }
+  .ch-icon-btn, .ch-modal-x { min-width: 48px; }
+}

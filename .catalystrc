@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "project": 1,
+    "env": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "94596000000230524",
+      "name": "POS",
+      "domain": {
+        "id": "10134675040",
+        "name": "pos-932021889.development"
+      },
+      "timezone": "Asia/Colombo",
+      "env": [
+        {
+          "idx": 1,
+          "id": "932021889",
+          "name": "Development",
+          "type": 3
+        }
+      ]
+    }
+  ]
+}
