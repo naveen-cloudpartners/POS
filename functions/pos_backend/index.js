@@ -297,36 +297,40 @@ async function sendSmtpMail(catalystApp, { to, subject, html, text }) {
  * Invitation email for team members (USR-01 mail gap).
  * Catalyst's registerUser API only creates the user record — it never sends
  * a password email (the platform emails only console-issued invites). So we
- * send our own welcome mail via the store SMTP: the member's role, a sign-in
- * link to the hosted login page, and first-time password instructions
- * ("Forgot password" on that page emails them a reset link, which acts as
- * the set-password mail). Best-effort: returns true/false, never throws,
- * never blocks the caller. False also means SMTP is not configured yet.
+ * send our own welcome mail via the store SMTP: the member's role, a primary
+ * link to the hosted signup page, a secondary sign-in link for existing
+ * accounts, and instructions to register with the invited email address.
+ * Best-effort: returns true/false, never throws, never blocks the caller.
+ * False also means SMTP is not configured yet.
  */
 async function sendInviteEmail(catalystApp, req, { to, name, role, orgName, invitedBy, isReminder }) {
   try {
     const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const addressee = esc(String(name || '').trim() || String(to).split('@')[0]);
+    const recipient = esc(to);
     const store = esc(orgName || 'CloudHub POS');
     const roleText = esc(role || 'Cashier');
     const inviter = esc(invitedBy || '');
     const loginUrl = `${getPublicBaseUrl(req)}/__catalyst/auth/login`;
+    const registerUrl = `${getPublicBaseUrl(req)}/__catalyst/auth/signup`;
     const subject = isReminder
       ? `Reminder: join ${store} on CloudHub POS`
       : `You're invited to join ${store} on CloudHub POS`;
     const text =
       `${isReminder ? 'Reminder' : 'Hello'} ${addressee}\n\n` +
       `${inviter !== '' ? `${inviter} invited` : 'You were invited'} you to join ${store} on CloudHub POS with the role: ${roleText}.\n\n` +
-      `Sign in here:\n${loginUrl}\n\n` +
-      `First time signing in? Open the sign-in page above and click "Forgot password" — you will get an email link to set your password.\n\n` +
+      `Create your account:\n${registerUrl}\n\n` +
+      `Already have an account? Sign in here: ${loginUrl}\n\n` +
+      `Click Create your account above and register with this email address (${recipient}), then sign in — your ${roleText} access for ${store} applies automatically.\n\n` +
       `If you did not expect this invitation, you can ignore this email.`;
     const html =
       `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f1b33">` +
       `<h2 style="margin:0 0 12px">You're invited to join ${store}</h2>` +
       `<p style="margin:0 0 8px">Hello ${addressee},</p>` +
       `<p style="margin:0 0 8px">${inviter !== '' ? `${inviter} invited` : 'You were invited'} you to join <b>${store}</b> on CloudHub POS with the role: <b>${roleText}</b>.</p>` +
-      `<p style="margin:16px 0"><a href="${loginUrl}" style="display:inline-block;background:#3a76f8;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px">Sign in to CloudHub POS</a></p>` +
-      `<p style="margin:0 0 8px;font-size:13px;color:#5b6b87">First time signing in? Open the sign-in page and click <b>"Forgot password"</b> — you will get an email link to set your password.</p>` +
+      `<p style="margin:16px 0"><a href="${registerUrl}" style="display:inline-block;background:#3a76f8;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px">Create your account</a></p>` +
+      `<p style="margin:0 0 8px;font-size:13px;color:#5b6b87">Already have an account? <a href="${loginUrl}">Sign in here</a>.</p>` +
+      `<p style="margin:0 0 8px;font-size:13px;color:#5b6b87">Click <b>Create your account</b> above and register with this email address (${recipient}), then sign in — your <b>${roleText}</b> access for <b>${store}</b> applies automatically.</p>` +
       `<p style="margin:16px 0 0;font-size:12px;color:#8b98b3">If you did not expect this invitation, you can ignore this email.</p>` +
       `</div>`;
     return await sendSmtpMail(catalystApp, { to, subject, html, text });
@@ -8967,35 +8971,18 @@ async function readUserRoster(catalystApp, orgUserContext) {
     verified_at: Date.now(),
   };
   usersMap.set(String(user.email).toLowerCase(), currentActiveUser);
-  try {
-    const orgUserItems = await listOrgUserRows(catalystApp, orgId);
-    if (orgUserItems.length > 0) {
-      for (const item of orgUserItems) {
-        const userEmail = item.user_id;
-        const userRole = item.role === 'master_admin' ? 'Admin' : (item.role || 'Cashier');
-        if (!usersMap.has(String(userEmail).toLowerCase())) {
-          usersMap.set(String(userEmail).toLowerCase(), {
-            email: userEmail,
-            name: item.display_name || userEmail,
-            role: userRole,
-            permissions: getRolePermissions(userRole),
-            status: 'active',
-            invited_at: Date.now(),
-            verified_at: Date.now(),
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('[roster] OrgUsers query failed, falling back to legacy Configurations', err.message);
-  }
+  // Roster JSON FIRST: full profile incl. lifecycle status (OrgUsers rows
+  // carry no status and would otherwise mask deactivations as Active).
+  // Fetch-all + JS prefix filter (same proven pattern as the adopted company
+  // scan) instead of a LIKE predicate, so no operator doubt can hide rows.
   try {
     const configUsers = await safeZcql(catalystApp,
-      `SELECT config_key, config_value FROM Configurations WHERE config_key LIKE 'user_%'`
+      `SELECT config_key, config_value FROM Configurations LIMIT 300`
     );
     if (configUsers && configUsers.length > 0) {
       configUsers.forEach((row) => {
-        if (row.Configurations.config_value !== 'used') {
+        if (String(row.Configurations.config_key || '').startsWith('user_')
+          && row.Configurations.config_value !== 'used') {
           try {
             const u = JSON.parse(row.Configurations.config_value);
             if (u && u.email && !usersMap.has(String(u.email).toLowerCase())) {
@@ -9011,6 +8998,52 @@ async function readUserRoster(catalystApp, orgUserContext) {
     }
   } catch (configErr) {
     console.warn('[roster] Legacy config query failed:', configErr.message);
+  }
+  try {
+    const orgUserItems = await listOrgUserRows(catalystApp, orgId);
+    if (orgUserItems.length > 0) {
+      for (const item of orgUserItems) {
+        const userEmail = item.user_id;
+        const userRole = item.role === 'master_admin' ? 'Admin' : (item.role || 'Cashier');
+        if (userEmail && !usersMap.has(String(userEmail).toLowerCase())) {
+          usersMap.set(String(userEmail).toLowerCase(), {
+            email: userEmail,
+            name: item.display_name || userEmail,
+            role: userRole,
+            permissions: getRolePermissions(userRole),
+            status: 'active',
+            invited_at: Date.now(),
+            verified_at: Date.now(),
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[roster] OrgUsers query failed, falling back to legacy Configurations', err.message);
+  }
+  // Catalyst Auth accounts with no roster/OrgUsers entry (console-added or
+  // self-registered members) must still appear on the Users page so an Admin
+  // can assign them a POS role. Best-effort: never blocks the list.
+  try {
+    const authUsers = await catalystApp.userManagement().getAllUsers();
+    for (const au of (Array.isArray(authUsers) ? authUsers : [])) {
+      const auEmail = String((au && (au.email_id || au.email)) || '').trim().toLowerCase();
+      if (auEmail === '' || !auEmail.includes('@') || usersMap.has(auEmail)) continue;
+      const auName = [au.first_name, au.last_name].filter(Boolean).join(' ').trim() || auEmail.split('@')[0];
+      usersMap.set(auEmail, {
+        email: auEmail,
+        name: auName,
+        role: 'Unassigned',
+        permissions: {},
+        status: 'active',
+        invited_at: null,
+        verified_at: null,
+        last_login: null,
+        invited_by: '',
+      });
+    }
+  } catch (authErr) {
+    console.warn('[roster] Catalyst Auth user merge skipped:', extractSdkMessage(authErr));
   }
   return Array.from(usersMap.values());
 }
@@ -9036,29 +9069,59 @@ async function saveRosterUser(catalystApp, email, data) {
 /** Best-effort OrgUsers role sync (roster JSON stays the source of truth). */
 /** Ensure the Catalyst login account exists AND trigger the platform
  * password email (USR-01 mail gap).
- * registerUser alone sends no reliable mail; resetPassword() hits
- * /project-user/forgotpassword, which is the API that makes Catalyst email
- * a password link. Returns { created, exists, failed, mailSent, detail }.
- * All best-effort — never throws, never blocks the caller. */
-async function ensureAuthAccount(catalystApp, { email, firstName, lastName }) {
+ * registerUser sends Catalyst's own activation/confirm mail; resetPassword()
+ * hits /project-user/forgotpassword, which emails a second password link.
+ * Invite flows pass { passwordMail: false } so the member gets EXACTLY ONE
+ * mail (the registerUser confirm mail) — no recovery mail, no SMTP welcome
+ * mail. The Reset-password endpoint keeps the default (true). Returns
+ * { created, exists, failed, mailSent, detail }. All best-effort — never
+ * throws, never blocks the caller. */
+/** Catalyst SDK errors are often plain objects ({status, code, message}),
+ * not Error instances — String(e) on those yields "[object Object]" and
+ * hides the real reason (this blanked invite failure details). */
+function extractSdkMessage(e) {
+  if (e instanceof Error && e.message) return e.message;
+  if (e && typeof e === 'object') {
+    const parts = [
+      e.message, e.error,
+      e.code !== undefined && e.code !== '' ? `code=${e.code}` : '',
+      e.status !== undefined && e.status !== '' ? `status=${e.status}` : '',
+    ].filter(Boolean).map(String);
+    if (parts.length > 0) return parts.join(' ');
+    try { return JSON.stringify(e).slice(0, 300); } catch { /* fall through */ }
+  }
+  return String(e);
+}
+
+async function ensureAuthAccount(catalystApp, { email, firstName, lastName }, { passwordMail = true } = {}) {
   const out = { created: false, exists: false, failed: false, mailSent: false, detail: '' };
+  // ICatalystSignupUserConfig allows ONLY email_id + first_name + optional
+  // last_name (+ optional role_id/org_id). A `role` string or an empty
+  // last_name is rejected by /project-user with INVALID_INPUT, so build the
+  // payload exactly like the working approve-org call. POS roles (Admin /
+  // Manager / Cashier / Storekeeper) live in the roster + OrgUsers sync, NOT
+  // in Catalyst Auth.
+  const userDetails = {
+    email_id: email,
+    first_name: String(firstName || '').trim() || String(email).split('@')[0],
+  };
+  if (lastName !== undefined && lastName !== null && String(lastName).trim() !== '') {
+    userDetails.last_name = String(lastName).trim();
+  }
   try {
-    await catalystApp.userManagement().registerUser(
-      { platform_type: 'web' },
-      { email_id: email, first_name: firstName, last_name: lastName, role: 'member' }
-    );
+    await catalystApp.userManagement().registerUser({ platform_type: 'web' }, userDetails);
     out.created = true;
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = extractSdkMessage(e);
     if (/already exists|duplicate|already registered/i.test(msg)) out.exists = true;
     else { out.failed = true; out.detail = msg; console.warn('[admin/users] registerUser:', msg); }
   }
-  if (out.created || out.exists) {
+  if ((out.created || out.exists) && passwordMail) {
     try {
       await catalystApp.userManagement().resetPassword(email, { platform_type: 'web' });
       out.mailSent = true;
     } catch (e) {
-      console.warn('[admin/users] platform password email not sent:', e.message);
+      console.warn('[admin/users] platform password email not sent:', extractSdkMessage(e));
     }
   }
   return out;
@@ -9122,6 +9185,12 @@ async function listOrgUserRows(catalystApp, orgId) {
   const queries = [`SELECT user_id, role, display_name FROM OrgUsers WHERE org_id = '${sanitizeZcql(ctx)}' LIMIT 300`];
   if (ctx !== 'org_default') {
     queries.push(`SELECT user_id, role, display_name FROM OrgUsers WHERE org_id = 'org_default' LIMIT 300`);
+  } else {
+    // Virtual-viewer fallback: owner/Admins with no OrgUsers row resolve to
+    // org_default while team rows carry the real org id — a filtered query
+    // alone hides the whole team (users then show as Unassigned via the Auth
+    // merge). Full scan so nobody is hidden; tiny team-sized table.
+    queries.push(`SELECT user_id, role, display_name FROM OrgUsers LIMIT 300`);
   }
   for (const q of queries) {
     try {
@@ -9477,13 +9546,13 @@ app.get('/api/admin/users/:id', async (req, res) => {
 });
 
 /**
- * POST /api/admin/users — invite/create (USR-01, Admin-only). Creates the
  * Catalyst project user when possible (best-effort: self-signup projects
  * reject unknown emails until the member signs in once), always creates the
  * POS roster entry, upserts the OrgUsers row (no console work needed), and
- * audits the outcome.
+ * audits the outcome. Shared by POST /api/admin/users and the legacy
+ * POST /api/users/invite alias.
  */
-app.post('/api/admin/users', async (req, res) => {
+async function handleInviteUser(req, res) {
   try {
     const catalystApp = catalyst.initialize(req);
     const orgUserContext = await requireAuth(req, catalystApp);
@@ -9525,56 +9594,45 @@ app.post('/api/admin/users', async (req, res) => {
     if (existing) {
       // Idempotent retry: a previous attempt may have written the roster but
       // missed the OrgUsers row (older backend) — heal it here instead of
-      // dead-ending. Password email is never sent by API invites (Catalyst
-      // sends it only for console invites); the member sets their password
-      // via Reset password or "Forgot password" on the hosted login page.
+      // dead-ending. Single-mail rule: only the registerUser confirm mail is
+      // ever sent (passwordMail: false); no SMTP welcome mail here.
       const existingRole = String(existing.data.role || 'Cashier');
       // A retry may also be missing the login account itself — repair that too.
       const retryAuth = await ensureAuthAccount(catalystApp, {
         email: cleanEmail,
         firstName: String(existing.data.name || '').split(' ')[0] || cleanEmail.split('@')[0],
         lastName: String(existing.data.name || '').split(' ').slice(1).join(' ') || '',
-      });
+      }, { passwordMail: false });
       await syncOrgUserRole(catalystApp, cleanEmail, existingRole, {
         orgId: callerOrgId,
         displayName: String(existing.data.name || cleanEmail.split('@')[0]),
       });
-      const retryActor = String(orgUserContext.user.email || orgUserContext.user.email_id || '');
-      const retryMailSent = await sendInviteEmail(catalystApp, req, {
-        to: cleanEmail,
-        name: String(existing.data.name || ''),
-        role: existingRole,
-        orgName: String((orgUserContext.org && orgUserContext.org.org_name) || 'CloudHub POS'),
-        invitedBy: retryActor,
-        isReminder: true,
-      });
       const retryAccountPart = retryAuth.failed
         ? ` Login account still missing (${retryAuth.detail || 'unknown error'}) — create it in console Authentication.`
-        : (retryAuth.created ? ` Login account created.` : ``);
+        : (retryAuth.created ? ` Login account created — Catalyst emailed a confirmation link to set the password (the only email sent).` : ``);
       return res.status(200).json({
         success: true,
-        message: retryMailSent
-          ? `User '${cleanEmail}' was already invited (role ${existingRole}); record repaired and invitation email re-sent.${retryAccountPart}`
-          : `User '${cleanEmail}' was already invited (role ${existingRole}); record repaired. No email could be sent (SMTP not configured or send failed) — use Reset password or ask them to use "Forgot password" on the login page.${retryAccountPart}`,
+        message: `User '${cleanEmail}' was already invited (role ${existingRole}); record repaired.${retryAccountPart}`,
         user: shapeAdminUser(existing.data),
         already_existed: true,
         password_email_sent: retryAuth.mailSent,
-        invite_email_sent: retryMailSent,
+        invite_email_sent: false,
       });
     }
-    // 1. Catalyst login account + platform password email (best-effort —
-    // registerUser alone sends no reliable mail; resetPassword does).
+    // 1. Catalyst login account (best-effort). Single-mail rule: the member
+    // gets EXACTLY ONE mail — Catalyst's own registerUser confirm mail.
+    // No resetPassword mail, no SMTP welcome mail on invites.
     const auth = await ensureAuthAccount(catalystApp, {
       email: cleanEmail,
       firstName: String(name || '').trim().split(' ')[0] || cleanEmail.split('@')[0],
       lastName: String(name || '').trim().split(' ').slice(1).join(' ') || '',
-    });
+    }, { passwordMail: false });
     const catalystInvited = auth.created || auth.exists;
-    let catalystNote = '';
+    let accountNote = '';
     if (auth.failed) {
-      catalystNote = `Login account not created (${auth.detail || 'unknown error'}) — invite them from console Authentication; the role below still applies on first login.`;
-    } else if (!auth.mailSent) {
-      catalystNote = 'Platform password email was not sent — use Reset password or console Invite.';
+      accountNote = ` Login account not created (${auth.detail || 'unknown error'}) — invite them from console Authentication; the role below still applies on first login.`;
+    } else if (auth.exists) {
+      accountNote = ' A login account with this email already exists — ask them to sign in (or use "Forgot password" if needed); no new email was sent.';
     }
     // 2. POS roster entry (source of truth for role + lifecycle).
     const actorEmail = String(orgUserContext.user.email || orgUserContext.user.email_id || '');
@@ -9597,32 +9655,27 @@ app.post('/api/admin/users', async (req, res) => {
       orgId: callerOrgId,
       displayName: String(name || '').trim() || cleanEmail.split('@')[0],
     });
-    // Welcome mail via store SMTP (registerUser itself sends no mail).
-    const storeName = String((orgUserContext.org && orgUserContext.org.org_name) || 'CloudHub POS');
-    const inviteEmailSent = await sendInviteEmail(catalystApp, req, {
-      to: cleanEmail,
-      name: String(name || '').trim(),
-      role: wantRole,
-      orgName: storeName,
-      invitedBy: actorEmail,
-      isReminder: false,
-    });
-    const fallbackNote = catalystNote !== '' ? ` ${catalystNote}` : '';
+    // No SMTP welcome mail on invites (single-mail rule) — the registerUser
+    // confirm mail is the only email the member receives.
+    const confirmNote = auth.created
+      ? ' Catalyst emailed them a confirmation link to set their password (the only email sent).'
+      : '';
     res.status(201).json({
       success: true,
-      message: inviteEmailSent
-        ? `Invitation email sent to ${cleanEmail} with role ${wantRole}.`
-        : `User ${cleanEmail} created with role ${wantRole}, but no invitation email could be sent (SMTP not configured or send failed).${fallbackNote} Ask them to use "Forgot password" on the login page to set a password.`,
+      message: `User ${cleanEmail} invited with role ${wantRole}.${confirmNote}${accountNote}`,
       user: shapeAdminUser(record),
       catalyst_invited: catalystInvited,
       password_email_sent: auth.mailSent,
-      invite_email_sent: inviteEmailSent,
+      invite_email_sent: false,
     });
   } catch (error) {
     console.error('Error creating admin user:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
-});
+}
+app.post('/api/admin/users', handleInviteUser);
+// Legacy alias: older UI builds call POST /users/invite — same Admin-only flow.
+app.post('/api/users/invite', handleInviteUser);
 
 /** PUT /api/admin/users/:id — profile fields (Admin/Manager, Admin accounts need Admin). */
 app.put('/api/admin/users/:id', async (req, res) => {
@@ -10277,6 +10330,18 @@ async function getCompanyProfile(catalystApp, orgId) {
     }
   }
   const str = (v) => (v === undefined || v === null ? '' : String(v));
+  // Logo self-healing: profile read under one org prefix, upload saved
+  // under another (org_default vs real org). Adopt any stratus logo ref
+  // so Settings shows the image instead of "No logo yet".
+  if (s.company_logo_file_id === undefined || String(s.company_logo_file_id || '') === '') {
+    const adoptedLogo = await findAnyLogoRef(catalystApp);
+    if (adoptedLogo) {
+      s.company_logo_file_id = adoptedLogo.ref;
+      if (s.company_logo_mime === undefined) s.company_logo_mime = adoptedLogo.mime;
+      if (s.company_logo_name === undefined) s.company_logo_name = adoptedLogo.name;
+      s.profile_source = s.profile_source || `adopted-logo:${adoptedLogo.source}`;
+    }
+  }
   const profile = {
     company_name: str(s.company_name ?? s.store_name),
     legal_name: str(s.company_legal_name ?? s.legal_name ?? s.company),
@@ -10713,6 +10778,22 @@ function stratusAssetsBucket(catalystApp) {
   return catalystApp.stratus().bucket(STRATUS_ASSETS_BUCKET);
 }
 
+/**
+ * App-level (admin) Stratus handle — bypasses end-user bucket policies.
+ * Auth checks stay on the user-context `catalystApp`; the actual bucket
+ * I/O retries here on 403/access_forbidden because `initialize(req)`
+ * evaluates Stratus policies against the App User ZUID, which fails for
+ * virtual/roster users even when the bucket name + policy are correct.
+ */
+function stratusAdminBucket() {
+  return catalyst.initialize().stratus().bucket(STRATUS_ASSETS_BUCKET);
+}
+
+function isAccessForbidden(err) {
+  const msg = String((err && err.message) || err || '');
+  return err && (err.status === 403 || err.code === 'access_forbidden' || /access_forbidden|denied by resource access policy/i.test(msg));
+}
+
 function companyLogoKey(orgId, ext) {
   const safeOrg = String(orgId || 'org_default').replace(/[^a-zA-Z0-9_-]/g, '_');
   return `company/${safeOrg}/logo.${ext}`;
@@ -10734,11 +10815,18 @@ async function stratusUploadBuffer(catalystApp, key, buffer, mime) {
   const safeName = String(key.split('/').pop() || 'logo');
   const tmpPath = path.join(os.tmpdir(), `stratus-${Date.now()}-${safeName}`);
   await fs.promises.writeFile(tmpPath, buffer);
+  const putWith = (bucket, streamFactory) => bucket.putObject(key, streamFactory(), {
+    overwrite: true,
+    contentType: mime,
+  });
   try {
-    await stratusAssetsBucket(catalystApp).putObject(key, fs.createReadStream(tmpPath), {
-      overwrite: true,
-      contentType: mime,
-    });
+    try {
+      await putWith(stratusAssetsBucket(catalystApp), () => fs.createReadStream(tmpPath));
+    } catch (e) {
+      if (!isAccessForbidden(e)) throw e;
+      console.warn('[LOGO] Stratus put denied for user context, retrying with app context:', e.message);
+      await putWith(stratusAdminBucket(), () => fs.createReadStream(tmpPath));
+    }
   } finally {
     await fs.promises.unlink(tmpPath).catch(() => {});
   }
@@ -10746,23 +10834,37 @@ async function stratusUploadBuffer(catalystApp, key, buffer, mime) {
 
 /** Download a Stratus object key to a Buffer (getObject → Readable). */
 async function stratusDownloadBuffer(catalystApp, key) {
-  const stream = await stratusAssetsBucket(catalystApp).getObject(key);
-  if (!stream) return null;
-  if (Buffer.isBuffer(stream)) return stream.length > 0 ? stream : null;
-  const chunks = [];
-  await new Promise((resolve, reject) => {
-    stream.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
-    stream.on('end', resolve);
-    stream.on('error', reject);
-  });
-  const out = Buffer.concat(chunks);
-  return out.length > 0 ? out : null;
+  const toBuffer = async (stream) => {
+    if (!stream) return null;
+    if (Buffer.isBuffer(stream)) return stream.length > 0 ? stream : null;
+    const chunks = [];
+    await new Promise((resolve, reject) => {
+      stream.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+    const out = Buffer.concat(chunks);
+    return out.length > 0 ? out : null;
+  };
+  try {
+    return await toBuffer(await stratusAssetsBucket(catalystApp).getObject(key));
+  } catch (e) {
+    if (!isAccessForbidden(e)) throw e;
+    console.warn('[LOGO] Stratus get denied for user context, retrying with app context:', e.message);
+    return await toBuffer(await stratusAdminBucket().getObject(key));
+  }
 }
 
 /** Best-effort Stratus delete. Never throws. */
 async function stratusDeleteKey(catalystApp, key) {
   try {
-    await stratusAssetsBucket(catalystApp).deleteObject(key);
+    try {
+      await stratusAssetsBucket(catalystApp).deleteObject(key);
+    } catch (e) {
+      if (!isAccessForbidden(e)) throw e;
+      console.warn('[LOGO] Stratus delete denied for user context, retrying with app context:', e.message);
+      await stratusAdminBucket().deleteObject(key);
+    }
     return true;
   } catch (e) {
     console.warn('[LOGO] Stratus delete skipped:', e.message);
@@ -10773,12 +10875,45 @@ async function stratusDeleteKey(catalystApp, key) {
 /**
  * Resolve the stored logo reference to bytes. Stratus-first with legacy
  * FileStore fallback. Returns { bytes, mime } (bytes null when absent).
+ * Self-healing: if this org has no logo ref (org_default vs real-org
+ * mismatch after onboarding), adopt any stratus logo ref in the table.
  */
+async function findAnyLogoRef(catalystApp) {
+  try {
+    const r = await catalystApp.zcql().executeZCQLQuery(
+      `SELECT config_key, config_value FROM Configurations LIMIT 300`
+    );
+    const rows = (r || []).map((x) => x.Configurations).filter(Boolean);
+    const hit = rows.find((row) =>
+      String(row.config_key || '').endsWith('_setting_company_logo_file_id') &&
+      String(row.config_value || '').startsWith('stratus:')
+    );
+    if (!hit) return null;
+    const prefix = String(hit.config_key).slice(0, -'company_logo_file_id'.length);
+    const val = (suffix) => {
+      const row = rows.find((x) => String(x.config_key || '') === `${prefix}${suffix}`);
+      return row ? String(row.config_value || '') : '';
+    };
+    return {
+      ref: String(hit.config_value),
+      mime: val('company_logo_mime') || 'image/png',
+      name: val('company_logo_name'),
+      source: `${prefix}*`,
+    };
+  } catch (e) { return null; }
+}
+
 async function getCompanyLogoBytes(catalystApp, orgId) {
   const booksService = new ZohoBooksService(catalystApp, null);
-  const ref = await booksService.getConfig(`org_${orgId}_setting_company_logo_file_id`);
-  const mime = (await booksService.getConfig(`org_${orgId}_setting_company_logo_mime`)) || 'image/png';
-  if (!ref || !logoRefIsStratus(ref)) return { bytes: null, mime };
+  let ref = await booksService.getConfig(`org_${orgId}_setting_company_logo_file_id`);
+  let mime = (await booksService.getConfig(`org_${orgId}_setting_company_logo_mime`)) || 'image/png';
+  if (!ref || !logoRefIsStratus(ref)) {
+    const adopted = await findAnyLogoRef(catalystApp);
+    if (!adopted) return { bytes: null, mime };
+    console.log(`[LOGO] adopted logo ref from ${adopted.source} for org ${orgId}`);
+    ref = adopted.ref;
+    mime = adopted.mime || mime;
+  }
   try {
     return { bytes: await stratusDownloadBuffer(catalystApp, logoKeyFromRef(ref)), mime };
   } catch (e) {

@@ -22,11 +22,10 @@ export async function getUsers(): Promise<Array<PosUser>> {
 
 /**
  * Invite a user.
- * NOTE: the deployed backend currently exposes GET /api/users,
- * POST /api/users/update-role and POST /api/users/delete (no dedicated
- * invite route). This helper attempts the documented invite endpoint
- * first and surfaces the backend message so the UI can guide the admin
- * (owner creates the account via Catalyst after approval).
+ * Primary path is POST /api/admin/users (Admin-only full flow: Catalyst
+ * login account + roster + OrgUsers + SMTP welcome mail). This legacy
+ * helper hits POST /api/users/invite, a same-flow alias kept for older
+ * builds — the Users page itself invites via createAdminUser below.
  */
 export async function inviteUser(email: string, role: string, name?: string): Promise<{ ok: boolean; message: string }> {
   try {
