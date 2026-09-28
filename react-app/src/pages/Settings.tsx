@@ -495,7 +495,7 @@ export default function Settings() {
   const logoSrc = company.logo_file_id ? `${companyLogoUrl()}?t=${logoTick}` : '';
 
   return (
-    <div>
+    <div className="settings-page">
       <div className="ch-page-head">
         <div>
           <h1 className="ch-page-title">Settings</h1>
@@ -1158,13 +1158,13 @@ export default function Settings() {
         >
           <dl className="settings-zoho">
             <div><dt>Connection</dt><dd>{zoho?.connected === true ? 'Active' : 'Not connected'}</dd></div>
-            <div><dt>Organisation</dt><dd>{health?.books.org_id || zoho?.org_id || '—'}</dd></div>
-            <div><dt>Data centre</dt><dd>{health?.books.dc || zoho?.dc || '—'}</dd></div>
+            <div><dt>Organisation</dt><dd>{health?.books?.org_id || zoho?.org_id || '—'}</dd></div>
+            <div><dt>Data centre</dt><dd>{health?.books?.dc || zoho?.dc || '—'}</dd></div>
             <div><dt>Developer keys</dt><dd>{zoho?.master_configured === true ? 'Configured' : 'Missing'}</dd></div>
-            <div><dt>Token expires</dt><dd>{health?.books.token_expires_at ? health.books.token_expires_at.slice(0, 16).replace('T', ' ') : '—'}</dd></div>
-            <div><dt>Last sync</dt><dd>{health?.books.last_sync_at ? health.books.last_sync_at.slice(0, 16).replace('T', ' ') : '—'}</dd></div>
-            <div><dt>Last sync result</dt><dd>{health?.books.last_sync_result || '—'}</dd></div>
-            <div><dt>SMTP engine</dt><dd>{health?.smtp.configured === true ? 'Configured' : 'Not configured'}</dd></div>
+            <div><dt>Token expires</dt><dd>{typeof health?.books?.token_expires_at === 'string' ? health.books.token_expires_at.slice(0, 16).replace('T', ' ') || '—' : '—'}</dd></div>
+            <div><dt>Last sync</dt><dd>{typeof health?.books?.last_sync_at === 'string' ? health.books.last_sync_at.slice(0, 16).replace('T', ' ') || '—' : '—'}</dd></div>
+            <div><dt>Last sync result</dt><dd>{health?.books?.last_sync_result || '—'}</dd></div>
+            <div><dt>SMTP engine</dt><dd>{health?.smtp === undefined ? 'Status unavailable' : health.smtp?.configured === true ? 'Configured' : 'Not configured'}</dd></div>
           </dl>
           {isAdmin && (
             <div className="ch-row" style={{ marginTop: 12 }}>

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Bell, Search, Zap, ShoppingCart, Package, Users, FileBarChart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { logout } from '../../services/catalystAuth';
+import { companyLogoUrl, getCompanyProfile } from '../../services/settingsService';
 
 interface HeaderProps {
   title: string;
@@ -27,12 +28,21 @@ export default function Header({ title, module, onMenu }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [qaOpen, setQaOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [logoSrc, setLogoSrc] = useState('');
   const notifRef = useRef<HTMLDivElement | null>(null);
   const qaRef = useRef<HTMLDivElement | null>(null);
   const userRef = useRef<HTMLDivElement | null>(null);
 
   const sub = MODULE_SUB[module] ?? 'CloudHub POS · Enterprise';
   const initial = (user?.name ?? user?.email ?? 'U').trim().charAt(0).toUpperCase() || 'U';
+
+  useEffect(() => {
+    let live = true;
+    getCompanyProfile().then((company) => {
+      if (live) setLogoSrc(company.logo_file_id ? companyLogoUrl() : company.logo_url || '');
+    }).catch(() => { if (live) setLogoSrc(''); });
+    return () => { live = false; };
+  }, [location.pathname, location.hash]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -139,7 +149,10 @@ export default function Header({ title, module, onMenu }: HeaderProps) {
 
         <div className="ch-notif-wrap" ref={userRef}>
           <button type="button" className="ch-profile" onClick={() => { setUserOpen((v) => !v); setNotifOpen(false); setQaOpen(false); }} aria-label="User menu" aria-expanded={userOpen} title="Account">
-            <span className="ch-avatar" aria-hidden="true">{initial}</span>
+            <span className="ch-avatar" aria-hidden="true">
+              <span className={logoSrc ? 'ch-profile-initial has-logo' : 'ch-profile-initial'}>{initial}</span>
+              {logoSrc && <img className="ch-profile-logo" src={logoSrc} alt="" onError={() => setLogoSrc('')} />}
+            </span>
             <span className="ch-profile-meta">
               <b>{user?.name ?? 'Store owner'}</b>
               <span>{role === '' ? '…' : role}</span>

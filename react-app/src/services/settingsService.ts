@@ -186,7 +186,8 @@ export interface IntegrationHealth {
     last_sync_at: string;
     last_sync_result: string;
   };
-  smtp: { configured: boolean };
+  // Older deployments and Books-only health responses omit SMTP entirely.
+  smtp?: { configured: boolean };
 }
 
 export async function getIntegrationHealth(): Promise<IntegrationHealth | null> {

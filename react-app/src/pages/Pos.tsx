@@ -16,6 +16,7 @@ import { currency, number, isLowStock, isOutOfStock } from '../utils/format';
 import { calcTotals, type TaxOpts } from '../utils/tax';
 import type { Customer, Product } from '../types';
 import './Pos.css';
+import ProductImage from '../components/ui/ProductImage';
 
 interface CartLine {
   product: Product;
@@ -512,7 +513,8 @@ export default function Pos() {
                       disabled={out}
                       title={out ? 'Out of stock' : `Add ${p.name} to cart`}
                     >
-                      <span className="ch-thumb pos-thumb" aria-hidden="true">{p.name.charAt(0).toUpperCase()}</span>
+                      <span className="ch-thumb pos-thumb pos-mobile-thumb" aria-hidden="true">{p.name.charAt(0).toUpperCase()}</span>
+                      <span className="desktop-product-media"><ProductImage product={p} className="ch-thumb pos-thumb" /></span>
                       <span className="pos-card-name">{p.name}</span>
                       <span className="pos-card-meta">{p.sku} · {number(p.stock)} left</span>
                       <span className="pos-card-row">

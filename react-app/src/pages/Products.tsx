@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { categoryNameOf, currency, isLowStock, isOutOfStock, number, profitPerUnit, reorderLevelOf, stockValueOf, productCategoryIds, productCategoryNames } from '../utils/format';
 import type { Category, Product, Warehouse } from '../types';
 import './Products.css';
+import ProductImage from '../components/ui/ProductImage';
 
 interface ProductForm {
   name: string;
@@ -814,11 +815,7 @@ export default function Products() {
               return (
                 <article key={`${rowId(p)}-${i}`} className="prod-card reveal" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
                   <div className="prod-card-top">
-                    {p.image_id ? (
-                      <img className="prod-grid-img" src={productImageUrl(rowId(p))} alt="" aria-hidden="true" loading="lazy" />
-                    ) : (
-                      <span className="ch-thumb prod-big" aria-hidden="true">{p.name.charAt(0).toUpperCase()}</span>
-                    )}
+                    <ProductImage product={p} className={p.image_id || p.image_url ? 'prod-grid-img' : 'ch-thumb prod-big'} />
                     {out ? <StatusBadge status="Out of stock" /> : low ? <StatusBadge status="Low stock" /> : <StatusBadge status={p.status || 'Active'} />}
                     <label className="prod-check"><input type="checkbox" className="ch-checkbox" aria-label={`Select ${p.name}`} checked={selected.has(rowId(p))} onChange={() => toggleSelect(rowId(p))} /></label>
                   </div>
