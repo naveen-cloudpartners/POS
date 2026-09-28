@@ -6,6 +6,7 @@ import './styles/ui.css'
 import './styles/workspace.css'
 import './styles/muster-type.css'
 import App from './App.tsx'
+import './styles/responsive.css'
 import MobileAccessGate from './components/mobile/MobileAccessGate.tsx'
 
 createRoot(document.getElementById('root')!).render(

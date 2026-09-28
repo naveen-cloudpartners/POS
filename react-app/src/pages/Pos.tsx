@@ -437,6 +437,11 @@ export default function Pos() {
       )}
 
       <div className="pos-layout">
+        <button type="button" className="pos-mobile-cart-link ch-btn ch-btn-primary" onClick={() => {
+          const cart = document.getElementById('pos-current-sale');
+          cart?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          cart?.focus({ preventScroll: true });
+        }}><ShoppingBag size={18} /> View cart · {itemCount} items · {currency(totals.total)}</button>
         {/* LEFT — categories + barcode */}
         <aside className="pos-col pos-left reveal" style={{ animationDelay: '40ms' }}>
           <div className="pos-panel">
@@ -524,7 +529,7 @@ export default function Pos() {
         </section>
 
         {/* RIGHT — floating glass cart */}
-        <aside className="pos-col pos-right reveal" style={{ animationDelay: '140ms' }}>
+        <aside id="pos-current-sale" tabIndex={-1} className="pos-col pos-right reveal" style={{ animationDelay: '140ms' }}>
           <div className="pos-cart">
             <div className="pos-cart-head">
               <div>

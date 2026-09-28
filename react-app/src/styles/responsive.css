@@ -1,0 +1,94 @@
+/* Responsive presentation, loaded after page styles. */
+.pos-mobile-cart-link { display: none; }
+@media (max-width: 1024px) {
+  .ch-app.no-panel .ch-main, .ch-app.panel-collapsed .ch-main, .ch-app .ch-main { margin-left: 0; }
+  .ch-app { background: #f5f7fc; }
+  .ch-app .ch-bg-decor { display: none; }
+  .ch-app .ch-content { padding: 20px 20px 40px; }
+  .ch-app .ch-header { top: 0; margin: 0; border-radius: 0; padding: 12px 20px; box-shadow: var(--ch-shadow-sm); }
+  .ch-app .ch-header-search, .ch-app .ch-env-pill { display: none; }
+  .ch-app .ch-header-right { gap: 8px; }
+  .ch-app .ch-profile-meta { max-width: 110px; overflow: hidden; }
+  .ch-app .ch-btn, .ch-app .ch-icon-btn, .ch-app .ch-modal-x, .ch-app .ch-panel-link { min-height: 44px; }
+  .ch-app .ch-icon-btn, .ch-app .ch-modal-x { min-width: 44px; }
+  .ch-app .ch-input, .ch-app .ch-select, .ch-app .ch-search input { min-height: 44px; }
+  .ch-app .ch-card, .ch-app .ch-stat { box-shadow: var(--ch-shadow-sm); }
+  .ch-app .ch-card-body { padding: 18px; }
+  .ch-app .ch-grid-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .ch-app .ch-stat > div { min-width: 0; }
+  .ch-app .ch-stat-value { font-size: 22px; overflow-wrap: anywhere; }
+  .ch-app .ch-table-wrap { max-width: 100%; overscroll-behavior-x: contain; }
+  .ch-app .ch-drawer-nav { width: min(360px, calc(100vw - 24px)); }
+  .ch-app .ch-drawer-nav .ch-panel-switcher { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .ch-app .ch-sw-btn { aspect-ratio: auto; min-height: 66px; flex-direction: column; gap: 5px; padding: 8px 2px; }
+  .ch-app .ch-sw-btn span { font-size: 10px; font-weight: 600; overflow-wrap: anywhere; }
+  .ch-app .ch-panel-head, .ch-app .ch-panel-switcher, .ch-app .ch-panel-foot { flex-shrink: 0; }
+  .ch-app .ch-panel-nav { min-height: 0; }
+  .ch-app .ch-drawer-body, .ch-app .ch-modal-body { min-height: 0; overscroll-behavior: contain; }
+  .ch-app .ch-drawer-foot { flex-wrap: wrap; }
+  .ch-app .settings-3col, .ch-app .ws-grid-2, .ch-app .reports-grid { grid-template-columns: minmax(0, 1fr); }
+  .ch-app .pos-layout { grid-template-columns: minmax(0, 1fr) minmax(300px, .85fr); gap: 14px; }
+  .ch-app .pos-left { grid-column: 1 / -1; }
+  .ch-app .pos-right { grid-column: 2; min-width: 0; }
+  .ch-app .pos-center { min-width: 0; }
+  .ch-app .pos-cats { flex-direction: row; overflow-x: auto; max-height: none; margin: 10px 0; }
+  .ch-app .pos-cat { flex: 0 0 auto; width: auto; min-width: 120px; min-height: 44px; }
+  .ch-app .pos-cart { position: static; max-height: none; }
+  .ch-app .pos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; }
+  .ch-app .pos-card { min-width: 0; padding: 12px; }
+  .ch-app .pos-card-row { flex-wrap: wrap; gap: 4px; }
+  .ch-app .pos-search, .ch-app .pos-search input { width: 100%; min-width: 0; }
+  .ch-app .pos-lines li { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: 'main main main' 'qty total remove'; }
+  .ch-app .pos-qty .ch-btn { min-width: 40px; padding: 8px; }
+  .ch-app .pos-pay { flex-wrap: wrap; }
+  .ch-app .pos-pay-btn { min-height: 44px; }
+}
+@media (max-width: 680px) {
+  .ch-app .ch-content { padding: 16px 12px calc(32px + env(safe-area-inset-bottom)); }
+  .ch-app .ch-header { padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); gap: 8px; }
+  .ch-app .ch-header-sub, .ch-app .ch-module-chip, .ch-app .ch-crumbs, .ch-app .ch-header-right > .ch-badge, .ch-app .ch-profile-meta { display: none; }
+  .ch-app .ch-header > div:first-of-type { display: block; flex: 1; }
+  .ch-app .ch-header-title { font-size: 15px; }
+  .ch-app .ch-header-right .ch-btn-primary { display: none; }
+  .ch-app .ch-notif-pop, .ch-app .ch-qa-pop { position: fixed; top: 72px; left: 12px; right: 12px; width: auto; max-height: 70dvh; overflow: auto; }
+  .ch-app .ch-page-head { gap: 12px; margin-bottom: 16px; }
+  .ch-app .ch-page-title { font-size: 24px; }
+  .ch-app .ch-page-actions { width: 100%; gap: 8px; }
+  .ch-app .ch-page-actions .ch-btn { flex: 1 1 auto; white-space: normal; }
+  .ch-app .ch-stat { padding: 12px; gap: 8px; min-height: 100px; }
+  .ch-app .ch-stat-icon { display: none; }
+  .ch-app .ch-stat-label { font-size: 10px; }
+  .ch-app .ch-stat-value { font-size: 20px; }
+  .ch-app .ch-stat-spark { display: none; }
+  .ch-app .ch-card-body { padding: 14px; gap: 16px; }
+  .ch-app .ch-card-head { padding: 14px; flex-wrap: wrap; }
+  .ch-app .ch-toolbar { padding: 10px; gap: 10px; }
+  .ch-app .ch-search { min-width: 0; width: 100%; max-width: none; flex-basis: 100%; }
+  .ch-app .ch-filterbar { width: 100%; }
+  .ch-app .ch-filterbar .ch-select { min-width: 0; flex: 1 1 120px; max-width: 100%; }
+  .ch-app .ch-input, .ch-app .ch-select, .ch-app .ch-textarea, .ch-app .ch-search input, .ch-app .pos-search input { font-size: 16px; }
+  .ch-app .ch-form-grid, .ch-app .settings-grid .ch-form-grid, .ch-app .settings-grid .settings-2col { grid-template-columns: minmax(0, 1fr); }
+  .ch-app .ch-pagination { flex-wrap: wrap; }
+  .ch-app .ch-alert { overflow-wrap: anywhere; }
+  .ch-app .ch-modal-backdrop { padding: 0; align-items: flex-end; }
+  .ch-app .ch-modal { border-radius: 20px 20px 0 0; max-height: 94dvh; }
+  .ch-app .ch-modal-head, .ch-app .ch-modal-body { padding: 16px; }
+  .ch-app .ch-modal-foot { padding: 12px 16px max(12px, env(safe-area-inset-bottom)); }
+  .ch-app .ch-modal-foot .ch-btn { flex: 1 1 auto; white-space: normal; }
+  .ch-app .ch-drawer { inset: 0; width: 100%; border-radius: 0; }
+  .ch-app .prod-grid, .ch-app .warehouse-grid, .ch-app .cust-layout, .ch-app .dash-grid, .ch-app .dash-grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .ch-app .prod-check { opacity: 1; }
+  .ch-app .prod-card-name, .ch-app .ws-dl dd { overflow-wrap: anywhere; }
+  .ch-app .ws-dl dd { text-align: right; min-width: 0; }
+  .ch-app .reports-bar-row { grid-template-columns: 64px minmax(0, 1fr) auto; gap: 8px; }
+  .ch-app .pos-layout { grid-template-columns: minmax(0, 1fr); }
+  .ch-app .pos-right, .ch-app .pos-left { grid-column: 1; }
+  .ch-app .pos-panel { padding: 14px; }
+  .ch-app .pos-left .pos-panel-sub { display: none; }
+  .ch-app .pos-mobile-cart-link { display: flex; position: sticky; top: 68px; z-index: 5; width: 100%; white-space: normal; }
+  .ch-app #pos-current-sale { scroll-margin-top: 130px; }
+  .ch-app .pos-split-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .login-features-list, .login-stats-grid, .org-graphic, .org-benefits { display: none; }
+  .login-page .login-brand-inner { padding: 16px; }
+  .org-page .org-input { font-size: 16px; }
+}

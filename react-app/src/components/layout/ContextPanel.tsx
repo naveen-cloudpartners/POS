@@ -78,6 +78,7 @@ export default function ContextPanel({
                 }}
               >
                 <WIcon size={17} aria-hidden="true" />
+                <span>{ws.label}</span>
               </NavLink>
             );
           })}
