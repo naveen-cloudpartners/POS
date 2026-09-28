@@ -11,9 +11,8 @@ import Loader from '../components/ui/Loader';
 import ErrorState from '../components/ui/ErrorState';
 import EmptyState from '../components/ui/EmptyState';
 import { useAuth } from '../context/AuthContext';
-import { exportOrdersCsv, getOrderDetail, getOrders, voidOrder, type PosReceipt } from '../services/orderService';
-import { fetchPrintJob, type PrintTemplate } from '../services/printService';
-import { billHtml, cancelHtml, kotHtml, openPrintWindow, type CancelChitPayload } from '../utils/print';
+import { exportOrdersCsv, getOrderDetail, getOrders, voidOrder } from '../services/orderService';
+import { fetchPrintJob, getPrinters, sendPrintJob, type Printer as PrinterConfig, type PrintJob, type PrintTemplate } from '../services/printService';
 import { getCustomers } from '../services/customerService';
 import { getUsers } from '../services/userService';
 import { currency, formatDate, number } from '../utils/format';
@@ -128,6 +127,7 @@ export default function Orders() {
   useEffect(() => {
     getCustomers().catch(() => [] as Array<Customer>).then(setCustomers).catch(() => undefined);
     getUsers().then(setUsers).catch(() => setUsers([]));
+    getPrinters().then(setTerminalPrinters).catch(() => undefined);
   }, []);
 
   // Stay in sync with workspace deep links (e.g. pipeline → ?status=synced).
@@ -187,6 +187,10 @@ export default function Orders() {
   };
 
   const [printBusy, setPrintBusy] = useState(false);
+  // Preloaded printer list: reprint payloads arrive async (fetchPrintJob),
+  // so resolving the printer from state keeps the browser-popup path as
+  // close to the click as possible instead of adding another await.
+  const [terminalPrinters, setTerminalPrinters] = useState<Array<PrinterConfig>>([]);
 
   const reprint = (orderId: string, template: PrintTemplate) => {
     setPrintBusy(true);
@@ -194,30 +198,15 @@ export default function Orders() {
     fetchPrintJob(orderId, template)
       .then((res) => {
         const p = res.payload as Record<string, unknown>;
-        let ok = false;
-        if (template === 'bill' && p.receipt) {
-          ok = openPrintWindow(`Receipt ${orderId}`, billHtml(p.receipt as PosReceipt));
-        } else if (template === 'cancel') {
-          ok = openPrintWindow(`Cancel ${orderId}`, cancelHtml(p as unknown as CancelChitPayload));
-        } else {
-          const chit = p as { groups?: Array<{ station: string; items: Array<{ name: string; sku: string; qty: number }> }> };
-          const body = (chit.groups ?? [])
-            .map((g) => kotHtml({
-              kotNumber: `${orderId} · ${g.station}`,
-              station: g.station,
-              items: g.items,
-              orderId,
-              invoiceNumber: '',
-              customerName: '',
-              roomNumber: '',
-              kitchenNotes: '',
-              cashier: '',
-              firedAt: '',
-            }))
-            .join('<hr/>');
-          ok = openPrintWindow(`KOT ${orderId}`, body === '' ? '<p>No station lines.</p>' : body);
-        }
-        if (!ok) setError('Popup blocked — allow popups to print.');
+        const station = template === 'bill' ? 'counter' : template === 'bar' ? 'bar' : 'kitchen';
+        const job: PrintJob = {
+          jobId: res.jobId, template, station, printerId: null, printerName: `${station} (default)`, copies: 1,
+          payload: template === 'bill' ? { receipt: p.receipt } : p as PrintJob['payload'],
+        };
+        getPrinters().then(setTerminalPrinters).catch(() => undefined);
+        sendPrintJob(job, terminalPrinters.find((printer) => printer.station === station && printer.enabled) ?? null)
+          .then((result) => { if (!result.ok) setError(result.error ?? 'Reprint failed.'); })
+          .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Reprint failed'));
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Reprint failed'))
       .finally(() => setPrintBusy(false));

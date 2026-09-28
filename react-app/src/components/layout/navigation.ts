@@ -162,7 +162,6 @@ export const WORKSPACES: Array<Workspace> = [
       { id: 'set-admin', label: 'Administration', to: '/settings#administration', roles: ['Admin'] },
       { id: 'set-taxes', label: 'Taxes', to: '/settings#taxes', roles: ['Admin'] },
       { id: 'set-notify', label: 'Notifications', to: '/settings#notifications', roles: ['Admin'] },
-      { id: 'set-email', label: 'SMTP email', to: '/settings#email', roles: ['Admin'] },
       { id: 'set-integrations', label: 'Integrations', to: '/settings#integrations', roles: ['Admin'] },
       { id: 'set-payments', label: 'Payments', to: '/settings#payments', roles: ['Admin'] },
       { id: 'set-printers', label: 'Printers', to: '/settings#printers', roles: ['Admin'] },
@@ -171,7 +170,7 @@ export const WORKSPACES: Array<Workspace> = [
     sections: [
       { label: 'Business Settings', childIds: ['set-general', 'set-taxes'] },
       { label: 'Store Operations', childIds: ['set-inventory', 'set-loyalty', 'set-reporting', 'set-admin'] },
-      { label: 'Store Configuration', childIds: ['set-notify', 'set-email', 'set-integrations', 'set-payments', 'set-printers', 'set-automation'] },
+      { label: 'Store Configuration', childIds: ['set-notify', 'set-integrations', 'set-payments', 'set-printers', 'set-automation'] },
     ],
   },
 ];

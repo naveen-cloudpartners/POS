@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Building2, Package, Star, Warehouse as WarehouseIcon } from 'lucide-react';
 import Card from '../components/ui/Card';
-import Table from '../components/ui/Table';
 import Modal from '../components/ui/Modal';
 import SearchBar from '../components/ui/SearchBar';
 import FilterBar from '../components/ui/FilterBar';
@@ -290,10 +289,11 @@ export default function Warehouses() {
             action={manageable ? <button type="button" className="ch-btn ch-btn-primary ch-btn-sm" onClick={openAdd}>Add warehouse</button> : undefined}
           />
         ) : (
-          <div className="ws-grid-2" style={{ marginTop: 4 }}>
+          <div className="warehouse-grid">
             {filtered.map((w) => (
               <Card
                 key={String(w.ROWID ?? w.code)}
+                className="warehouse-card"
                 title={w.name}
                 subtitle={`${w.code}${w.is_default === true ? ' · Default' : ''}`}
                 hoverable
@@ -311,33 +311,13 @@ export default function Warehouses() {
                   <div><dt>Low stock lines</dt><dd>{number(w.low_stock_count ?? 0)}</dd></div>
                   {(w.contact_person ?? '') !== '' && <div><dt>Contact</dt><dd>{w.contact_person}{w.contact_phone ? ` · ${w.contact_phone}` : ''}</dd></div>}
                 </dl>
-                <div className="ch-row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
-                  <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" onClick={() => setDetail(w)}>
-                    Details
-                  </button>
-                  <Link to={`/inventory?warehouse=${encodeURIComponent(String(w.ROWID ?? ''))}`} className="ch-btn ch-btn-ghost ch-btn-sm">
-                    View stock <ArrowRight size={13} />
-                  </Link>
-                  {manageable && (
-                    <>
-                      <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" onClick={() => openEdit(w)} disabled={busy}>
-                        Edit
-                      </button>
-                      <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" onClick={() => toggleActive(w)} disabled={busy}>
-                        {(w.status ?? 'Active') === 'Active' ? 'Deactivate' : 'Reactivate'}
-                      </button>
-                      {w.is_default !== true && (w.status ?? 'Active') === 'Active' && (
-                        <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" onClick={() => makeDefault(w)} disabled={busy}>
-                          Set default
-                        </button>
-                      )}
-                      {deletable && w.is_default !== true && (
-                        <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" onClick={() => setDeleteTarget(w)} disabled={busy}>
-                          Delete
-                        </button>
-                      )}
-                    </>
-                  )}
+                <div className="warehouse-card-actions">
+                  <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" onClick={() => setDetail(w)}>Details</button>
+                  <Link to={`/inventory?warehouse=${encodeURIComponent(String(w.ROWID ?? ''))}`} className="ch-btn ch-btn-ghost ch-btn-sm">View stock <ArrowRight size={13} /></Link>
+                  {manageable && <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" onClick={() => openEdit(w)} disabled={busy}>Edit</button>}
+                  {manageable && <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" onClick={() => toggleActive(w)} disabled={busy}>{(w.status ?? 'Active') === 'Active' ? 'Deactivate' : 'Reactivate'}</button>}
+                  {manageable && w.is_default !== true && (w.status ?? 'Active') === 'Active' && <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" onClick={() => makeDefault(w)} disabled={busy}>Set default</button>}
+                  {deletable && w.is_default !== true && <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" onClick={() => setDeleteTarget(w)} disabled={busy}>Delete</button>}
                 </div>
               </Card>
             ))}
@@ -448,23 +428,6 @@ export default function Warehouses() {
         </p>
       </Modal>
 
-      <Card title="How warehouses work" subtitle="Backward-compatible multi-location stock" delay={120} style={{ marginTop: 16 }}>
-        <p className="ch-hint" style={{ margin: 0 }}>
-          Existing stock lives in the default warehouse. Adjustments and transfers keep
-          <b> Products.stock = SUM(warehouse quantities) </b>
-          automatically, so Dashboard, POS, Products and Reports never change behavior.
-        </p>
-        <Table
-          columns={[
-            { key: 'w', header: 'Warehouse', render: (w: Warehouse) => <span><span className="ch-cell-main">{w.name}</span><br /><span className="ch-cell-sub">{w.code}</span></span> },
-            { key: 'u', header: 'Units', numeric: true, render: (w: Warehouse) => <b>{number(w.units ?? 0)}</b> },
-            { key: 'v', header: 'Value', numeric: true, render: (w: Warehouse) => currency(w.inventory_value ?? 0) },
-            { key: 's', header: 'Status', render: (w: Warehouse) => <StatusBadge status={w.status ?? 'Active'} /> },
-          ]}
-          rows={filtered}
-          rowKey={(w) => String(w.ROWID ?? w.code)}
-        />
-      </Card>
     </div>
   );
 }

@@ -120,6 +120,34 @@ export default function Inventory() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stockRows, search, filter, warehouseId]);
 
+  // Scope counts to the selected warehouse (but not the current availability
+  // or search filter) so the filter menu describes that warehouse accurately.
+  const warehouseScopeCounts = useMemo(() => {
+    const rows = stockRows.filter((r) => warehouseId === 'all' || String(r.warehouse_id) === warehouseId);
+    const low = rows.filter((r) => r.status === 'Low stock').length;
+    const out = rows.filter((r) => r.status === 'Out of stock').length;
+    const backordered = rows.filter((r) => r.status === 'Backordered').length;
+    return { total: rows.length, low, out, backordered, ok: rows.length - low - out - backordered };
+  }, [stockRows, warehouseId]);
+
+  // Summary cards always describe precisely what the table is showing. When
+  // a warehouse is selected, use its row-level values rather than the global
+  // Products.stock aggregate.
+  const visibleCounts = useMemo(() => {
+    if (warehouseId !== 'all') {
+      const low = warehouseFiltered.filter((r) => r.status === 'Low stock').length;
+      const out = warehouseFiltered.filter((r) => r.status === 'Out of stock').length;
+      const backordered = warehouseFiltered.filter((r) => r.status === 'Backordered').length;
+      const value = warehouseFiltered.reduce((sum, r) => sum + (Number(r.stock_value) || 0), 0);
+      return { low, out, backordered, value };
+    }
+    const low = filtered.filter((p) => Number(p.stock) > 0 && Number(p.stock) <= 10).length;
+    const out = filtered.filter((p) => Number(p.stock) <= 0 && Number(p.stock) >= 0).length;
+    const backordered = filtered.filter((p) => Number(p.stock) < 0).length;
+    const value = filtered.reduce((sum, p) => sum + Number(p.rate || 0) * Number(p.stock || 0), 0);
+    return { low, out, backordered, value };
+  }, [warehouseId, warehouseFiltered, filtered]);
+
   const statusOf = (p: Product): string => {
     const s = Number(p.stock);
     if (s < 0) return 'Backordered';
@@ -202,9 +230,9 @@ export default function Inventory() {
       {error !== '' && <div className="ch-alert ch-alert-error">{error}</div>}
 
       <div className="ch-grid-stats cols-3">
-        <StatCard label="Stock value" value={currency(counts.value)} icon={boxesIcon} />
-        <StatCard label="Low stock" value={number(counts.low)} delta={counts.low > 0 ? 'Reorder soon' : 'All healthy'} deltaTone={counts.low > 0 ? 'down' : 'up'} icon={alertIcon} iconBg="#fef3e2" iconColor="#d97706" />
-        <StatCard label="Out of stock" value={number(counts.out + counts.backordered)} icon={checkIcon} iconBg={counts.out + counts.backordered > 0 ? 'var(--ch-danger-bg)' : 'var(--ch-success-bg)'} iconColor={counts.out + counts.backordered > 0 ? 'var(--ch-danger)' : 'var(--ch-success)'} />
+        <StatCard label="Stock value" value={currency(visibleCounts.value)} icon={boxesIcon} />
+        <StatCard label="Low stock" value={number(visibleCounts.low)} delta={visibleCounts.low > 0 ? 'Reorder soon' : 'All healthy'} deltaTone={visibleCounts.low > 0 ? 'down' : 'up'} icon={alertIcon} iconBg="#fef3e2" iconColor="#d97706" />
+        <StatCard label="Out of stock" value={number(visibleCounts.out + visibleCounts.backordered)} icon={checkIcon} iconBg={visibleCounts.out + visibleCounts.backordered > 0 ? 'var(--ch-danger-bg)' : 'var(--ch-success-bg)'} iconColor={visibleCounts.out + visibleCounts.backordered > 0 ? 'var(--ch-danger)' : 'var(--ch-success)'} />
       </div>
 
       <Card>
@@ -215,11 +243,11 @@ export default function Inventory() {
               {
                 key: 'f', value: filter, ariaLabel: 'Filter by availability', onChange: (v) => setFilter((parseAvailability(v) ?? 'all') as Availability),
                 options: [
-                  { value: 'all', label: `All (${products.length})` },
-                  { value: 'ok', label: `Healthy (${counts.ok})` },
-                  { value: 'low', label: `Low stock (${counts.low})` },
-                  { value: 'out', label: `Out of stock (${counts.out})` },
-                  ...(counts.backordered > 0 ? [{ value: 'backordered', label: `Backordered (${counts.backordered})` }] : []),
+                  { value: 'all', label: `All (${warehouseId === 'all' ? products.length : warehouseScopeCounts.total})` },
+                  { value: 'ok', label: `Healthy (${warehouseId === 'all' ? counts.ok : warehouseScopeCounts.ok})` },
+                  { value: 'low', label: `Low stock (${warehouseId === 'all' ? counts.low : warehouseScopeCounts.low})` },
+                  { value: 'out', label: `Out of stock (${warehouseId === 'all' ? counts.out : warehouseScopeCounts.out})` },
+                  ...((warehouseId === 'all' ? counts.backordered : warehouseScopeCounts.backordered) > 0 ? [{ value: 'backordered', label: `Backordered (${warehouseId === 'all' ? counts.backordered : warehouseScopeCounts.backordered})` }] : []),
                 ],
               },
               ...(perWarehouse ? [{

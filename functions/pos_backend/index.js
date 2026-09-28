@@ -17,7 +17,7 @@ if (!process.env.ZOHO_CLIENT_SECRET)
 console.log('[ENV] ZOHO_CLIENT_ID:', !!process.env.ZOHO_CLIENT_ID);
 console.log('[ENV] ZOHO_CLIENT_SECRET:', !!process.env.ZOHO_CLIENT_SECRET);
 // Build stamp: proves exactly what shipped (cold-start line in logs).
-console.log('[BUILD] pos_backend 2026-09-24 (stratus storage, KOT, LIMIT300, company-reader)');
+console.log('[BUILD] pos_backend 2026-09-28 (stratus, KOT, LIMIT300, company-reader, tax-read, invite-mail1, roster-merge, printers-qz, smtp-kept)');
 
 const express = require('express');
 const axios = require('axios');
@@ -65,6 +65,7 @@ async function ensureMasterCredentials(booksService) {
   } else if (!clientId) {
     console.warn('ZOHO_CLIENT_ID environment variable is not set. OAuth flows will fail until configured.');
   }
+
 
   // Auto-seed SMTP config for OTP email delivery only if environment variables are present
   const smtpHost = await booksService.getConfig('email_smtp_host');
@@ -297,40 +298,36 @@ async function sendSmtpMail(catalystApp, { to, subject, html, text }) {
  * Invitation email for team members (USR-01 mail gap).
  * Catalyst's registerUser API only creates the user record — it never sends
  * a password email (the platform emails only console-issued invites). So we
- * send our own welcome mail via the store SMTP: the member's role, a primary
- * link to the hosted signup page, a secondary sign-in link for existing
- * accounts, and instructions to register with the invited email address.
- * Best-effort: returns true/false, never throws, never blocks the caller.
- * False also means SMTP is not configured yet.
+ * send our own welcome mail via the store SMTP: the member's role, a sign-in
+ * link to the hosted login page, and first-time password instructions
+ * ("Forgot password" on that page emails them a reset link, which acts as
+ * the set-password mail). Best-effort: returns true/false, never throws,
+ * never blocks the caller. False also means SMTP is not configured yet.
  */
 async function sendInviteEmail(catalystApp, req, { to, name, role, orgName, invitedBy, isReminder }) {
   try {
     const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const addressee = esc(String(name || '').trim() || String(to).split('@')[0]);
-    const recipient = esc(to);
     const store = esc(orgName || 'CloudHub POS');
     const roleText = esc(role || 'Cashier');
     const inviter = esc(invitedBy || '');
     const loginUrl = `${getPublicBaseUrl(req)}/__catalyst/auth/login`;
-    const registerUrl = `${getPublicBaseUrl(req)}/__catalyst/auth/signup`;
     const subject = isReminder
       ? `Reminder: join ${store} on CloudHub POS`
       : `You're invited to join ${store} on CloudHub POS`;
     const text =
       `${isReminder ? 'Reminder' : 'Hello'} ${addressee}\n\n` +
       `${inviter !== '' ? `${inviter} invited` : 'You were invited'} you to join ${store} on CloudHub POS with the role: ${roleText}.\n\n` +
-      `Create your account:\n${registerUrl}\n\n` +
-      `Already have an account? Sign in here: ${loginUrl}\n\n` +
-      `Click Create your account above and register with this email address (${recipient}), then sign in — your ${roleText} access for ${store} applies automatically.\n\n` +
+      `Sign in here:\n${loginUrl}\n\n` +
+      `First time signing in? Open the sign-in page above and click "Forgot password" — you will get an email link to set your password.\n\n` +
       `If you did not expect this invitation, you can ignore this email.`;
     const html =
       `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#0f1b33">` +
       `<h2 style="margin:0 0 12px">You're invited to join ${store}</h2>` +
       `<p style="margin:0 0 8px">Hello ${addressee},</p>` +
       `<p style="margin:0 0 8px">${inviter !== '' ? `${inviter} invited` : 'You were invited'} you to join <b>${store}</b> on CloudHub POS with the role: <b>${roleText}</b>.</p>` +
-      `<p style="margin:16px 0"><a href="${registerUrl}" style="display:inline-block;background:#3a76f8;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px">Create your account</a></p>` +
-      `<p style="margin:0 0 8px;font-size:13px;color:#5b6b87">Already have an account? <a href="${loginUrl}">Sign in here</a>.</p>` +
-      `<p style="margin:0 0 8px;font-size:13px;color:#5b6b87">Click <b>Create your account</b> above and register with this email address (${recipient}), then sign in — your <b>${roleText}</b> access for <b>${store}</b> applies automatically.</p>` +
+      `<p style="margin:16px 0"><a href="${loginUrl}" style="display:inline-block;background:#3a76f8;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px">Sign in to CloudHub POS</a></p>` +
+      `<p style="margin:0 0 8px;font-size:13px;color:#5b6b87">First time signing in? Open the sign-in page and click <b>"Forgot password"</b> — you will get an email link to set your password.</p>` +
       `<p style="margin:16px 0 0;font-size:12px;color:#8b98b3">If you did not expect this invitation, you can ignore this email.</p>` +
       `</div>`;
     return await sendSmtpMail(catalystApp, { to, subject, html, text });
@@ -646,21 +643,32 @@ async function getCurrentOrgUser(req, catalystApp) {
   // Try querying OrgUsers and Organizations tables. Matches email-keyed
   // rows (invite rows, the growing majority) first, then numeric Catalyst
   // user ids (legacy console rows) — one query in the common case.
+  // NOTE: no LIMIT 1 — duplicate rows (legacy org_default stamp + real org)
+  // made single-row picks flip orgs between requests, so settings saved to
+  // one prefix "disappeared" on reads from the other. Prefer the real org
+  // deterministically below.
   try {
     let orgUserRows = null;
     if (safeUserEmail !== '') {
       orgUserRows = await safeZcql(catalystApp,
-        `SELECT ROWID, org_id, role, display_name, user_id FROM OrgUsers WHERE user_id = '${safeUserEmail}' LIMIT 1`
+        `SELECT ROWID, org_id, role, display_name, user_id FROM OrgUsers WHERE user_id = '${safeUserEmail}' LIMIT 300`
       );
     }
     if ((!orgUserRows || orgUserRows.length === 0) && safeUserId !== '') {
       orgUserRows = await safeZcql(catalystApp,
-        `SELECT ROWID, org_id, role, display_name, user_id FROM OrgUsers WHERE user_id = '${safeUserId}' LIMIT 1`
+        `SELECT ROWID, org_id, role, display_name, user_id FROM OrgUsers WHERE user_id = '${safeUserId}' LIMIT 300`
       );
     }
 
     if (orgUserRows && orgUserRows.length > 0) {
-      const orgUser = orgUserRows[0].OrgUsers;
+      // Deterministic pick: rows carrying the real org win over legacy
+      // org_default stamps (stable sort keeps original order otherwise).
+      const ranked = [...orgUserRows].sort((a, b) => {
+        const ao = String((a && a.OrgUsers && a.OrgUsers.org_id) || '');
+        const bo = String((b && b.OrgUsers && b.OrgUsers.org_id) || '');
+        return (ao === 'org_default' ? 1 : 0) - (bo === 'org_default' ? 1 : 0);
+      });
+      const orgUser = ranked[0].OrgUsers;
       // Self-heal: converge numeric-id rows to email-keyed rows so the team
       // roster always shows real emails. Cosmetic migration only, best-effort.
       try {
@@ -1188,6 +1196,8 @@ app.get('/api/admin/approve-org', async (req, res) => {
       text: `Hello ${org.owner_name},\n\nYour organization has been approved.\n\nA CloudHub POS account has been created. Please check your inbox and complete account activation.\n\nAfter creating your password you will be able to log in.`
     });
 
+    // hosted Catalyst login (activation mail comes from Catalyst Auth).
+
     return res.status(200).send(adminResultPage({
       title: 'Approved', heading: 'Organization approved',
       message: `“${escHtml(org.organization_name)}” is now <strong>approved</strong>. The Catalyst account for ${escHtml(org.owner_email)} has been created and the owner notified.`,
@@ -1241,6 +1251,7 @@ app.get('/api/admin/reject-org', async (req, res) => {
       status: 'rejected'
     });
     console.log(`[REJECT] Organization rejected: ${org.organization_name} <${org.owner_email}>`);
+
 
     const html =
       `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;background:#f4f7fe;padding:28px 20px;">` +
@@ -1817,13 +1828,26 @@ app.post('/api/users/delete', async (req, res) => {
       return res.status(400).json({ success: false, error: 'You cannot delete your own account.' });
     }
 
-    const userKey = `user_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    const result = await safeZcql(catalystApp, `SELECT ROWID FROM Configurations WHERE config_key = '${userKey}'`);
-    if (result && result.length > 0) {
-      try { await catalystApp.datastore().table('Configurations').deleteRow(result[0].Configurations.ROWID); } catch (e) {}
+    const target = String(email).trim();
+    const userKey = rosterKey(target);
+    // Older clients still call this endpoint when their first request to the
+    // admin lifecycle API is a 404. Keep that fallback complete: remove every
+    // duplicate roster row, revoke OrgUsers, then best-effort delete the
+    // matching Catalyst Authentication login just like DELETE /api/admin/users.
+    const result = await safeZcql(catalystApp,
+      `SELECT ROWID FROM Configurations WHERE config_key = '${sanitizeZcql(userKey)}' LIMIT 300`
+    );
+    const table = catalystApp.datastore().table('Configurations');
+    for (const row of (result || [])) {
+      try { await table.deleteRow(row.Configurations.ROWID); } catch (e) { /* continue removing duplicate rows */ }
     }
-    await deleteOrgUserRows(catalystApp, String(email));
-    res.status(200).json({ success: true, message: 'User removed' });
+    await deleteOrgUserRows(catalystApp, target);
+    const authOutcome = await removeCatalystAuthLogin(catalystApp, target);
+    const roleMessage = `User '${target}' deleted. Role record revoked.`;
+    const message = authOutcome.auth_removed
+      ? `${roleMessage} Login account removed.`
+      : `${roleMessage} Login account still exists (${authOutcome.auth_detail}) — remove it in console Authentication.`;
+    res.status(200).json({ success: true, message, auth_removed: authOutcome.auth_removed, auth_detail: authOutcome.auth_detail });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -3389,6 +3413,16 @@ app.post('/api/orders/:id/return', async (req, res) => {
    PHASE 2 — MISSING BACKEND ENDPOINTS
    ========================================================================== */
 
+/** Return the existing product for an exact non-empty barcode, if any. */
+async function findProductByBarcode(catalystApp, barcode) {
+  const clean = String(barcode ?? '').trim();
+  if (clean === '') return null;
+  const rows = await safeZcql(catalystApp,
+    `SELECT ROWID, name, barcode FROM Products WHERE barcode = '${sanitizeZcql(clean)}' LIMIT 1`
+  );
+  return rows && rows[0] && rows[0].Products ? rows[0].Products : null;
+}
+
 /**
  * POST /api/items
  * Create a new local catalog item in the Catalyst Data Store
@@ -3403,7 +3437,7 @@ app.post('/api/items', async (req, res) => {
 
     if (!requirePermission(orgUserContext, res, 'manage_products', 'Creating products requires Admin or Manager.')) return;
     const { name, sku, rate, stock, category, tax_percentage, books_item_id,
-      cost_price, reorder_level, status, barcode, unit, description, category_id, category_ids } = req.body;
+      cost_price, reorder_level, status, barcode, unit, description, category_id, category_ids, warehouse_id } = req.body;
 
     if (!name || !sku) {
       return res.status(400).json({ success: false, error: 'Name and SKU are required.' });
@@ -3415,6 +3449,33 @@ app.post('/api/items', async (req, res) => {
     );
     if (existing && existing.length > 0) {
       return res.status(409).json({ success: false, error: `SKU '${sku}' already exists.` });
+    }
+    const cleanBarcode = String(barcode ?? '').trim();
+    if (cleanBarcode !== '') {
+      const barcodeMatch = await findProductByBarcode(catalystApp, cleanBarcode);
+      if (barcodeMatch) {
+        return res.status(409).json({ success: false, error: `Barcode '${cleanBarcode}' is already assigned to '${barcodeMatch.name || 'another product'}'.` });
+      }
+    }
+
+    // Initial product stock is a per-warehouse balance. Existing API clients
+    // which omit warehouse_id retain the legacy default-warehouse behavior.
+    let openingWarehouse = null;
+    const rawWarehouseId = warehouse_id === undefined || warehouse_id === null
+      ? '' : String(warehouse_id).trim();
+    if (rawWarehouseId !== '') {
+      openingWarehouse = await findWarehouseById(catalystApp, rawWarehouseId);
+      if (!openingWarehouse) {
+        return res.status(404).json({ success: false, error: 'Selected warehouse was not found.' });
+      }
+      if (String(openingWarehouse.status || 'Active').toLowerCase() !== 'active') {
+        return res.status(400).json({ success: false, error: 'Opening stock must be assigned to an active warehouse.' });
+      }
+    } else {
+      try {
+        const all = await listAllWarehouses(catalystApp);
+        openingWarehouse = all.find((w) => whIsDefault(w)) || null;
+      } catch (e) { /* warehouse mirror remains best-effort for legacy callers */ }
     }
 
     // category_id link (optional for legacy callers, required for new UI).
@@ -3472,20 +3533,19 @@ app.post('/api/items', async (req, res) => {
       cost_price: Number.isFinite(costPrice) && costPrice >= 0 ? costPrice : 0,
       reorder_level: reorderLevel,
       status: STATUS_VALUES.includes(String(status)) ? status : 'Active',
-      barcode: String(barcode ?? '').trim(),
+      barcode: cleanBarcode,
       unit: String(unit ?? 'Piece').trim() || 'Piece',
       description: String(description ?? ''),
     };
 
     const table = catalystApp.datastore().table('Products');
     const row = await table.insertRow(itemData);
-    // Phase 2 mirror (best-effort): new catalog stock belongs to the
-    // default warehouse so SUM(WarehouseStock.quantity) stays correct.
+    // New catalog stock belongs to the chosen warehouse. The product's stock
+    // column remains the aggregate quantity, while WarehouseStock supplies
+    // warehouse-specific inventory and existing warehouse filters.
     try {
-      const all = await listAllWarehouses(catalystApp);
-      const def = all.find((w) => whIsDefault(w));
-      if (def) {
-        await setWarehouseQuantity(catalystApp, String(def.ROWID), String(row.ROWID), itemData.stock, reorderLevel);
+      if (openingWarehouse) {
+        await setWarehouseQuantity(catalystApp, String(openingWarehouse.ROWID), String(row.ROWID), itemData.stock, reorderLevel);
       }
     } catch (e) { /* warehouse mirror is best-effort */ }
     res.status(201).json({ success: true, message: 'Item created', item: { ROWID: row.ROWID, ...itemData } });
@@ -3514,6 +3574,15 @@ app.put('/api/items/:id', async (req, res) => {
     if (!requirePermission(orgUserContext, res, 'manage_products', 'Updating products requires Admin or Manager.')) return;
     const { name, rate, stock, category, tax_percentage,
       cost_price, reorder_level, status, barcode, unit, description, category_id, category_ids } = req.body;
+    if (barcode !== undefined) {
+      const cleanBarcode = String(barcode ?? '').trim();
+      if (cleanBarcode !== '') {
+        const barcodeMatch = await findProductByBarcode(catalystApp, cleanBarcode);
+        if (barcodeMatch && String(barcodeMatch.ROWID) !== rowId) {
+          return res.status(409).json({ success: false, error: `Barcode '${cleanBarcode}' is already assigned to '${barcodeMatch.name || 'another product'}'.` });
+        }
+      }
+    }
     const updateData = { ROWID: rowId };
     if (name !== undefined) updateData.name = name;
     if (rate !== undefined) updateData.rate = parseFloat(rate) || 0;
@@ -3635,6 +3704,17 @@ app.delete('/api/items/:id', async (req, res) => {
     // Best-effort image cleanup (never blocks delete).
     if (target.image_id && logoRefIsStratus(target.image_id)) {
       await stratusDeleteKey(catalystApp, logoKeyFromRef(target.image_id));
+    }
+
+    // WarehouseStock has no database cascade. Remove every stock balance for
+    // this exact product before deleting its Products row so deleted catalog
+    // items cannot leave orphan inventory in any warehouse.
+    const stockRows = await safeZcql(catalystApp,
+      `SELECT ROWID FROM WarehouseStock WHERE product_id = '${sanitizeZcql(rowId)}' LIMIT 300`
+    );
+    const stockTable = catalystApp.datastore().table('WarehouseStock');
+    for (const stockRow of (stockRows || [])) {
+      await stockTable.deleteRow(stockRow.WarehouseStock.ROWID);
     }
 
     const table = catalystApp.datastore().table('Products');
@@ -3937,9 +4017,11 @@ app.post('/api/items/import', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Import capped at 500 rows per batch.' });
     }
 
-    // Existing catalog SKUs (case-insensitive) + active category names.
-    const existingRows = await safeZcql(catalystApp, `SELECT sku FROM Products LIMIT 300`);
+    // Existing catalog SKU/barcode values + active category names. Blank
+    // barcodes are allowed; a non-blank barcode identifies one product only.
+    const existingRows = await safeZcql(catalystApp, `SELECT sku, barcode FROM Products LIMIT 300`);
     const takenSkus = new Set((existingRows || []).map((r) => String(r.Products?.sku ?? '').trim().toLowerCase()).filter(Boolean));
+    const takenBarcodes = new Set((existingRows || []).map((r) => String(r.Products?.barcode ?? '').trim().toLowerCase()).filter(Boolean));
     let activeCats = new Map();
     try {
       const catRows = await safeZcql(catalystApp, `SELECT ROWID, name, status FROM Categories`);
@@ -3962,6 +4044,7 @@ app.post('/api/items/import', async (req, res) => {
 
     const table = catalystApp.datastore().table('Products');
     const seenInFile = new Set();
+    const seenBarcodesInFile = new Set();
     let inserted = 0;
     const errors = [];
     for (let idx = 0; idx < rows.length; idx++) {
@@ -3975,6 +4058,11 @@ app.post('/api/items/import', async (req, res) => {
       const skuKey = sku.toLowerCase();
       if (sku !== '' && (takenSkus.has(skuKey) || seenInFile.has(skuKey))) {
         rowErrors.push(`Row ${lineNo}: SKU '${sku}' already exists.`);
+      }
+      const barcode = String(r.barcode ?? '').trim();
+      const barcodeKey = barcode.toLowerCase();
+      if (barcode !== '' && (takenBarcodes.has(barcodeKey) || seenBarcodesInFile.has(barcodeKey))) {
+        rowErrors.push(`Row ${lineNo}: barcode '${barcode}' already exists.`);
       }
       const rate = num(r.rate, 'rate', rowErrors, lineNo);
       const cost = num(r.cost_price ?? r.cost, 'cost_price', rowErrors, lineNo);
@@ -3996,13 +4084,17 @@ app.post('/api/items/import', async (req, res) => {
       if (rowErrors.length > 0) { errors.push(...rowErrors.map((m) => ({ row: lineNo, sku, error: m.replace(`Row ${lineNo}: `, '') }))); continue; }
       seenInFile.add(skuKey);
       takenSkus.add(skuKey);
+      if (barcode !== '') {
+        seenBarcodesInFile.add(barcodeKey);
+        takenBarcodes.add(barcodeKey);
+      }
       try {
         const primary = catIds.length > 0 ? activeCats.get(catNames[0].toLowerCase()) : null;
         await table.insertRow({
           sku, name,
           rate, cost_price: cost, stock,
           reorder_level: reorder === 0 && String(r.reorder_level ?? r.reorder ?? '').trim() === '' ? 10 : reorder,
-          barcode: String(r.barcode ?? '').trim(),
+          barcode,
           unit: String(r.unit ?? 'Piece').trim() || 'Piece',
           status,
           tax_percentage: tax,
@@ -5154,9 +5246,11 @@ async function ensureDefaultWarehouse(catalystApp) {
 }
 
 /**
- * Backfill WarehouseStock from Products.stock: every product gets one row
- * in the default warehouse when it has none. Idempotent — only missing
- * combinations are inserted. Returns { created }.
+ * Backfill WarehouseStock from Products.stock only for products which have
+ * no warehouse balance anywhere. This is a legacy migration for products
+ * created before multi-warehouse stock existed; it must never mirror a
+ * product already assigned to a non-default warehouse into the default one.
+ * Idempotent — only products with no WarehouseStock row are inserted.
  */
 async function backfillWarehouseStock(catalystApp) {
   const def = await ensureDefaultWarehouse(catalystApp);
@@ -5171,8 +5265,11 @@ async function backfillWarehouseStock(catalystApp) {
   } catch (e) {
     existing = [];
   }
-  const have = new Set(
-    (existing || []).map((r) => `${String(r.WarehouseStock.warehouse_id)}:${String(r.WarehouseStock.product_id)}`)
+  const productsWithWarehouseStock = new Set(
+    (existing || [])
+      .map((r) => r && r.WarehouseStock && r.WarehouseStock.product_id)
+      .filter((productId) => productId !== undefined && productId !== null && String(productId) !== '')
+      .map((productId) => String(productId))
   );
   const table = catalystApp.datastore().table('WarehouseStock');
   const now = formatCatalystDateTime(new Date());
@@ -5181,7 +5278,7 @@ async function backfillWarehouseStock(catalystApp) {
     const p = r.Products;
     if (!p) continue;
     const pid = String(p.ROWID);
-    if (have.has(`${defId}:${pid}`)) continue;
+    if (productsWithWarehouseStock.has(pid)) continue;
     try {
       await table.insertRow({
         warehouse_id: defId,
@@ -9093,6 +9190,37 @@ function extractSdkMessage(e) {
   return String(e);
 }
 
+/**
+ * Remove the Catalyst Authentication login for an already-authorized roster
+ * deletion. This is deliberately best-effort: role/roster revocation has
+ * already completed, so an Auth SDK outage must never turn that success into
+ * a 500 or target any account other than this exact email.
+ */
+function removeCatalystAuthLogin(catalystApp, email) {
+  const target = String(email || '').trim().toLowerCase();
+  return (async () => {
+    try {
+      const users = await catalystApp.userManagement().getAllUsers();
+      const hit = (Array.isArray(users) ? users : []).find((user) => {
+        const candidate = String((user && (user.email_id || user.email)) || '').trim().toLowerCase();
+        return candidate !== '' && candidate === target;
+      });
+      if (!hit) return { auth_removed: true, auth_detail: 'Login account was already absent.' };
+      // deleteUser() calls /project-user/:id. Catalyst's list response carries
+      // both a Zoho account ZUID and the project User ID; only `user_id` is
+      // valid for that endpoint (passing the ZUID returns INVALID_ID).
+      const projectUserId = String(hit.user_id || '').trim();
+      if (projectUserId === '') return { auth_removed: false, auth_detail: 'Matching login has no Catalyst project user id.' };
+      const removed = await catalystApp.userManagement().deleteUser(projectUserId);
+      return removed
+        ? { auth_removed: true, auth_detail: 'Login account removed.' }
+        : { auth_removed: false, auth_detail: 'Catalyst did not confirm login removal.' };
+    } catch (e) {
+      return { auth_removed: false, auth_detail: extractSdkMessage(e) };
+    }
+  })();
+}
+
 async function ensureAuthAccount(catalystApp, { email, firstName, lastName }, { passwordMail = true } = {}) {
   const out = { created: false, exists: false, failed: false, mailSent: false, detail: '' };
   // ICatalystSignupUserConfig allows ONLY email_id + first_name + optional
@@ -9743,15 +9871,34 @@ app.delete('/api/admin/users/:id', async (req, res) => {
       }
     }
     if (hadRoster) {
+      // Delete EVERY row carrying the roster key: concurrent invites can
+      // stamp duplicate config rows (SELECT-then-insert race in
+      // safeUpsertConfig), and removing only the LIMIT-1 match leaves a twin
+      // that keeps the user listed after a "User removed" notice.
       try {
-        await catalystApp.datastore().table('Configurations').deleteRow(found.ROWID);
+        const dupes = await safeZcql(catalystApp,
+          `SELECT ROWID FROM Configurations WHERE config_key = '${rosterKey(target)}' LIMIT 300`
+        );
+        const table = catalystApp.datastore().table('Configurations');
+        let removed = 0;
+        for (const d of (dupes || [])) {
+          try { await table.deleteRow(d.Configurations.ROWID); removed++; } catch (e) { /* keep going */ }
+        }
+        if (removed === 0) {
+          await table.deleteRow(found.ROWID);
+        }
       } catch (e) {
         return res.status(500).json({ success: false, error: 'Failed to remove user record.' });
       }
     }
     // Revoke everywhere: a surviving OrgUsers row would keep signing them in.
-    const removedRows = await deleteOrgUserRows(catalystApp, target);
-    res.status(200).json({ success: true, message: `User '${target}' deleted.${removedRows > 0 ? ' Role record revoked.' : ''}` });
+    await deleteOrgUserRows(catalystApp, target);
+    const authOutcome = await removeCatalystAuthLogin(catalystApp, target);
+    const roleMessage = `User '${target}' deleted. Role record revoked.`;
+    const message = authOutcome.auth_removed
+      ? `${roleMessage} Login account removed.`
+      : `${roleMessage} Login account still exists (${authOutcome.auth_detail}) — remove it in console Authentication.`;
+    res.status(200).json({ success: true, message, auth_removed: authOutcome.auth_removed, auth_detail: authOutcome.auth_detail });
   } catch (error) {
     console.error('Error deleting admin user:', error.message);
     res.status(500).json({ success: false, error: error.message });
@@ -10263,10 +10410,16 @@ async function readOrgSettings(catalystApp, orgId) {
     const prefix = `org_${orgId}_setting_`;
     let rows = [];
     try {
+      // Catalyst's ZCQL LIKE can return no rows for these keys even when the
+      // exact prefix exists. Scan the bounded Configurations slice and filter
+      // locally so virtual org_default and real-org viewers read the same
+      // prefix that their save path writes.
       const r = await catalystApp.zcql().executeZCQLQuery(
-        `SELECT config_key, config_value FROM Configurations WHERE config_key LIKE '${sanitizeZcql(prefix)}%' LIMIT 300`
+        'SELECT config_key, config_value FROM Configurations LIMIT 300'
       );
-      rows = (r || []).map((x) => x.Configurations).filter(Boolean);
+      rows = (r || [])
+        .map((x) => x.Configurations)
+        .filter((row) => row && String(row.config_key || '').startsWith(prefix));
     } catch (e) { rows = []; }
     for (const row of rows) {
       out[String(row.config_key).slice(prefix.length)] = row.config_value;
@@ -10602,67 +10755,11 @@ async function saveNotificationSettings(catalystApp, orgId, input) {
   return { notifications: prefs };
 }
 
-/** Recipients for stock alerts: type recipients → global alert email. */
-function alertRecipients(prefs, type) {
-  const out = [];
-  const push = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter((s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)).forEach((s) => {
-    if (!out.includes(s)) out.push(s);
-  });
-  if (prefs && prefs[type]) push(prefs[type].recipients);
-  if (prefs) push(prefs.alert_email);
-  return out;
-}
-
-/** Immediate low-stock email (best-effort; daily digest needs a scheduler). */
-async function maybeSendLowStockAlert(catalystApp, orgId, { productName, sku, newStock, reorderLevel }) {
-  try {
-    const prefs = await getNotificationSettings(catalystApp, orgId);
-    const cfg = prefs.low_stock;
-    if (!cfg.enabled || cfg.frequency !== 'immediate') return false;
-    if (!cfg.channels.includes('email')) return false;
-    const threshold = cfg.threshold !== '' && cfg.threshold !== undefined
-      ? Number(cfg.threshold)
-      : (Number.isFinite(Number(reorderLevel)) ? Number(reorderLevel) : 10);
-    if ((Number(newStock) || 0) > threshold) return false;
-    const to = alertRecipients(prefs, 'low_stock');
-    if (to.length === 0) return false;
-    return await sendSmtpMail(catalystApp, {
-      to: to.join(','),
-      subject: `Low stock: ${productName} (${newStock} left)`,
-      html: `<p><strong>${escHtml(productName)}</strong> (${escHtml(sku || '')}) is at <strong>${Number(newStock) || 0}</strong> units (threshold ${threshold}).</p><p>CloudHub POS · Inventory alert</p>`,
-      text: `Low stock: ${productName} (${sku || ''}) at ${Number(newStock) || 0} units (threshold ${threshold}).`,
-    });
-  } catch (e) {
-    return false;
-  }
-}
-
-/** Void notification email (best-effort). */
-async function maybeSendVoidNotification(catalystApp, orgId, { orderNumber, customerEmail, total }) {
-  try {
-    const prefs = await getNotificationSettings(catalystApp, orgId);
-    if (!prefs.order_void.enabled || !prefs.order_void.channels.includes('email')) return false;
-    const to = String(customerEmail ?? '').trim();
-    if (to === '' || to.toLowerCase() === 'walkin@pos.system') return false;
-    return await sendSmtpMail(catalystApp, {
-      to,
-      subject: `Order ${orderNumber} voided`,
-      html: `<p>Order <strong>${escHtml(orderNumber)}</strong> (${escHtml(String(total ?? ''))}) has been voided. Contact the store for assistance.</p>`,
-      text: `Order ${orderNumber} (${total}) has been voided.`,
-    });
-  } catch (e) {
-    return false;
-  }
-}
-
-/* ---------------- IntegrationService (SET-05 health) ---------------- */
-
 async function getIntegrationHealth(catalystApp, orgUserContext) {
   const booksService = new ZohoBooksService(catalystApp, null);
   const orgId = orgUserContext && orgUserContext.orgUser ? String(orgUserContext.orgUser.org_id || '') : '';
   const health = {
     books: { connected: false, org_id: '', dc: '', token_expires_at: '', last_sync_at: '', last_sync_result: '' },
-    smtp: { configured: false },
   };
   try {
     const connected = await booksService.getConfig(`zoho_books_connected_${orgId}`)
@@ -10691,11 +10788,6 @@ async function getIntegrationHealth(catalystApp, orgUserContext) {
     health.books.last_sync_at = String(await booksService.getConfig('last_books_sync_at') || '');
     health.books.last_sync_result = String(await booksService.getConfig('last_books_sync_result') || '');
   } catch (e) { /* blanks */ }
-  try {
-    const host = await booksService.getConfig('email_smtp_host');
-    const user = await booksService.getConfig('email_smtp_user');
-    health.smtp.configured = !!(host && user);
-  } catch (e) { /* false */ }
   return health;
 }
 
@@ -11546,6 +11638,17 @@ app.put('/api/settings/payments', async (req, res) => {
 const PRINT_STATIONS = ['counter', 'kitchen', 'bar'];
 const PRINT_TRANSPORTS = ['browser', 'qz', 'bridge', 'cloud'];
 const KOT_STATUSES = ['FIRED', 'ACKED', 'DONE'];
+const PRINTER_KNOWN_FIELDS = new Set(['id', 'name', 'station', 'width', 'transport', 'address', 'active', 'enabled', 'osPrinter']);
+
+/** Preserve forward-compatible terminal metadata while normalizing known keys. */
+function printerExtraFields(input) {
+  const extras = {};
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return extras;
+  for (const [key, value] of Object.entries(input)) {
+    if (!PRINTER_KNOWN_FIELDS.has(key) && !['__proto__', 'constructor', 'prototype'].includes(key)) extras[key] = value;
+  }
+  return extras;
+}
 
 function normPrintStation(v, dflt) {
   const s = String(v ?? '').trim().toLowerCase();
@@ -11559,6 +11662,7 @@ async function getPrinters(catalystApp, orgId) {
     const parsed = JSON.parse(String(raw));
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((p) => p && String(p.id ?? '').trim() !== '').map((p) => ({
+      ...printerExtraFields(p),
       id: String(p.id).trim().slice(0, 60),
       name: String(p.name ?? '').trim().slice(0, 80) || String(p.id).trim(),
       station: normPrintStation(p.station, 'counter'),
@@ -11566,7 +11670,12 @@ async function getPrinters(catalystApp, orgId) {
       transport: PRINT_TRANSPORTS.includes(String(p.transport || '').trim().toLowerCase())
         ? String(p.transport).trim().toLowerCase() : 'browser',
       address: String(p.address ?? '').trim().slice(0, 200),
-      active: p.active !== false,
+      osPrinter: String(p.osPrinter ?? '').trim().slice(0, 200),
+      // `active` is the persisted key.  Also expose `enabled` because the
+      // terminal settings form uses that API field; accepting both keeps old
+      // saved JSON and the terminal round-trip in agreement.
+      active: p.active !== false && p.enabled !== false,
+      enabled: p.active !== false && p.enabled !== false,
     })).slice(0, 20);
   } catch (e) {
     return [];
@@ -11584,6 +11693,7 @@ async function savePrinters(catalystApp, orgId, list) {
     if (seen.has(id.toLowerCase())) return { error: `Duplicate printer id "${id}".` };
     seen.add(id.toLowerCase());
     clean.push({
+      ...printerExtraFields(p),
       id,
       name: String(p.name ?? '').trim().slice(0, 80) || id,
       station: normPrintStation(p.station, 'counter'),
@@ -11591,11 +11701,14 @@ async function savePrinters(catalystApp, orgId, list) {
       transport: PRINT_TRANSPORTS.includes(String(p.transport || '').trim().toLowerCase())
         ? String(p.transport).trim().toLowerCase() : 'browser',
       address: String(p.address ?? '').trim().slice(0, 200),
-      active: p.active !== false,
+      osPrinter: String(p.osPrinter ?? '').trim().slice(0, 200),
+      // Persist the established `active` key, while accepting the terminal's
+      // `enabled` field.  A disabled printer must stay disabled after reload.
+      active: p.active !== false && p.enabled !== false,
     });
   }
   await safeUpsertConfig(catalystApp, `org_${orgId}_setting_printers`, JSON.stringify(clean));
-  return { printers: clean };
+  return { printers: clean.map((p) => ({ ...p, enabled: p.active })) };
 }
 
 async function getPrintRouting(catalystApp, orgId) {
@@ -11654,14 +11767,25 @@ async function productStationMap(catalystApp, rowIds) {
   return map;
 }
 
-/** Station for one line: category link → category name → routing default. */
+/**
+ * Station for one line: category id → case-insensitive category-name match
+ * → routing default. Name rules are substring matches; an exact match wins,
+ * otherwise the longest matching configured name wins (then lexical order),
+ * which makes overlapping rules deterministic for checkout and cancel chits.
+ */
 function stationForLine(live, routing, stationMap) {
   const id = live ? String(live.ROWID ?? '') : '';
   const info = (id !== '' && stationMap.get(id)) || null;
   const cid = info ? String(info.category_id ?? '').trim() : '';
   if (cid !== '' && routing.byCategoryId[cid]) return routing.byCategoryId[cid];
   const cname = info ? String(info.category ?? '').trim().toLowerCase() : '';
-  if (cname !== '' && routing.byCategoryName[cname]) return routing.byCategoryName[cname];
+  if (cname !== '') {
+    if (routing.byCategoryName[cname]) return routing.byCategoryName[cname];
+    const match = Object.keys(routing.byCategoryName)
+      .filter((name) => name !== '' && cname.includes(name))
+      .sort((a, b) => b.length - a.length || a.localeCompare(b))[0];
+    if (match) return routing.byCategoryName[match];
+  }
   return routing.defaultStation || 'counter';
 }
 
@@ -11672,7 +11796,7 @@ function kotDayStamp(d) {
 
 /** Forward-only KOT transitions: FIRED → ACKED → DONE. */
 function kotTransitionAllowed(from, to) {
-  return KOT_STATUSES.indexOf(to) > KOT_STATUSES.indexOf(from);
+  return KOT_STATUSES.indexOf(to) === KOT_STATUSES.indexOf(from) + 1;
 }
 
 function kotLogKey(orgId, day) {
@@ -11910,6 +12034,8 @@ app.get('/api/kot', async (req, res) => {
     let log = await readKotLog(catalystApp, orgId);
     const status = String((req.query && req.query.status) || '').trim().toUpperCase();
     if (status !== '' && KOT_STATUSES.includes(status)) log = log.filter((e) => e.status === status);
+    const station = String((req.query && req.query.station) || '').trim().toLowerCase();
+    if (station !== '' && PRINT_STATIONS.includes(station)) log = log.filter((e) => e.station === station);
     const limit = Math.min(200, Math.max(1, parseInt((req.query && req.query.limit) || '50', 10) || 50));
     res.status(200).json({ success: true, count: log.length, data: log.slice(-limit).reverse() });
   } catch (error) {
@@ -11923,6 +12049,13 @@ async function kotTransition(req, res, to, action) {
     const catalystApp = catalyst.initialize(req);
     const orgUserContext = await getCurrentOrgUser(req, catalystApp);
     if (!orgUserContext) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    // Kitchen pass, not Admin console: anyone holding a POS role (the same
+    // roles allowed on the /sales/kitchen board) may ACK/Done. manage_settings
+    // would lock out Chef/Storekeeper/Cashier and break the KOT workflow.
+    // Roleless (Unassigned) logins are still blocked.
+    if (!['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'].includes(callerRole(orgUserContext))) {
+      return res.status(403).json({ success: false, error: 'KOT transitions require a POS role.' });
+    }
     const number = String(req.params.number || '').trim();
     if (number === '') return res.status(400).json({ success: false, error: 'KOT number is required.' });
     const orgId = String(orgUserContext.orgUser.org_id || '');
@@ -11943,7 +12076,11 @@ async function kotTransition(req, res, to, action) {
 app.post('/api/kot/:number/ack', async (req, res) => kotTransition(req, res, 'ACKED', 'KOT_ACKED'));
 app.post('/api/kot/:number/done', async (req, res) => kotTransition(req, res, 'DONE', 'KOT_DONE'));
 
-/** GET /api/print-queue — pending (FIRED) chits for bridges to drain. */
+/**
+ * GET /api/print-queue — read-only pending (FIRED) chits for bridges to
+ * drain. Fetching never consumes a chit: a bridge must ACK it through the
+ * normal KOT transition endpoint, after which it no longer appears here.
+ */
 app.get('/api/print-queue', async (req, res) => {
   try {
     const catalystApp = catalyst.initialize(req);
@@ -12043,6 +12180,61 @@ app.post('/api/settings/notifications/digest', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+/** Recipients for stock alerts: type recipients → global alert email. */
+function alertRecipients(prefs, type) {
+  const out = [];
+  const push = (v) => String(v ?? '').split(',').map((s) => s.trim()).filter((s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)).forEach((s) => {
+    if (!out.includes(s)) out.push(s);
+  });
+  if (prefs && prefs[type]) push(prefs[type].recipients);
+  if (prefs) push(prefs.alert_email);
+  return out;
+}
+
+/** Immediate low-stock email (best-effort; daily digest needs a scheduler). */
+async function maybeSendLowStockAlert(catalystApp, orgId, { productName, sku, newStock, reorderLevel }) {
+  try {
+    const prefs = await getNotificationSettings(catalystApp, orgId);
+    const cfg = prefs.low_stock;
+    if (!cfg.enabled || cfg.frequency !== 'immediate') return false;
+    if (!cfg.channels.includes('email')) return false;
+    const threshold = cfg.threshold !== '' && cfg.threshold !== undefined
+      ? Number(cfg.threshold)
+      : (Number.isFinite(Number(reorderLevel)) ? Number(reorderLevel) : 10);
+    if ((Number(newStock) || 0) > threshold) return false;
+    const to = alertRecipients(prefs, 'low_stock');
+    if (to.length === 0) return false;
+    return await sendSmtpMail(catalystApp, {
+      to: to.join(','),
+      subject: `Low stock: ${productName} (${newStock} left)`,
+      html: `<p><strong>${escHtml(productName)}</strong> (${escHtml(sku || '')}) is at <strong>${Number(newStock) || 0}</strong> units (threshold ${threshold}).</p><p>CloudHub POS · Inventory alert</p>`,
+      text: `Low stock: ${productName} (${sku || ''}) at ${Number(newStock) || 0} units (threshold ${threshold}).`,
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
+/** Void notification email (best-effort). */
+async function maybeSendVoidNotification(catalystApp, orgId, { orderNumber, customerEmail, total }) {
+  try {
+    const prefs = await getNotificationSettings(catalystApp, orgId);
+    if (!prefs.order_void.enabled || !prefs.order_void.channels.includes('email')) return false;
+    const to = String(customerEmail ?? '').trim();
+    if (to === '' || to.toLowerCase() === 'walkin@pos.system') return false;
+    return await sendSmtpMail(catalystApp, {
+      to,
+      subject: `Order ${orderNumber} voided`,
+      html: `<p>Order <strong>${escHtml(orderNumber)}</strong> (${escHtml(String(total ?? ''))}) has been voided. Contact the store for assistance.</p>`,
+      text: `Order ${orderNumber} (${total}) has been voided.`,
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
+/* ---------------- IntegrationService (SET-05 health) ---------------- */
 
 /* ---------------- integration health (SET-05) ---------------- */
 

@@ -7,10 +7,12 @@
 | Project | CloudHub POS — Cloud-Based Point of Sale & Retail Management System |
 | Target baseline | `CloudHub_POS_SRS.pdf` v1.0 (18 Sep 2026, Draft for BA/Stakeholder review) |
 | Current-state source | Full codebase read: `react-app/`, `functions/pos_backend/`, `catalyst.json`, configs (no assumptions; every claim below traces to a file) |
-| Report date | 20 Sep 2026 |
+| Report date | 28 Sep 2026 |
 | Audience | Business Analysts, Stakeholders, Developers, PMs, New joiners, Auditors, Maintainers |
 
 **How to read this document:** Executive Summary first; §1 business model; §2 build order; §3 SRS target; §4 what the code does today; §5 line-by-line gap tables; §6 risks; §7 health; §8 remaining work; §9 roadmap; §10 completion math; §11 final recommendation.
+
+> **Current Development checkpoint — Phase 5, Organization Administration (user-lifecycle verification):** complete and verified on Development. An Admin removal now clears the POS roster (`Configurations` `user_*` entries), every matching `OrgUsers` row, and the matching Catalyst Authentication project user. The Auth deletion uses Catalyst's project `user_id` (not the distinct Zoho-account `zuid`); a failed Auth step leaves the role removal intact and returns the exact console-fallback reason. Next work should proceed from the remaining Phase 5 administration/configuration items, with normal Development regression checks after each deployment.
 
 ---
 

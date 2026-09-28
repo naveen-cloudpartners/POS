@@ -27,11 +27,13 @@ describe('stationForLine', () => {
     ['1', { category_id: '111', category: 'Food' }],
     ['2', { category_id: '', category: 'Beverages' }],
     ['3', { category_id: '', category: '' }],
+    ['4', { category_id: '', category: 'Cold Beverages' }],
   ]);
 
   it('resolves category link, then name, then default', () => {
     assert.equal(stationForLine({ ROWID: '1' }, routing, stationMap), 'kitchen');
     assert.equal(stationForLine({ ROWID: '2' }, routing, stationMap), 'bar');
+    assert.equal(stationForLine({ ROWID: '4' }, routing, stationMap), 'bar');
     assert.equal(stationForLine({ ROWID: '3' }, routing, stationMap), 'counter');
     assert.equal(stationForLine(null, routing, stationMap), 'counter');
     assert.equal(stationForLine({ ROWID: '999' }, routing, stationMap), 'counter');
@@ -48,7 +50,7 @@ describe('kotDayStamp', () => {
 describe('kotTransitionAllowed', () => {
   it('only allows forward FIRED → ACKED → DONE moves', () => {
     assert.equal(kotTransitionAllowed('FIRED', 'ACKED'), true);
-    assert.equal(kotTransitionAllowed('FIRED', 'DONE'), true);
+    assert.equal(kotTransitionAllowed('FIRED', 'DONE'), false);
     assert.equal(kotTransitionAllowed('ACKED', 'DONE'), true);
     assert.equal(kotTransitionAllowed('ACKED', 'ACKED'), false);
     assert.equal(kotTransitionAllowed('DONE', 'ACKED'), false);

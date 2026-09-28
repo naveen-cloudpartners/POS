@@ -591,7 +591,7 @@ function KitchenView() {
       setLoading(true);
       setError('');
     }
-    getKotLog(undefined, 100)
+    getKotLog(undefined, 100, station)
       .then(setEntries)
       .catch((e: unknown) => {
         if (!quiet) setError(e instanceof Error ? e.message : 'Failed to load KOTs');
@@ -603,14 +603,14 @@ function KitchenView() {
 
   useEffect(() => {
     load();
-    // Fetch-light: 60s cadence, skipped while the tab is hidden (the
+    // Fetch-light: 20s cadence, skipped while the tab is hidden (the
     // Refresh button covers on-demand updates).
     const t = window.setInterval(() => {
       if (document.hidden) return;
       load(true);
-    }, 60000);
+    }, 20000);
     return () => window.clearInterval(t);
-  }, []);
+  }, [station]);
 
   const transition = (number: string, to: 'ack' | 'done') => {
     setBusy(number);
@@ -713,7 +713,7 @@ function KitchenView() {
                         {busy === e.number ? '…' : 'Ack'}
                       </button>
                     )}
-                    {e.status !== 'DONE' && (
+                    {e.status === 'ACKED' && (
                       <button type="button" className="ch-btn ch-btn-primary ch-btn-sm" disabled={busy === e.number} onClick={() => transition(e.number, 'done')}>
                         {busy === e.number ? '…' : 'Done'}
                       </button>

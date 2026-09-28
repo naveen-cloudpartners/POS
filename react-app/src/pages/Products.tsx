@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, RefreshCw, PackagePlus, CheckSquare, LayoutGrid, List, Eye, X, Upload, Download, ImagePlus, ImageOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, PackagePlus, CheckSquare, Eye, X, Upload, Download, ImagePlus, ImageOff } from 'lucide-react';
 import Card from '../components/ui/Card';
-import Table from '../components/ui/Table';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import SearchBar from '../components/ui/SearchBar';
@@ -12,11 +11,12 @@ import Loader from '../components/ui/Loader';
 import ErrorState from '../components/ui/ErrorState';
 import EmptyState from '../components/ui/EmptyState';
 import { getProducts, createProduct, updateProduct, deleteProduct, adjustStock, syncFromBooks, getCategories, createCategory, updateCategory, deactivateCategory, deleteCategory, uploadProductImage, deleteProductImage, productImageUrl, exportProductsCsv, importProductsCsv, ApiError, type ImportResult } from '../services/productService';
-import { getTaxSettings } from '../services/settingsService';
+import { getTaxSettings, type TaxProfile } from '../services/settingsService';
+import { getWarehouses } from '../services/inventoryService';
 import { can } from '../services/authService';
 import { useAuth } from '../context/AuthContext';
 import { categoryNameOf, currency, isLowStock, isOutOfStock, number, profitPerUnit, reorderLevelOf, stockValueOf, productCategoryIds, productCategoryNames } from '../utils/format';
-import type { Category, Product } from '../types';
+import type { Category, Product, Warehouse } from '../types';
 import './Products.css';
 
 interface ProductForm {
@@ -26,6 +26,8 @@ interface ProductForm {
   rate: string;
   cost_price: string;
   stock: string;
+  /** Warehouse that receives opening stock when a product is first created. */
+  warehouse_id: string;
   reorder_level: string;
   category: string;
   category_id: string;
@@ -38,7 +40,7 @@ interface ProductForm {
 }
 
 const EMPTY_FORM: ProductForm = {
-  name: '', sku: '', barcode: '', rate: '', cost_price: '', stock: '',
+  name: '', sku: '', barcode: '', rate: '', cost_price: '', stock: '', warehouse_id: '',
   reorder_level: '10', category: 'General', category_id: '', category_ids: [], unit: 'Piece', status: 'Active',
   tax_percentage: '0', description: '',
 };
@@ -87,12 +89,11 @@ function mapCsvHeaders(header: Array<string>): Array<string | null> {
 
 const UNIT_OPTIONS = ['Piece', 'Box', 'Bottle', 'Packet', 'Kg', 'Gram', 'Litre', 'ML', 'Other'];
 const STATUS_OPTIONS = ['Active', 'Inactive', 'Discontinued'];
+type TaxMode = 'default' | 'custom' | 'exempt' | `profile:${number}`;
 
 function rowId(p: Product): string {
   return String(p.ROWID ?? p.sku);
 }
-
-type ViewMode = 'table' | 'grid';
 
 export default function Products() {
   const { role } = useAuth();
@@ -107,7 +108,6 @@ export default function Products() {
     const s = (params.get('stock') ?? 'all').toLowerCase();
     return s === 'in' || s === 'low' || s === 'out' ? s : 'all';
   });
-  const [view, setView] = useState<ViewMode>('table');
   const [details, setDetails] = useState<Product | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
@@ -122,6 +122,7 @@ export default function Products() {
   const [stockBusy, setStockBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
   const [allCategories, setAllCategories] = useState<Array<Category>>([]);
+  const [warehouses, setWarehouses] = useState<Array<Warehouse>>([]);
   const [catManageOpen, setCatManageOpen] = useState(false);
   const [catForm, setCatForm] = useState({ name: '', description: '', display_order: '0', status: 'Active' });
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
@@ -136,8 +137,9 @@ export default function Products() {
   const [imageRemoved, setImageRemoved] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   // SET-02: tax treatment selector + live default rate for "Use default".
-  const [taxModeSel, setTaxModeSel] = useState<'default' | 'custom' | 'exempt'>('default');
+  const [taxModeSel, setTaxModeSel] = useState<TaxMode>('default');
   const [defaultTaxRate, setDefaultTaxRate] = useState(0);
+  const [taxProfiles, setTaxProfiles] = useState<Array<TaxProfile>>([]);
   // PROD-09 CSV import/export.
   const [exportBusy, setExportBusy] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -151,13 +153,21 @@ export default function Products() {
     setLoading(true);
     setError('');
     getTaxSettings().then((t) => {
-      if (t !== null) setDefaultTaxRate(Number(t.default_rate) || 0);
-    }).catch(() => undefined);
-    Promise.all([getProducts(), getCategories().then((c) => ({ ok: true as const, list: c })).catch(() => ({ ok: false as const, list: [] as Array<Category> }))])
-      .then(([items, cats]) => {
+      if (t !== null) {
+        setDefaultTaxRate(Number(t.default_rate) || 0);
+        setTaxProfiles(Array.isArray(t.profiles) ? t.profiles : []);
+      }
+    }).catch(() => setTaxProfiles([]));
+    Promise.all([
+      getProducts(),
+      getCategories().then((c) => ({ ok: true as const, list: c })).catch(() => ({ ok: false as const, list: [] as Array<Category> })),
+      getWarehouses().catch(() => [] as Array<Warehouse>),
+    ])
+      .then(([items, cats, loadedWarehouses]) => {
         setProducts(items);
         setAllCategories(cats.list);
         setCatsFailed(!cats.ok);
+        setWarehouses(loadedWarehouses);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load products'))
       .finally(() => setLoading(false));
@@ -207,6 +217,11 @@ export default function Products() {
   const activeCategories = useMemo(() => {
     return allCategories.filter((c) => (c.status || 'Active') === 'Active');
   }, [allCategories]);
+
+  /** Opening stock can only be assigned to an active warehouse. */
+  const activeWarehouses = useMemo(() => (
+    warehouses.filter((w) => String(w.status || 'Active').toLowerCase() === 'active')
+  ), [warehouses]);
 
   /** Display names across every linked category (PROD-05). */
   const productNames = (p: Product): Array<string> =>
@@ -275,12 +290,14 @@ export default function Products() {
     setEditing(null);
     const firstActive = allCategories.find((c) => (c.status || 'Active') === 'Active');
     const firstId = firstActive?.ROWID === undefined ? '' : String(firstActive.ROWID);
+    const defaultWarehouse = activeWarehouses.find((w) => w.is_default === true) ?? activeWarehouses[0];
     setForm({
       ...EMPTY_FORM,
       category_id: firstId,
       category_ids: firstId === '' ? [] : [firstId],
       category: firstActive?.name ?? 'General',
       tax_percentage: String(defaultTaxRate),
+      warehouse_id: defaultWarehouse?.ROWID === undefined ? '' : String(defaultWarehouse.ROWID),
     });
     setTaxModeSel('default');
     setImagePreview(null);
@@ -303,6 +320,7 @@ export default function Products() {
       rate: String(p.rate),
       cost_price: p.cost_price === undefined || p.cost_price === null ? '' : String(p.cost_price),
       stock: String(p.stock),
+      warehouse_id: '',
       reorder_level: String(reorderLevelOf(p)),
       category: categoryNameOf(p),
       category_id: linked?.ROWID === undefined ? '' : String(linked.ROWID),
@@ -312,8 +330,10 @@ export default function Products() {
       tax_percentage: String(p.tax_percentage ?? 0),
       description: p.description ?? '',
     });
-    // Stored 0 reads as exempt (behavior-preserving); anything else is custom.
-    setTaxModeSel(Number(p.tax_percentage ?? 0) > 0 ? 'custom' : 'exempt');
+    // Prefer a saved profile when the stored rate exactly matches one.
+    const savedRate = Number(p.tax_percentage ?? 0);
+    const profileIndex = taxProfiles.findIndex((profile) => Number(profile.rate) === savedRate);
+    setTaxModeSel(savedRate === 0 ? 'exempt' : savedRate === defaultTaxRate ? 'default' : profileIndex >= 0 ? `profile:${profileIndex}` : 'custom');
     setImagePreview(p.image_id ? productImageUrl(rowId(p)) : null);
     setImageFile(null);
     setImageRemoved(false);
@@ -395,6 +415,9 @@ export default function Products() {
       // SET-02: default resolves to the live default rate; exempt is 0.
       tax_percentage: taxModeSel === 'exempt' ? 0 : taxModeSel === 'default' ? defaultTaxRate : Math.max(0, Number(form.tax_percentage) || 0),
       description: form.description.trim(),
+      // Only meaningful for create: edits keep their existing per-warehouse
+      // balances and must use the stock adjustment / transfer flows.
+      warehouse_id: form.warehouse_id === '' ? undefined : form.warehouse_id,
     };
     const syncImage = async (savedId: string): Promise<string | null> => {
       // Returns an error message, or null on success / nothing to do.
@@ -757,14 +780,6 @@ export default function Products() {
             ]}
             onReset={() => { setSearch(''); setCategory('all'); setStockFilter('all'); }}
           />
-          <span className="ch-segmented" role="tablist" aria-label="View mode">
-            <button type="button" role="tab" aria-selected={view === 'table'} className={view === 'table' ? 'active' : ''} onClick={() => setView('table')}>
-              <List size={14} /> Table
-            </button>
-            <button type="button" role="tab" aria-selected={view === 'grid'} className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')}>
-              <LayoutGrid size={14} /> Grid
-            </button>
-          </span>
           {selected.size > 0 && editable && (
             <button type="button" className="ch-btn ch-btn-danger ch-btn-sm" onClick={bulkDelete} disabled={deleteBusy}>
               <Trash2 size={14} />
@@ -790,72 +805,6 @@ export default function Products() {
             message="Try a different search, or add a new product to the catalog."
             icon={<PackagePlus size={26} />}
             action={editable ? <button type="button" className="ch-btn ch-btn-primary" onClick={openAdd}><Plus size={15} /> Add product</button> : undefined}
-          />
-        ) : view === 'table' ? (
-          <Table
-            columns={[
-              {
-                key: 'sel', header: '', width: '36px', render: (p: Product) => (
-                  <input type="checkbox" className="ch-checkbox" aria-label={`Select ${p.name}`} checked={selected.has(rowId(p))} onChange={() => toggleSelect(rowId(p))} />
-                ),
-              },
-              {
-                key: 'item', header: 'Product', render: (p: Product) => (
-                  <span className="prod-item">
-                    <button type="button" className="prod-thumb-btn" onClick={() => setDetails(p)} title={`View ${p.name}`} aria-label={`View ${p.name}`}>
-                      <span className="ch-thumb" aria-hidden="true">{p.name.charAt(0).toUpperCase()}</span>
-                    </button>
-                    <span className="prod-item-meta">
-                      <button type="button" className="prod-item-name" onClick={() => setDetails(p)} title={`View ${p.name}`}>{p.name}</button>
-                      <span className="ch-cell-sub">SKU: {p.sku}</span>
-                    </span>
-                  </span>
-                ),
-              },
-              {
-                key: 'cat', header: 'Categories', width: '150px', render: (p: Product) => {
-                  const names = productNames(p);
-                  const shown = names.slice(0, 2).join(', ');
-                  const extra = names.length - 2;
-                  return (
-                    <span className="prod-cat" title={names.join(', ')}>
-                      {shown}{extra > 0 ? ` +${extra}` : ''}
-                    </span>
-                  );
-                },
-              },
-              {
-                key: 'inv', header: 'Stock', numeric: true, width: '110px', render: (p: Product) => {
-                  const out = isOutOfStock(p);
-                  const low = isLowStock(p);
-                  return (
-                    <span className={out ? 'prod-inv out' : low ? 'prod-inv warn' : 'prod-inv'} data-label={out ? 'Out' : low ? 'Low Stock' : undefined}>
-                      <b className={out ? 'neg' : low ? 'warn' : undefined}>{number(p.stock)}</b>
-                    </span>
-                  );
-                },
-              },
-              { key: 'pricing', header: 'Price', numeric: true, width: '110px', render: (p: Product) => <b className="prod-pricing">{currency(p.rate)}</b> },
-              { key: 'status', header: 'Status', width: '110px', render: (p: Product) => <StatusBadge status={p.status || 'Active'} /> },
-              {
-                key: 'act', header: 'Actions', width: '150px', render: (p: Product) => (
-                  <span className="prod-actions">
-                    <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" title={`View ${p.name}`} aria-label={`View ${p.name}`} onClick={() => setDetails(p)}><Eye size={15} /></button>
-                    {editable && (
-                      <>
-                        <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" title={`Edit ${p.name}`} aria-label={`Edit ${p.name}`} onClick={() => openEdit(p)}><Pencil size={15} /></button>
-                        <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" title={`Adjust stock for ${p.name}`} aria-label={`Adjust stock for ${p.name}`} onClick={() => { setStockTarget(p); setStockDelta(''); }}><CheckSquare size={15} /></button>
-                        <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm prod-danger" title={`Delete ${p.name}`} aria-label={`Delete ${p.name}`} onClick={() => setDeleteTarget(p)}><Trash2 size={15} /></button>
-                      </>
-                    )}
-                  </span>
-                ),
-              },
-            ]}
-            rows={filtered}
-            rowKey={(p, i) => `${rowId(p)}-${i}`}
-            minWidth={800}
-            rowClassName={(p) => (isOutOfStock(p) ? 'prod-row-out' : isLowStock(p) ? 'prod-row-low' : undefined)}
           />
         ) : (
           <div className="prod-grid">
@@ -1097,16 +1046,23 @@ export default function Products() {
           <div className="ch-field">
             <label className="ch-label" htmlFor="pf-taxmode">Tax treatment</label>
             <select id="pf-taxmode" className="ch-select" value={taxModeSel} onChange={(e) => {
-              const v = e.target.value as 'default' | 'custom' | 'exempt';
+              const v = e.target.value as TaxMode;
               setTaxModeSel(v);
               if (v === 'default') setForm((prev) => ({ ...prev, tax_percentage: String(defaultTaxRate) }));
               if (v === 'exempt') setForm((prev) => ({ ...prev, tax_percentage: '0' }));
+              if (v.startsWith('profile:')) {
+                const profile = taxProfiles[Number(v.slice('profile:'.length))];
+                if (profile !== undefined) setForm((prev) => ({ ...prev, tax_percentage: String(profile.rate) }));
+              }
             }}>
               <option value="default">Use default ({defaultTaxRate}%)</option>
+              {taxProfiles.map((profile, index) => (
+                <option key={`${profile.name}-${index}`} value={`profile:${index}`}>{profile.name} ({profile.rate}%)</option>
+              ))}
               <option value="custom">Custom rate</option>
               <option value="exempt">Tax exempt</option>
             </select>
-            <span className="ch-hint">Default copies the current default rate into the product.</span>
+            <span className="ch-hint">Choose a saved tax profile, use the current default, or enter a custom rate.</span>
           </div>
           {taxModeSel === 'custom' && (
             <div className="ch-field">
@@ -1118,6 +1074,20 @@ export default function Products() {
             <label className="ch-label" htmlFor="pf-stock">{editing === null ? 'Opening stock' : 'Stock'}</label>
             <input id="pf-stock" className="ch-input" type="number" step="1" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
           </div>
+          {editing === null && (
+            <div className="ch-field">
+              <label className="ch-label" htmlFor="pf-warehouse">Opening stock warehouse</label>
+              <select id="pf-warehouse" className="ch-select" value={form.warehouse_id} onChange={(e) => setForm({ ...form, warehouse_id: e.target.value })}>
+                {activeWarehouses.length === 0 && <option value="">Default warehouse</option>}
+                {activeWarehouses.map((warehouse) => (
+                  <option key={String(warehouse.ROWID)} value={String(warehouse.ROWID)}>
+                    {warehouse.name}{warehouse.is_default === true ? ' (default)' : ''}
+                  </option>
+                ))}
+              </select>
+              <span className="ch-hint">Opening stock is assigned here. Use Transfers to move stock between warehouses later.</span>
+            </div>
+          )}
           <div className="ch-field">
             <label className="ch-label" htmlFor="pf-reorder">Reorder level</label>
             <input id="pf-reorder" className="ch-input" type="number" min="0" step="1" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: e.target.value })} placeholder="10" />

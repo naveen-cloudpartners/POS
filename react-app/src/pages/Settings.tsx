@@ -14,7 +14,6 @@ import {
   getNotificationSettings,
   getPaymentMethods,
   getSettings,
-  getSmtpStatus,
   getTaxSettings,
   getZohoStatus,
   removeCompanyLogo,
@@ -22,7 +21,6 @@ import {
   saveNotificationSettings,
   savePaymentMethods,
   saveSettings,
-  saveSmtp,
   saveTaxSettings,
   sendLowStockDigest,
   uploadCompanyLogo,
@@ -38,12 +36,16 @@ import {
   getPrintRouting,
   savePrinters,
   savePrintRouting,
+  discoverQzPrinters,
+  sendPrintJob,
   type Printer,
+  type PrintJob,
   type PrintRouting,
 } from '../services/printService';
 import { useAuth } from '../context/AuthContext';
 import { calcLine } from '../utils/tax';
 import { currency } from '../utils/format';
+import type { PosReceipt } from '../services/orderService';
 import type { Product, StoreSettings, ZohoStatus } from '../types';
 import './Settings.css';
 
@@ -85,7 +87,6 @@ const SETTINGS_SECTION_IDS: Array<string> = [
   'taxes',
   'printers',
   'notifications',
-  'email',
   'integrations',
   'payments',
 ];
@@ -108,14 +109,6 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [savingKey, setSavingKey] = useState('');
 
-  const [smtpHost, setSmtpHost] = useState('');
-  const [smtpPort, setSmtpPort] = useState('587');
-  const [smtpUser, setSmtpUser] = useState('');
-  const [smtpPass, setSmtpPass] = useState('');
-  const [smtpFrom, setSmtpFrom] = useState('');
-  const [smtpConfigured, setSmtpConfigured] = useState(false);
-  const [smtpBusy, setSmtpBusy] = useState(false);
-
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoTick, setLogoTick] = useState(0);
   const [payMethods, setPayMethods] = useState<Array<PaymentMethod>>([]);
@@ -124,9 +117,13 @@ export default function Settings() {
   const [newPrinterName, setNewPrinterName] = useState('');
   const [newRuleName, setNewRuleName] = useState('');
   const [newRuleStation, setNewRuleStation] = useState('kitchen');
+  const [qzConnected, setQzConnected] = useState(false);
+  const [qzPrinters, setQzPrinters] = useState<Array<string>>([]);
+  const [qzMessage, setQzMessage] = useState('');
   const [digestBusy, setDigestBusy] = useState(false);
   const [previewPrice, setPreviewPrice] = useState('100');
   const [previewRate, setPreviewRate] = useState('');
+  const [previewRateManuallySelected, setPreviewRateManuallySelected] = useState(false);
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfileRate, setNewProfileRate] = useState('');
 
@@ -146,10 +143,9 @@ export default function Settings() {
       getPrinters().catch(() => [] as Array<Printer>),
       getPrintRouting(),
       getZohoStatus(),
-      getSmtpStatus(),
       getProducts().catch(() => [] as Array<Product>),
     ])
-      .then(([s, co, tx, nt, he, pm, pr, rt, z, smtp, prods]) => {
+      .then(([s, co, tx, nt, he, pm, pr, rt, z, prods]) => {
         setSettings(s);
         setCompany(co);
         setTax(tx);
@@ -160,18 +156,31 @@ export default function Settings() {
         setRouting(rt);
         setProducts(prods);
         setZoho(z);
-        setSmtpHost(smtp.smtp_host);
-        setSmtpPort(smtp.smtp_port);
-        setSmtpUser(smtp.smtp_user);
-        setSmtpFrom(smtp.smtp_from);
-        setSmtpConfigured(smtp.configured);
-        if (tx !== null && previewRate === '') setPreviewRate(String(tx.default_rate));
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load settings'))
       .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
+
+  useEffect(() => {
+    if (!printers.some((printer) => printer.transport === 'qz')) return;
+    discoverQzPrinters().then((result) => {
+      setQzConnected(result.connected);
+      setQzPrinters(result.printers);
+      setQzMessage(result.error ?? '');
+    });
+  }, [printers]);
+
+  // Keep the preview on the loaded/saved default until an operator chooses a
+  // different profile. If a selected profile is removed, fall back to the
+  // default so the select value and preview calculation can never diverge.
+  useEffect(() => {
+    if (tax === null) return;
+    const defaultRate = String(tax.default_rate);
+    const validRates = new Set([defaultRate, ...tax.profiles.map((profile) => String(profile.rate))]);
+    setPreviewRate((current) => (!previewRateManuallySelected || !validRates.has(current) ? defaultRate : current));
+  }, [tax, previewRateManuallySelected]);
 
   const taxStats = useMemo(() => {
     const rates = products.map((p) => Number(p.tax_percentage ?? 0));
@@ -286,11 +295,17 @@ export default function Settings() {
 
   const addPrinter = () => {
     const name = newPrinterName.trim();
-    if (name === '') return;
+    // Silent no-op here read as "Add printer is broken" — always respond.
+    if (name === '') {
+      setError('Printer name is required — type a name (e.g. Kitchen printer), then Add printer.');
+      return;
+    }
     const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'printer'}-${Date.now().toString(36)}`;
     const printer: Printer = { id, name: name.slice(0, 80), station: 'kitchen', width: 80, transport: 'browser', address: '', enabled: true };
     setPrinters((prev) => [...prev, printer]);
     setNewPrinterName('');
+    setError('');
+    setNotice(`Printer "${name.slice(0, 80)}" added to the list — click Save settings to persist it.`);
   };
 
   const saveRoutingForm = () => {
@@ -309,9 +324,69 @@ export default function Settings() {
 
   const addRoutingRule = () => {
     const name = newRuleName.trim().toLowerCase();
-    if (name === '' || routing === null) return;
+    if (name === '') {
+      setError('Category name is required for a routing rule.');
+      return;
+    }
+    if (routing === null) return;
     setRouting({ ...routing, byCategoryName: { ...routing.byCategoryName, [name]: newRuleStation } });
     setNewRuleName('');
+  };
+
+  /* Test a real printer through the browser pipeline: counter prints a
+     sample bill, kitchen/bar print a sample KOT. Pick the physical printer
+     in the OS dialog (or set it as default). The 192.168.x address field is
+     only used by QZ/Bridge/Cloud transports — browser printing always goes
+     through this terminal's OS printers. */
+  const testPrinter = (p: Printer) => {
+    setError('');
+    const now = new Date().toLocaleString();
+    const job: PrintJob = p.station === 'counter'
+      ? (() => {
+        const sample: PosReceipt = {
+          store: { store_name: company.company_name || 'CloudHub POS', company: company.legal_name || '', currency: 'LKR' },
+          orderId: 'TEST-001',
+          invoiceNumber: 'TEST-001',
+          booksInvoiceId: '',
+          date: now,
+          customerName: 'Test print',
+          customerEmail: '',
+          paymentMode: 'Cash',
+          payments: [{ mode: 'Cash', amount: 236 }],
+          lines: [
+            { name: 'Test item 1', quantity: 2, rate: 100, discount: 0, discountType: 'percent', lineTotal: 200 },
+            { name: 'Test item 2', quantity: 1, rate: 36, discount: 0, discountType: 'percent', lineTotal: 36 },
+          ],
+          subtotal: 236,
+          tax: 0,
+          discount: 0,
+          total: 236,
+          tendered: 236,
+          change: 0,
+        };
+        return { jobId: `test-bill-${p.id}`, template: 'bill', station: 'counter', printerId: p.id, printerName: p.name, copies: 1, payload: { receipt: sample } };
+      })()
+      : {
+        jobId: `test-kot-${p.id}`, template: p.station === 'bar' ? 'bar' : 'kot', station: p.station,
+        printerId: p.id, printerName: p.name, copies: 1, payload: {
+        kotNumber: 'TEST-001',
+        station: p.station,
+        items: [
+          { name: 'Test item 1', qty: 2, sku: '' },
+          { name: 'Test item 2', qty: 1, sku: '' },
+        ],
+        orderId: 'TEST-001',
+        invoiceNumber: 'TEST-001',
+        customerName: 'Test print',
+        roomNumber: '',
+        kitchenNotes: 'Test chit — no action needed.',
+        cashier: 'Admin',
+        firedAt: now,
+      }};
+    sendPrintJob(job, p).then((result) => {
+      if (!result.ok) setError(result.error ?? 'Test print failed.');
+      else setNotice(result.transport === 'qz' ? `Test chit sent silently to "${p.osPrinter}".` : `Test chit sent for "${p.name}" — pick the physical printer in the OS dialog.`);
+    });
   };
 
   const sendDigest = () => {
@@ -321,22 +396,6 @@ export default function Settings() {
       .then((res) => setNotice(res.message ?? (res.sent ? `Digest sent to ${(res.to ?? []).join(', ')}.` : 'Digest checked.')))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Digest failed'))
       .finally(() => setDigestBusy(false));
-  };
-
-  const saveSmtpForm = () => {
-    if (smtpHost.trim() === '' || smtpUser.trim() === '' || smtpPass === '') {
-      setError('SMTP host, username and password are required.');
-      return;
-    }
-    setSmtpBusy(true);
-    saveSmtp({ smtp_host: smtpHost.trim(), smtp_port: smtpPort, smtp_user: smtpUser.trim(), smtp_pass: smtpPass, smtp_from: smtpFrom.trim() || smtpUser.trim() })
-      .then(() => {
-        setNotice('SMTP configuration saved.');
-        setSmtpPass('');
-        load();
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'SMTP save failed'))
-      .finally(() => setSmtpBusy(false));
   };
 
   const onLogoFile = (file: File | undefined) => {
@@ -393,13 +452,20 @@ export default function Settings() {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Disconnect failed'));
   };
 
+  const previewRateOptions = tax === null
+    ? []
+    : [String(tax.default_rate), ...tax.profiles.map((profile) => String(profile.rate))];
+  const selectedPreviewRate = tax !== null && previewRateOptions.includes(previewRate)
+    ? previewRate
+    : String(tax?.default_rate ?? 0);
+
   const preview = useMemo(() => {
     const price = Math.max(0, Number(previewPrice) || 0);
-    const rate = Math.max(0, Math.min(100, Number(previewRate) || 0));
+    const rate = Math.max(0, Math.min(100, Number(selectedPreviewRate) || 0));
     const mode = tax?.mode ?? 'exclusive';
     const r = calcLine({ qty: 1, rate: price, taxPct: rate }, { mode, round: tax?.round ?? true });
     return { price, rate, sub: r.net, tax: r.tax, total: r.net + r.tax, mode };
-  }, [previewPrice, previewRate, tax]);
+  }, [previewPrice, selectedPreviewRate, tax]);
 
   const setNotifKey = (key: string, patch: Partial<{ enabled: boolean; channels: Array<string>; threshold: string; recipients: string; frequency: string }>) => {
     setNotif((prev) => {
@@ -942,7 +1008,15 @@ export default function Settings() {
                 </div>
                 <div className="ch-field">
                   <label className="ch-label" htmlFor="st-prev-rate">Rate %</label>
-                  <select id="st-prev-rate" className="ch-select" value={previewRate} onChange={(e) => setPreviewRate(e.target.value)}>
+                  <select
+                    id="st-prev-rate"
+                    className="ch-select"
+                    value={selectedPreviewRate}
+                    onChange={(e) => {
+                      setPreviewRate(e.target.value);
+                      setPreviewRateManuallySelected(e.target.value !== String(tax.default_rate));
+                    }}
+                  >
                     <option value={String(tax.default_rate)}>Default ({tax.default_rate}%)</option>
                     {tax.profiles.map((p) => <option key={p.name} value={String(p.rate)}>{p.name} ({p.rate}%)</option>)}
                   </select>
@@ -1072,50 +1146,6 @@ export default function Settings() {
               </div>
             </>
           )}
-        </Card>
-
-        )}
-        {activeSection === 'email' && (
-        <Card
-          id="email"
-          title="SMTP email"
-          subtitle="Receipts and notifications delivery"
-          action={<span>{smtpConfigured ? <StatusBadge status="Connected" /> : <StatusBadge status="Pending" />}</span>}
-          footer={
-            isAdmin ? (
-              <button type="button" className="ch-btn ch-btn-primary" onClick={saveSmtpForm} disabled={smtpBusy}>
-                <Save size={15} /> {smtpBusy ? 'Saving…' : 'Save SMTP'}
-              </button>
-            ) : (
-              <span className="ch-hint">Read-only — Managers cannot save settings.</span>
-            )
-          }
-        >
-          <div className="ch-form-grid">
-            <div className="ch-field">
-              <label className="ch-label" htmlFor="smtp-host">Host</label>
-              <input id="smtp-host" className="ch-input" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.example.com" autoComplete="off" disabled={!isAdmin} />
-            </div>
-            <div className="ch-field">
-              <label className="ch-label" htmlFor="smtp-port">Port</label>
-              <input id="smtp-port" className="ch-input" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} placeholder="587" autoComplete="off" disabled={!isAdmin} />
-            </div>
-            <div className="ch-field">
-              <label className="ch-label" htmlFor="smtp-user">Username</label>
-              <input id="smtp-user" className="ch-input" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} placeholder="user@example.com" autoComplete="off" disabled={!isAdmin} />
-            </div>
-            <div className="ch-field">
-              <label className="ch-label" htmlFor="smtp-pass">Password</label>
-              <input id="smtp-pass" className="ch-input" type="password" value={smtpPass} onChange={(e) => setSmtpPass(e.target.value)} placeholder={smtpConfigured ? '•••••••• (unchanged)' : 'SMTP password'} autoComplete="new-password" disabled={!isAdmin} />
-            </div>
-            <div className="ch-field ch-field-full">
-              <label className="ch-label" htmlFor="smtp-from">From address</label>
-              <input id="smtp-from" className="ch-input" value={smtpFrom} onChange={(e) => setSmtpFrom(e.target.value)} placeholder="noreply@store.lk" disabled={!isAdmin} />
-            </div>
-          </div>
-          <p className="ch-hint" style={{ marginTop: 10, display: 'flex', gap: 6, alignItems: 'center' }}>
-            <Mail size={13} aria-hidden="true" /> Password is never displayed back — it is stored server-side only.
-          </p>
         </Card>
 
         )}
@@ -1250,15 +1280,40 @@ export default function Settings() {
                   </select>
                 </div>
                 <div className="ch-field">
-                  <label className="ch-label" htmlFor={`pr-addr-${p.id}`}>Address (IP / queue, optional)</label>
-                  <input
-                    id={`pr-addr-${p.id}`}
-                    className="ch-input"
-                    value={p.address}
-                    onChange={(e) => setPrinters((prev) => prev.map((x) => (x.id === p.id ? { ...x, address: e.target.value } : x)))}
-                    placeholder="192.168.1.50"
-                    disabled={!isAdmin}
-                  />
+                  {p.transport === 'qz' && qzConnected ? (
+                    <>
+                      <label className="ch-label" htmlFor={`pr-os-${p.id}`}>Windows printer</label>
+                      <select
+                        id={`pr-os-${p.id}`}
+                        className="ch-select"
+                        value={p.osPrinter ?? ''}
+                        onChange={(e) => setPrinters((prev) => prev.map((x) => (x.id === p.id ? { ...x, osPrinter: e.target.value } : x)))}
+                        disabled={!isAdmin}
+                      >
+                        <option value="">Select a detected printer…</option>
+                        {qzPrinters.map((name) => <option key={name} value={name}>{name}</option>)}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <label className="ch-label" htmlFor={`pr-addr-${p.id}`}>Address (IP / queue, optional)</label>
+                      <input
+                        id={`pr-addr-${p.id}`}
+                        className="ch-input"
+                        value={p.address}
+                        onChange={(e) => setPrinters((prev) => prev.map((x) => (x.id === p.id ? { ...x, address: e.target.value } : x)))}
+                        placeholder="192.168.1.50"
+                        disabled={!isAdmin}
+                      />
+                    </>
+                  )}
+                  {p.transport === 'qz' && (
+                    <p className="ch-hint" style={{ margin: '5px 0 0' }}>
+                      {qzConnected
+                        ? `QZ connected — ${qzPrinters.length} Windows printer${qzPrinters.length === 1 ? '' : 's'} detected.`
+                        : <><a href="https://qz.io/download/" target="_blank" rel="noreferrer">Install QZ Tray on this terminal</a>{qzMessage ? ` — ${qzMessage}` : ''}</>}
+                    </p>
+                  )}
                 </div>
                 <div className="ch-field" style={{ alignSelf: 'end' }}>
                   <span className="ch-row" style={{ gap: 8 }}>
@@ -1281,16 +1336,34 @@ export default function Settings() {
                         Remove
                       </button>
                     )}
-                  </span>
+                    <button
+                      type="button"
+                      className="ch-btn ch-btn-secondary ch-btn-sm"
+                      onClick={() => testPrinter(p)}
+                      title="Print a sample chit through this terminal's OS printers"
+                    >
+                      Test print
+                    </button>
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+            <p className="ch-hint" style={{ marginTop: 8 }}>
+              Real printers work through this terminal: Browser print opens the OS dialog — pick the physical
+              printer there (or set it as default). The IP/queue address is only used by QZ Tray, print-bridge
+              or Cloud transports; the cloud backend can never reach LAN addresses like 192.168.x.x directly.
+            </p>
+            <p className="ch-hint">
+              QZ Tray connects locally over <code>wss://localhost</code>. Its standard unsigned mode prompts
+              this browser/terminal for approval; production terminals should install QZ Tray with the shop's
+              own certificate and allowlist this POS origin. No certificate or private key is stored by CloudHub POS.
+            </p>
           {isAdmin && (
             <div className="ch-form-grid" style={{ marginTop: 8 }}>
               <div className="ch-field">
                 <label className="ch-label" htmlFor="pr-new-name">New printer name</label>
-                <input id="pr-new-name" className="ch-input" value={newPrinterName} onChange={(e) => setNewPrinterName(e.target.value)} placeholder="e.g. Kitchen printer" />
+                <input id="pr-new-name" className="ch-input" value={newPrinterName} onChange={(e) => setNewPrinterName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addPrinter(); }} placeholder="e.g. Kitchen printer" />
               </div>
               <div className="ch-field" style={{ alignSelf: 'end' }}>
                 <button type="button" className="ch-btn ch-btn-secondary ch-btn-sm" onClick={addPrinter}>
@@ -1329,7 +1402,7 @@ export default function Settings() {
                   </select>
                 </div>
               </div>
-              <h4 className="cust-h">Category rules (name match)</h4>
+              <h4 className="cust-h">Category rules (case-insensitive name contains match)</h4>
               {Object.entries(routing.byCategoryName).length === 0 ? (
                 <p className="ch-hint">No rules — everything fires at the default station.</p>
               ) : (

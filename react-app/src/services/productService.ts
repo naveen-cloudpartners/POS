@@ -47,6 +47,8 @@ export async function createProduct(input: {
   barcode?: string;
   unit?: string;
   description?: string;
+  /** Active warehouse that receives this product's opening stock. */
+  warehouse_id?: number | string;
   category_id?: number | string | null;
   category_ids?: Array<string>;
 }): Promise<Product | null> {

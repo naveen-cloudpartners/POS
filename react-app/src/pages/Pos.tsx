@@ -10,8 +10,7 @@ import { getProducts } from '../services/productService';
 import { checkout, sendReceiptEmail, voidOrder, type PosReceipt } from '../services/orderService';
 import { getCustomers } from '../services/customerService';
 import { getPaymentMethods, getSettings, getSmtpStatus, getTaxSettings } from '../services/settingsService';
-import type { KotJobPayload, PrintJob } from '../services/printService';
-import { kotHtml, openPrintWindow } from '../utils/print';
+import { getPrinters, sendPrintJob, type KotJobPayload, type Printer as PrinterConfig, type PrintJob } from '../services/printService';
 import { useAuth } from '../context/AuthContext';
 import { currency, number, isLowStock, isOutOfStock } from '../utils/format';
 import { calcTotals, type TaxOpts } from '../utils/tax';
@@ -93,6 +92,10 @@ export default function Pos() {
   const [taxName, setTaxName] = useState('Tax');
   // SET-05: tender methods offered follow Settings → Payment methods.
   const [tenderModes, setTenderModes] = useState<Array<PayMode>>(['Cash', 'Card', 'Bank']);
+  // Preloaded once: print dispatch below must resolve the printer
+  // synchronously from the click handler so the browser-popup path keeps the
+  // user gesture (an await before window.open gets popup-blocked).
+  const [terminalPrinters, setTerminalPrinters] = useState<Array<PrinterConfig>>([]);
 
   const load = () => {
     setLoading(true);
@@ -120,6 +123,7 @@ export default function Pos() {
       })
       .catch(() => undefined);
     getSmtpStatus().then((s) => setSmtpReady(s.configured)).catch(() => undefined);
+    getPrinters().then(setTerminalPrinters).catch(() => undefined);
     getTaxSettings()
       .then((t) => {
         if (t !== null) {
@@ -382,38 +386,26 @@ export default function Pos() {
     URL.revokeObjectURL(url);
   };
 
+  const dispatchPrintJob = (job: PrintJob) => {
+    const printer = terminalPrinters.find((p) => p.id === job.printerId)
+      ?? terminalPrinters.find((p) => p.station === job.station && p.enabled)
+      ?? null;
+    // No await before sendPrintJob's browser path: window.open still runs in
+    // this click task. QZ jobs go async silently (no popup involved).
+    sendPrintJob(job, printer)
+      .then((result) => { if (!result.ok) setError(result.error ?? 'Print failed.'); })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Print failed.'));
+  };
+
   const printReceipt = () => {
     if (receipt === null) return;
-    const w = window.open('', '_blank', 'width=480,height=640');
-    if (w === null) {
-      setEmailMsg('Popup blocked — allow popups to print.');
-      return;
-    }
-    const money = (n: number): string => currency(n);
-    const rows = receipt.lines.map((l) =>
-      `<tr><td>${l.name}<br/><small>${l.quantity} × ${money(l.rate)}${l.discount > 0 ? ` (−${money(l.discount)})` : ''}</small></td><td align="right">${money(l.lineTotal)}</td></tr>`,
-    ).join('');
-    const pays = receipt.payments.map((p) => `<div>${p.mode}: ${money(p.amount)}</div>`).join('');
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Receipt ${receipt.invoiceNumber || receipt.orderId}</title></head>` +
-      `<body style="font-family:Arial,sans-serif;max-width:380px;margin:0 auto;padding:16px;">` +
-      `<h1 style="font-size:18px;margin:0 0 2px;">${receipt.store.store_name || 'CloudHub POS'}</h1>` +
-      `<p>Invoice: ${receipt.invoiceNumber || receipt.orderId}<br/>Date: ${receipt.date}<br/>Customer: ${receipt.customerName}</p>` +
-      `<table style="width:100%;border-collapse:collapse;font-size:13px;">${rows}</table>` +
-      `<p>Subtotal: ${money(receipt.subtotal)}<br/>Tax: ${money(receipt.tax)}<br/>Discount: −${money(receipt.discount)}<br/><strong>Total: ${money(receipt.total)}</strong></p>` +
-      `<p>${pays}</p></body></html>`);
-    w.document.close();
-    w.focus();
-    w.print();
+    void dispatchPrintJob({ jobId: `bill-${receipt.orderId}`, template: 'bill', station: 'counter', printerId: null, printerName: 'Counter (default)', copies: 1, payload: { receipt } });
   };
 
   const printKot = (job: PrintJob) => {
     const payload = job.payload as Partial<KotJobPayload>;
     if (!payload.kotNumber || !Array.isArray(payload.items)) return;
-    const ok = openPrintWindow(
-      `KOT ${payload.kotNumber}`,
-      kotHtml(payload as KotJobPayload),
-    );
-    if (!ok) setEmailMsg('Popup blocked — allow popups to print.');
+    void dispatchPrintJob(job);
   };
 
   if (loading) return <Loader message="Loading POS…" skeleton="page" />;
@@ -719,7 +711,7 @@ export default function Pos() {
         footer={
           <>
             <button type="button" className="ch-btn ch-btn-secondary" onClick={printReceipt}><Printer size={15} /> Print</button>
-            {printJobs.map((j) => (
+            {printJobs.filter((j) => j.template !== 'bill').map((j) => (
               <button key={j.jobId} type="button" className="ch-btn ch-btn-secondary" onClick={() => printKot(j)}>
                 <Printer size={15} /> {(j.payload as Partial<KotJobPayload>).kotNumber ?? j.station}
               </button>

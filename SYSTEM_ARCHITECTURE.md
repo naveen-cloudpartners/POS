@@ -124,7 +124,9 @@ change writes a `CustomerActivity` row.
   settings/SMTP/master-key writes, catalog writes, legacy stock adjust,
   checkout sell check, dashboard aggregates, shifts, Books sync.
 - Lifecycle: `POST /api/admin/users` (invite + best-effort Catalyst
-  `registerUser`), `PUT`, `DELETE` (Admin, self + last-Admin guards),
+  `registerUser`), `PUT`, `DELETE` (Admin, self + last-Admin guards;
+  removes roster JSON, `OrgUsers`, and the Catalyst Auth project user using
+  its `user_id`, with an honest best-effort fallback message),
   `activate` / `deactivate` (Admin, last-Admin guard),
   `reset-password` (re-invite), `change-role` (Manager cannot touch Admin).
 - Audit: `auditMiddleware` (registered post-CORS) appends a `UserAuditLog`
@@ -220,8 +222,10 @@ runs the Ack/Done board; printers + routing are managed in Settings.
 
 - `Configurations`: `org_<id>_setting_printers` (JSON: id, name, station
   `counter|kitchen|bar`, width `58|80mm`, transport, address, active) and
-  `org_<id>_setting_print_routing` (category → station map; unmapped
-  categories fall back to counter-only).
+  `org_<id>_setting_print_routing` (category → station map; category-name
+  rules are case-insensitive substring matches, with an exact or longest
+  match winning; unmapped categories fall back to the selected default
+  station, initially counter).
 - Catalog: `Categories.station` (or `Products` override) drives the split —
   Food → kitchen KOT, Beverages → bar, everything → counter bill.
 - Order flow: `POST /api/orders` validates + writes rows, then builds
