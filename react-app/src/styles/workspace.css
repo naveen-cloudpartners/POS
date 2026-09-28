@@ -303,10 +303,10 @@
   .ch-scrim { display: none; }
 }
 
-/* Tablet: rail stays, context panel becomes an overlay drawer */
+/* Tablet and phone: use the drawer so the application gets the full viewport
+   width. The Header menu button opens this same navigation. */
 @media (max-width: 1024px) {
-  .ch-side .ch-panel { display: none; }
-  .ch-rail-collapse { display: none; }
+  .ch-side { display: none; }
 }
 
 /* Mobile: rail hides too — full drawer navigation */

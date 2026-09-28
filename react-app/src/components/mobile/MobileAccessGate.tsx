@@ -1,26 +1,14 @@
-import { useState, type ReactNode } from 'react';
-import { deviceIsMobile, hasDesktopOverride, setDesktopOverride } from './detect';
-import MobileAccessScreen from './MobileAccessScreen';
+import type { ReactNode } from 'react';
 
 interface MobileAccessGateProps {
   children: ReactNode;
 }
 
 /**
- * Global device gate — evaluated once at startup (zero desktop impact).
- * Mobile visitors see the access screen unless they chose desktop mode,
- * which persists in localStorage under `cloudhub_mobile_override`.
+ * Responsive web access is enabled for phone and tablet terminals. The
+ * component remains as a stable app-shell seam, but no longer replaces the
+ * application with the former desktop-only access screen.
  */
 export default function MobileAccessGate({ children }: MobileAccessGateProps) {
-  const [mobile] = useState<boolean>(() => deviceIsMobile());
-  const [override, setOverride] = useState<boolean>(() => hasDesktopOverride());
-
-  if (!mobile || override) return <>{children}</>;
-
-  const continueToDesktop = () => {
-    setDesktopOverride();
-    setOverride(true);
-  };
-
-  return <MobileAccessScreen onContinue={continueToDesktop} />;
+  return <>{children}</>;
 }

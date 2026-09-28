@@ -408,7 +408,9 @@ button { font-family: inherit; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1024px) {
-  .ch-main, .ch-app.panel-collapsed .ch-main { margin-left: calc(var(--ch-rail-w) + var(--ch-side-gap) * 2); }
+  /* Tablet uses the existing menu drawer. Reclaim the rail width for
+     working screens such as POS, orders and inventory tables. */
+  .ch-main, .ch-app.panel-collapsed .ch-main { margin-left: 0; }
   .ch-menu-btn { display: inline-flex; }
   .ch-header { margin: 10px 14px 0; }
   .ch-content { padding: 16px 16px 44px; }
@@ -441,6 +443,8 @@ button { font-family: inherit; }
   .ch-page-head { align-items: flex-start; margin-bottom: 16px; }
   .ch-page-actions { width: 100%; }
   .ch-page-actions .ch-btn { flex: 1 1 auto; }
+  .ch-crumbs { display: none; }
+  .ch-page-sub { display: none; }
 }
 
 @media (min-width: 1025px) {
