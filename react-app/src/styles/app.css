@@ -156,6 +156,7 @@ button { font-family: inherit; }
   max-width: 1440px;
   width: 100%;
   margin: 0 auto;
+  min-width: 0;
   animation: ch-fade-up 0.35s var(--ch-ease) both;
 }
 /* In-page anchors (report/setting sections) land below the sticky header */
@@ -190,6 +191,7 @@ button { font-family: inherit; }
   margin-bottom: 22px;
   flex-wrap: wrap;
 }
+.ch-page-head > * { min-width: 0; }
 .ch-page-title {
   margin: 0;
   font-size: 26px;
@@ -205,6 +207,7 @@ button { font-family: inherit; }
   font-weight: 500;
 }
 .ch-page-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.ch-page-actions .ch-btn { min-height: 38px; }
 
 /* ---------- Buttons ---------- */
 .ch-btn {
@@ -424,6 +427,20 @@ button { font-family: inherit; }
   .ch-env-pill { display: none; }
   .ch-profile-meta { display: none; }
   .ch-profile { padding: 5px; }
+}
+
+/* Narrow terminals: preserve controls without allowing the header to spill
+   sideways. Each page already has its own visible title below the header. */
+@media (max-width: 520px) {
+  .ch-header { min-height: 56px; margin: 8px 8px 0; padding: 7px 9px; }
+  .ch-header > div:first-of-type { display: none; }
+  .ch-header-right { gap: 6px; }
+  .ch-header-right > .ch-badge { display: none; }
+  .ch-header-right .ch-btn-primary { width: 38px; padding: 9px; font-size: 0; gap: 0; }
+  .ch-content { padding: 14px 10px 32px; }
+  .ch-page-head { align-items: flex-start; margin-bottom: 16px; }
+  .ch-page-actions { width: 100%; }
+  .ch-page-actions .ch-btn { flex: 1 1 auto; }
 }
 
 @media (min-width: 1025px) {
