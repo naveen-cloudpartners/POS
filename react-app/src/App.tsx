@@ -13,6 +13,7 @@ import Customers from './pages/Customers';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
 import Reports from './pages/Reports';
+import Purchases from './pages/Purchases';
 import WorkspaceView from './pages/WorkspaceView';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
@@ -38,10 +39,17 @@ export default function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/inventory/products" element={<Products />} />
           <Route path="/inventory/categories" element={<WorkspaceView />} />
-          <Route path="/inventory/adjustments" element={<WorkspaceView />} />
           <Route path="/inventory/warehouses" element={<WorkspaceView />} />
           <Route path="/inventory/transfers" element={<WorkspaceView />} />
           <Route path="/inventory/movements" element={<WorkspaceView />} />
+
+          {/* Purchasing workspace */}
+          <Route path="/purchases" element={<Purchases />} />
+          <Route path="/purchases/vendors" element={<Purchases />} />
+          <Route path="/purchases/orders" element={<Purchases />} />
+          <Route path="/purchases/receiving" element={<Purchases />} />
+          <Route path="/purchases/bills" element={<Purchases />} />
+          <Route path="/purchases/payments" element={<Purchases />} />
           {/* Legacy alias */}
           <Route path="/products" element={<Products />} />
 

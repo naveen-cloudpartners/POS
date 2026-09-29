@@ -60,7 +60,7 @@ are the next section's prerequisites.
 ## 4. Warehouses, transfers, movements
 
 **Prerequisites:** §3 green. `Warehouses`, `WarehouseStock`, `StockTransfers`, `TransferItems`, `StockMovements` tables.
-**UI to check:** Warehouses (CRUD, set default, 409-on-stock delete) · Transfers (create → Draft → Pending → Approved → Completed/Cancelled + cancel) · Adjustments console · Movements ledger (filters, in/out summary, CSV).
+**UI to check:** Warehouses (CRUD, set default, 409-on-stock delete) · Transfers (create → Draft → Pending → Approved → Completed/Cancelled + cancel) · Stock-page Adjust modal (warehouse picker + required reason) · Movements ledger (filters, in/out summary, CSV).
 **API to check:** `/api/warehouses*`, `/api/warehouse-stock*`, `/api/transfers*` (+ `/approve|/complete|/cancel`), `GET /api/stock-movements`.
 **Rule:** `Products.stock` = SUM(`WarehouseStock.quantity`); EVERY stock change writes a `StockMovements` row.
 **Typical faults:**

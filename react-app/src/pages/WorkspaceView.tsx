@@ -12,7 +12,6 @@ import {
   Gift,
   HeartHandshake,
   ImageOff,
-  Minus,
   Package,
   Pencil,
   Plus,
@@ -37,7 +36,7 @@ import ErrorState from '../components/ui/ErrorState';
 import EmptyState from '../components/ui/EmptyState';
 import { useAuth } from '../context/AuthContext';
 import { can } from '../services/authService';
-import { adjustStock, getProducts, getCategories, createCategory, updateCategory, deactivateCategory, deleteCategory, repairCategoryLinks, type RepairResult } from '../services/productService';
+import { getProducts, getCategories, createCategory, updateCategory, deactivateCategory, deleteCategory, repairCategoryLinks, type RepairResult } from '../services/productService';
 import { getOrders } from '../services/orderService';
 import { getCampaigns, createCampaign, updateCampaign, redeemReward, getCustomers, type RewardCampaign } from '../services/customerService';
 import { exportAuditCsv, exportAuditPdf, getAuditLogs, getUsers, type AuditMetrics, type AuditRecord } from '../services/userService';
@@ -53,7 +52,7 @@ import {
   uploadCompanyLogo,
   type CompanyProfile,
 } from '../services/settingsService';
-import { avatarGradient, currency, customerTier, formatDate, initials, number, stockStatus } from '../utils/format';
+import { avatarGradient, currency, customerTier, formatDate, initials, number } from '../utils/format';
 import type { Category, Customer, Order, PosUser, Product, SmtpStatus, ZohoStatus } from '../types';
 import Warehouses from './Warehouses';
 import Transfers from './Transfers';
@@ -453,112 +452,6 @@ function CategoriesView() {
             ? ''
             : `Delete "${deleteTarget.cat.name}" permanently? This cannot be undone. Categories with products can only be deactivated.`}
         </p>
-      </Modal>
-    </div>
-  );
-}
-
-/* ---------------- Adjustments ---------------- */
-
-function AdjustmentsView() {
-  const { role } = useAuth();
-  const [products, setProducts] = useState<Array<Product>>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [search, setSearch] = useState('');
-  const [target, setTarget] = useState<Product | null>(null);
-  const [delta, setDelta] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const editable = can('adjust_stock', role === '' ? 'Admin' : role);
-
-  const load = () => {
-    setLoading(true);
-    getProducts().then(setProducts).catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load')).finally(() => setLoading(false));
-  };
-  useEffect(load, []);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (q === '') return products;
-    return products.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
-  }, [products, search]);
-
-  const quick = (p: Product, d: number) => {
-    setBusy(true);
-    adjustStock(String(p.ROWID ?? p.sku), d, 'Quick adjustment from Adjustments view')
-      .then((res) => {
-        setNotice(`${p.name}: ${res.old_stock ?? '?'} → ${res.new_stock ?? '?'}.`);
-        load();
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Adjustment failed'))
-      .finally(() => setBusy(false));
-  };
-
-  const submit = () => {
-    if (target === null || delta.trim() === '') return;
-    setBusy(true);
-    adjustStock(String(target.ROWID ?? target.sku), Number(delta), 'Manual adjustment from Adjustments view')
-      .then((res) => {
-        setNotice(`${target.name}: ${res.old_stock ?? '?'} → ${res.new_stock ?? '?'}.`);
-        setTarget(null);
-        setDelta('');
-        load();
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Adjustment failed'))
-      .finally(() => setBusy(false));
-  };
-
-  if (loading) return <Loader message="Loading adjustments…" skeleton="page" />;
-  if (error !== '' && products.length === 0) return <ErrorState message={error} onRetry={load} />;
-
-  return (
-    <div>
-      <ViewHead title="Stock Adjustments" sub="Correct counts for deliveries, wastage, damage and recounts." />
-      {notice !== '' && <div className="ch-alert ch-alert-success">{notice}</div>}
-      {error !== '' && <div className="ch-alert ch-alert-error">{error}</div>}
-      <Card delay={80}>
-        <div className="ch-toolbar">
-          <SearchBar value={search} onChange={setSearch} placeholder="Search SKU or name…" ariaLabel="Search products" />
-          <span className="ch-cell-sub" style={{ marginLeft: 'auto', fontWeight: 700 }}>{filtered.length} items</span>
-        </div>
-        <Table
-          columns={[
-            { key: 'p', header: 'Product', render: (p: Product) => <span><span className="ch-cell-main">{p.name}</span><br /><span className="ch-cell-sub">{p.sku}</span></span> },
-            { key: 's', header: 'On hand', numeric: true, render: (p: Product) => <b>{number(p.stock)}</b> },
-            { key: 'st', header: 'Status', render: (p: Product) => <StatusBadge status={stockStatus(Number(p.stock))} /> },
-            {
-              key: 'a', header: 'Adjust', render: (p: Product) => (
-                <span className="ws-quick">
-                  <button type="button" className="ch-btn ch-btn-secondary ch-btn-sm" disabled={!editable || busy} onClick={() => quick(p, -1)} aria-label={`Remove 1 ${p.name}`}><Minus size={13} /></button>
-                  <button type="button" className="ch-btn ch-btn-secondary ch-btn-sm" disabled={!editable || busy} onClick={() => quick(p, 1)} aria-label={`Add 1 ${p.name}`}><Plus size={13} /></button>
-                  <button type="button" className="ch-btn ch-btn-ghost ch-btn-sm" disabled={!editable} onClick={() => { setTarget(p); setDelta(''); }}>Custom</button>
-                </span>
-              ),
-            },
-          ]}
-          rows={filtered.slice(0, 60)}
-          rowKey={(p, i) => `${String(p.ROWID ?? p.sku)}-${i}`}
-        />
-        {filtered.length > 60 && <p className="ch-hint" style={{ marginTop: 10 }}>Showing first 60 of {filtered.length} — refine search to narrow.</p>}
-      </Card>
-      <Modal
-        open={target !== null}
-        title={target === null ? 'Adjust stock' : `Adjust — ${target.name}`}
-        subtitle={target === null ? undefined : `Current: ${number(target.stock)} units`}
-        onClose={() => setTarget(null)}
-        footer={
-          <>
-            <button type="button" className="ch-btn ch-btn-secondary" onClick={() => setTarget(null)} disabled={busy}>Cancel</button>
-            <button type="button" className="ch-btn ch-btn-primary" onClick={submit} disabled={busy || delta.trim() === ''}>{busy ? 'Saving…' : 'Apply'}</button>
-          </>
-        }
-      >
-        <div className="ch-field">
-          <label className="ch-label" htmlFor="ws-delta">Quantity change</label>
-          <input id="ws-delta" className="ch-input" type="number" step="1" value={delta} onChange={(e) => setDelta(e.target.value)} placeholder="e.g. 20 or -4" />
-        </div>
       </Modal>
     </div>
   );
@@ -1951,8 +1844,6 @@ export default function WorkspaceView() {
   const location = useLocation();
   switch (location.pathname) {    case '/inventory/categories':
       return <CategoriesView />;
-    case '/inventory/adjustments':
-      return <AdjustmentsView />;
     case '/inventory/warehouses':
       return <Warehouses />;
     case '/inventory/transfers':

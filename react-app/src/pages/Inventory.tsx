@@ -44,7 +44,14 @@ export default function Inventory() {
   const [target, setTarget] = useState<Product | null>(null);
   const [targetRow, setTargetRow] = useState<WarehouseStockRow | null>(null);
   const [delta, setDelta] = useState('');
+  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  // Aggregate-view adjust needs an explicit warehouse: legacy adjustStock()
+  // silently lands on the DEFAULT warehouse, which is wrong when the filter
+  // shows "All warehouses". Empty = legacy path (no warehouses provisioned).
+  const [adjustWarehouseId, setAdjustWarehouseId] = useState('');
+  const [warehouseQuery, setWarehouseQuery] = useState('');
+  const [warehouseOpen, setWarehouseOpen] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -148,6 +155,16 @@ export default function Inventory() {
     return { low, out, backordered, value };
   }, [warehouseId, warehouseFiltered, filtered]);
 
+  // Aggregate-view adjust warehouse options (searchable). useMemo must live
+  // with the other hooks above the loading/error early returns (#310).
+  const adjustWarehouseOptions = useMemo(() => {
+    const q = warehouseQuery.trim().toLowerCase();
+    return warehouses.filter((w) => {
+      if (q === '') return true;
+      return w.name.toLowerCase().includes(q) || String(w.code ?? '').toLowerCase().includes(q);
+    });
+  }, [warehouses, warehouseQuery]);
+
   const statusOf = (p: Product): string => {
     const s = Number(p.stock);
     if (s < 0) return 'Backordered';
@@ -160,6 +177,13 @@ export default function Inventory() {
     setTarget(p);
     setTargetRow(null);
     setDelta('');
+    setReason('');
+    // Preselect the default warehouse so the target is always explicit —
+    // never silently the default while showing "All warehouses".
+    const def = warehouses.find((w) => w.is_default === true) ?? warehouses[0] ?? null;
+    setAdjustWarehouseId(def === null ? '' : String(def.ROWID));
+    setWarehouseQuery(def === null ? '' : def.name);
+    setWarehouseOpen(false);
   };
 
   const openWarehouseAdjust = (r: WarehouseStockRow) => {
@@ -167,17 +191,22 @@ export default function Inventory() {
     setTarget(p);
     setTargetRow(r);
     setDelta('');
+    setReason('');
   };
 
   const submit = () => {
     if ((target === null && targetRow === null) || delta.trim() === '') return;
+    if (target === null && targetRow === null) return;
+    if (reason.trim() === '') return;
+    if (targetRow === null && target !== null && warehouses.length > 0 && adjustWarehouseId === '') return;
     setBusy(true);
-    const reason = 'Manual adjustment from Inventory page';
+    const adjReason = reason.trim().slice(0, 200);
     const done = (msg: string) => {
       setNotice(msg);
       setTarget(null);
       setTargetRow(null);
       setDelta('');
+      setReason('');
       setBusy(false);
       load();
     };
@@ -194,12 +223,25 @@ export default function Inventory() {
         warehouse_id: targetRow.warehouse_id,
         product_id: targetRow.product_id,
         quantity: Number(delta),
-        reason,
+        reason: adjReason,
       })
         .then((res) => done(`${targetRow.product_name} @ ${targetRow.warehouse_name}: ${res.old_stock ?? '?'} → ${res.new_stock ?? '?'} units.`))
         .catch(fail);
+    } else if (target !== null && adjustWarehouseId !== '') {
+      // Aggregate view with an explicitly chosen warehouse: same
+      // warehouse-scoped endpoint, so Catalyst updates that warehouse (and
+      // the Products.stock aggregate) — never silently the default.
+      const wh = warehouses.find((w) => String(w.ROWID) === adjustWarehouseId);
+      adjustWarehouseStock({
+        warehouse_id: adjustWarehouseId,
+        product_id: String(target.ROWID ?? target.sku),
+        quantity: Number(delta),
+        reason: adjReason,
+      })
+        .then((res) => done(`${target.name} @ ${wh?.name ?? adjustWarehouseId}: ${res.old_stock ?? '?'} → ${res.new_stock ?? '?'} units.`))
+        .catch(fail);
     } else if (target !== null) {
-      adjustStock(String(target.ROWID ?? target.sku), Number(delta), reason)
+      adjustStock(String(target.ROWID ?? target.sku), Number(delta), adjReason)
         .then((res) => done(`${target.name}: ${res.old_stock ?? '?'} → ${res.new_stock ?? '?'} units.`))
         .catch(fail);
     }
@@ -210,12 +252,30 @@ export default function Inventory() {
 
   const perWarehouse = warehouseId !== 'all' || warehouses.length > 0;
   const showWarehouseView = warehouseId !== 'all';
+  // Single-field warehouse picker (Google-search style): typing filters,
+  // clicking an option selects. Any keystroke clears the previous pick so
+  // Apply only fires on an explicitly clicked warehouse.
+  const pickAdjustWarehouse = (id: string, name: string) => {
+    setAdjustWarehouseId(id);
+    setWarehouseQuery(name);
+    setWarehouseOpen(false);
+  };
+  const adjustWarehouseName = targetRow !== null
+    ? targetRow.warehouse_name
+    : (warehouses.find((w) => String(w.ROWID) === adjustWarehouseId)?.name ?? '');
+  const adjustWarehouseQty = target === null || targetRow !== null ? null : (() => {
+    const row = stockRows.find((r) => String(r.product_id) === String(target.ROWID) && String(r.warehouse_id) === adjustWarehouseId);
+    return row === undefined ? null : Number(row.quantity);
+  })();
   const adjustTitle = targetRow !== null
     ? `Adjust — ${targetRow.product_name} @ ${targetRow.warehouse_name}`
-    : target === null ? 'Adjust stock' : `Adjust — ${target.name}`;
+    : target === null ? 'Adjust stock' : `Adjust — ${target.name}${adjustWarehouseName !== '' ? ` @ ${adjustWarehouseName}` : ''}`;
   const adjustSubtitle = targetRow !== null
     ? `Current: ${number(targetRow.quantity)} units`
-    : target === null ? undefined : `Current: ${number(target.stock)} units`;
+    : target === null ? undefined : adjustWarehouseQty === null
+      ? `Total: ${number(target.stock)} units`
+      : `Current @ ${adjustWarehouseName}: ${number(adjustWarehouseQty)} units (total ${number(target.stock)})`;
+  const adjustReady = !busy && delta.trim() !== '' && reason.trim() !== '' && (targetRow !== null || target === null || warehouses.length === 0 || adjustWarehouseId !== '');
 
   return (
     <div>
@@ -331,14 +391,66 @@ export default function Inventory() {
         footer={
           <>
             <button type="button" className="ch-btn ch-btn-secondary" onClick={() => { setTarget(null); setTargetRow(null); }} disabled={busy}>Cancel</button>
-            <button type="button" className="ch-btn ch-btn-primary" onClick={submit} disabled={busy || delta.trim() === ''}>{busy ? 'Saving…' : 'Apply'}</button>
+            <button type="button" className="ch-btn ch-btn-primary" onClick={submit} disabled={!adjustReady}>{busy ? 'Saving…' : 'Apply'}</button>
           </>
         }
       >
+        {targetRow === null && target !== null && warehouses.length > 0 && (
+          <div className="ch-field" style={{ marginBottom: 12, position: 'relative' }}>
+            <label className="ch-label" htmlFor="inv-warehouse-search">Warehouse (adjustment target)</label>
+            <input
+              id="inv-warehouse-search"
+              className="ch-input"
+              value={warehouseQuery}
+              onChange={(e) => { setWarehouseQuery(e.target.value); setAdjustWarehouseId(''); setWarehouseOpen(true); }}
+              onFocus={() => setWarehouseOpen(true)}
+              onBlur={() => setWarehouseOpen(false)}
+              placeholder="Type to search warehouses…"
+              autoComplete="off"
+            />
+            {warehouseOpen && adjustWarehouseOptions.length > 0 && (
+              <div
+                role="listbox"
+                aria-label="Matching warehouses"
+                style={{
+                  position: 'absolute', zIndex: 30, left: 0, right: 0, top: '100%',
+                  background: 'var(--ch-card-bg, #fff)', border: '1px solid var(--ch-border-soft, #e2e8f0)',
+                  borderRadius: 10, marginTop: 4, maxHeight: 180, overflowY: 'auto',
+                  boxShadow: '0 12px 32px rgba(15,27,51,.14)',
+                }}
+              >
+                {adjustWarehouseOptions.map((w) => (
+                  <div
+                    key={String(w.ROWID)}
+                    role="option"
+                    aria-selected={String(w.ROWID) === adjustWarehouseId}
+                    onMouseDown={(e) => { e.preventDefault(); pickAdjustWarehouse(String(w.ROWID), w.name); }}
+                    style={{
+                      padding: '9px 12px', cursor: 'pointer', fontSize: 13,
+                      background: String(w.ROWID) === adjustWarehouseId ? 'var(--ch-primary-bg, #eef4ff)' : 'transparent',
+                    }}
+                  >
+                    <strong>{w.name}</strong>
+                    <span className="ch-cell-sub"> · {w.code}{w.is_default === true ? ' · Default' : ''}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {warehouseOpen && warehouseQuery.trim() !== '' && adjustWarehouseOptions.length === 0 && (
+              <span className="ch-hint">No warehouse matches “{warehouseQuery.trim()}”.</span>
+            )}
+            <span className="ch-hint">Stock changes in the selected warehouse on Catalyst; the product total re-sums automatically.</span>
+          </div>
+        )}
         <div className="ch-field">
           <label className="ch-label" htmlFor="inv-delta">Quantity change</label>
           <input id="inv-delta" className="ch-input" type="number" step="1" value={delta} onChange={(e) => setDelta(e.target.value)} placeholder="e.g. 20 or -4" />
           <span className="ch-hint">Positive adds stock (delivery), negative removes (sale, wastage, damage).</span>
+        </div>
+        <div className="ch-field">
+          <label className="ch-label" htmlFor="inv-reason">Reason (required)</label>
+          <input id="inv-reason" className="ch-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Delivery, recount, wastage…" maxLength={200} />
+          <span className="ch-hint">Recorded in the stock-movement audit trail.</span>
         </div>
       </Modal>
     </div>

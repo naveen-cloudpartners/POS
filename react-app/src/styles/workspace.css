@@ -25,10 +25,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 0;
-  gap: 6px;
+  padding: 8px 0;
+  gap: 4px;
   position: relative;
   overflow: visible;
+  min-width: 0;
 }
 .ch-rail::before {
   content: '';
@@ -51,14 +52,27 @@
   transition: transform 0.15s var(--ch-ease);
 }
 .ch-rail-logo:hover { transform: scale(1.05); }
-.ch-rail-items { flex: 1; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; scrollbar-width: none; }
-.ch-rail-items::-webkit-scrollbar { display: none; }
+/* The workspace rail is deliberately a fixed, no-scroll control. Buttons are
+   compact enough that every workspace is visible at one time on desktop. */
+.ch-rail-items {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  overflow: hidden;
+  width: 100%;
+}
 
 .ch-rail-btn {
-  width: 56px;
-  min-height: 56px;
-  padding: 8px 4px;
-  border-radius: 14px;
+  width: 58px;
+  height: 58px;
+  min-height: 58px;
+  flex: 0 0 58px;
+  padding: 5px 3px;
+  border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
   color: #93a2c9;
@@ -74,7 +88,7 @@
 .ch-rail-btn svg { transition: transform 150ms var(--ch-ease); }
 .ch-rail-btn:hover svg { transform: scale(1.08); }
 .ch-rail-lbl {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1.2;
@@ -87,10 +101,15 @@
   -webkit-box-orient: vertical;
   color: inherit;
 }
-.ch-rail-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; transform: translateX(2px); }
+.ch-rail-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 .ch-rail-btn.active {
+  width: 62px;
+  height: 62px;
+  min-height: 62px;
+  flex-basis: 62px;
   background: linear-gradient(135deg, rgba(93, 142, 249, 0.4), rgba(58, 118, 248, 0.22));
   border-color: rgba(123, 164, 255, 0.35);
+  border-radius: 6px;
   color: #fff;
   box-shadow: 0 0 18px rgba(58, 118, 248, 0.45), inset 0 1px 0 rgba(255,255,255,0.15);
 }
@@ -134,7 +153,7 @@
 }
 .ch-rail-btn[data-tip]:hover::after,
 .ch-rail-logo[data-tip]:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
-.ch-rail-collapse { color: var(--ch-sidebar-muted); margin-top: 4px; }
+.ch-rail-collapse { color: var(--ch-sidebar-muted); margin-top: 0; flex: 0 0 auto; }
 .ch-rail-collapse .flipped { transform: rotate(180deg); }
 
 /* ---------- Level 2: context panel (solid white) ---------- */
@@ -188,22 +207,22 @@
 
 .ch-panel-switcher { display: none; }
 
-.ch-panel-nav { flex: 1; overflow-y: auto; padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; }
+.ch-panel-nav { flex: 1; min-height: 0; overflow: hidden; padding: 8px 10px; display: flex; flex-direction: column; gap: 1px; }
 .ch-panel-section {
   display: flex; align-items: center; gap: 7px;
   font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--ch-muted-soft);
-  padding: 8px 10px 7px;
+  padding: 5px 10px 4px;
 }
-.ch-panel-nav .ch-panel-section { margin-top: 8px; }
+.ch-panel-nav .ch-panel-section { margin-top: 4px; }
 .ch-panel-nav .ch-panel-section:first-child { margin-top: 0; }
 .ch-panel-link {
   display: flex; align-items: center; gap: 10px;
-  padding: 9px 11px;
+  padding: 7px 11px;
   border-radius: 11px;
   background: transparent;
   color: var(--ch-muted);
-  font-size: 13.5px; font-weight: 600;
+  font-size: 13px; font-weight: 600;
   border: 1px solid transparent;
   transition: background 150ms ease, color 150ms ease, box-shadow 200ms ease, transform 150ms var(--ch-ease);
   position: relative;

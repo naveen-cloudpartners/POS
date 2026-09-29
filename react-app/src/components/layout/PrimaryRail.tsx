@@ -18,9 +18,6 @@ interface PrimaryRailProps {
 export default function PrimaryRail({ workspaces, activeId, role, onSelect, onCollapsePanel, panelCollapsed }: PrimaryRailProps) {
   return (
     <div className="ch-rail" role="navigation" aria-label="Workspaces">
-      <NavLink to="/dashboard" className="ch-rail-logo" data-tip="CloudHub POS — Home" aria-label="CloudHub POS home">
-        C
-      </NavLink>
       <div className="ch-rail-items">
         {workspaces.map((ws) => {
           const Icon = ws.icon;

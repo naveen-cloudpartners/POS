@@ -12,7 +12,7 @@
 
 **How to read this document:** Executive Summary first; §1 business model; §2 build order; §3 SRS target; §4 what the code does today; §5 line-by-line gap tables; §6 risks; §7 health; §8 remaining work; §9 roadmap; §10 completion math; §11 final recommendation.
 
-> **Current Development checkpoint — Phase 5, Organization Administration (user-lifecycle verification):** complete and verified on Development. An Admin removal now clears the POS roster (`Configurations` `user_*` entries), every matching `OrgUsers` row, and the matching Catalyst Authentication project user. The Auth deletion uses Catalyst's project `user_id` (not the distinct Zoho-account `zuid`); a failed Auth step leaves the role removal intact and returns the exact console-fallback reason. Next work should proceed from the remaining Phase 5 administration/configuration items, with normal Development regression checks after each deployment.
+> **Current Development checkpoint — UI polish + Purchasing workspace build-out:** the primary workspace rail is fixed/no-scroll, the CloudHub home mark has been removed, all rail entries remain visible together, and the active rail item now uses a slightly larger selected border box. The Purchasing workspace has been expanded into page-specific views for Purchase Orders, Vendors, Receive Stock, Vendor Bills, and Payments & Credits. Continue from Purchasing workflow validation and normal Development regression checks after each deployment.
 
 ---
 

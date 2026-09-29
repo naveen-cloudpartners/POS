@@ -17,7 +17,7 @@ if (!process.env.ZOHO_CLIENT_SECRET)
 console.log('[ENV] ZOHO_CLIENT_ID:', !!process.env.ZOHO_CLIENT_ID);
 console.log('[ENV] ZOHO_CLIENT_SECRET:', !!process.env.ZOHO_CLIENT_SECRET);
 // Build stamp: proves exactly what shipped (cold-start line in logs).
-console.log('[BUILD] pos_backend 2026-09-28 (stratus, KOT, LIMIT300, company-reader, tax-read, invite-mail1, roster-merge, printers-qz, smtp-kept)');
+console.log('[BUILD] pos_backend 2026-09-29 (stratus, KOT, LIMIT300, company-reader, tax-read, invite-mail1, roster-merge, printers-qz, transfer-create, smtp-kept)');
 
 const express = require('express');
 const axios = require('axios');
@@ -814,7 +814,7 @@ app.get('/api/config/smtp', async (req, res) => {
  * This is a one-time diagnostic — once tables are confirmed, this endpoint is no longer needed.
  */
 app.get('/api/setup/status', async (req, res) => {
-  const requiredTables = ['Products', 'Orders', 'OrderItems', 'Configurations', 'Organizations', 'OrgUsers', 'StockMovements', 'Categories', 'Warehouses', 'WarehouseStock', 'StockTransfers', 'TransferItems', 'Customers', 'CustomerActivity'];
+  const requiredTables = ['Products', 'Orders', 'OrderItems', 'Configurations', 'Organizations', 'OrgUsers', 'StockMovements', 'Categories', 'Warehouses', 'WarehouseStock', 'StockTransfers', 'TransferItems', 'Customers', 'CustomerActivity', 'Vendors', 'PurchaseOrders', 'PurchaseOrderItems', 'VendorBills', 'VendorPayments'];
   const tableStatus = {};
 
   for (const tableName of requiredTables) {
@@ -5420,6 +5420,20 @@ function whMissingTable(res, tableName) {
   });
 }
 
+function whIsMissingTableError(error) {
+  const msg = extractSdkMessage(error);
+  return /No Such Table|No such table|table.*not.*exist|INVALID_TABLE/i.test(msg);
+}
+
+function whDatastoreWriteError(res, tableName, error) {
+  const detail = extractSdkMessage(error);
+  console.error(`[WAREHOUSE] ${tableName} write failed:`, detail);
+  if (whIsMissingTableError(error)) return whMissingTable(res, tableName);
+  return res.status(500).json({
+    success: false,
+    error: `Could not write ${tableName}: ${detail}`,
+  });
+}
 /* ---------------- Warehouses CRUD (INV-04) ---------------- */
 
 /** GET /api/warehouses — list with live per-warehouse metrics. */
@@ -6171,11 +6185,9 @@ app.post('/api/transfers', async (req, res) => {
         approved_by: '',
         completed_by: '',
         created_at: now,
-        approved_at: '',
-        completed_at: '',
       });
     } catch (e) {
-      return whMissingTable(res, 'StockTransfers');
+      return whDatastoreWriteError(res, 'StockTransfers', e);
     }
     try {
       const itemsTable = catalystApp.datastore().table('TransferItems');
@@ -6187,7 +6199,7 @@ app.post('/api/transfers', async (req, res) => {
         });
       }
     } catch (e) {
-      return whMissingTable(res, 'TransferItems');
+      return whDatastoreWriteError(res, 'TransferItems', e);
     }
     const created = await loadTransfer(catalystApp, transferRow.ROWID);
     res.status(201).json({ success: true, message: `Transfer ${transferNumber} created.`, transfer: created });
@@ -6212,7 +6224,7 @@ app.get('/api/transfers', async (req, res) => {
       );
       rows = (r || []).map((x) => x.StockTransfers).filter(Boolean);
     } catch (e) {
-      return whMissingTable(res, 'StockTransfers');
+      return whDatastoreWriteError(res, 'StockTransfers', e);
     }
     const q = req.query || {};
     if (q.status) {
@@ -6261,7 +6273,7 @@ app.get('/api/transfers/:id', async (req, res) => {
     try {
       t = await loadTransfer(catalystApp, req.params.id);
     } catch (e) {
-      return whMissingTable(res, 'StockTransfers');
+      return whDatastoreWriteError(res, 'StockTransfers', e);
     }
     if (!t) return res.status(404).json({ success: false, error: 'Transfer not found.' });
     res.status(200).json({ success: true, transfer: t });
@@ -6432,6 +6444,185 @@ app.post('/api/transfers/:id/cancel', async (req, res) => {
 });
 
 /* ==========================================================================
+   PURCHASING — vendors → purchase orders → receiving → bills → payments
+   --------------------------------------------------------------------------
+   Receipt is the only purchasing action which changes stock. It reuses the
+   WarehouseStock aggregate and StockMovements ledger, so a receipt raises
+   stock in the selected PO warehouse exactly once and stays auditable.
+   ========================================================================== */
+
+function purchaseRole(ctx) { return normWhRole(ctx.orgUser && ctx.orgUser.role); }
+function canUsePurchasing(role) { return ['Admin', 'Manager', 'Storekeeper'].includes(role); }
+function canManagePayables(role) { return ['Admin', 'Manager'].includes(role); }
+function purchaseNumber(prefix) { return `${prefix}-${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 1296).toString(36).toUpperCase().padStart(2, '0')}`; }
+
+async function purchaseRows(catalystApp, table, fields, where = '') {
+  const rows = await catalystApp.zcql().executeZCQLQuery(`SELECT ${fields} FROM ${table}${where ? ` WHERE ${where}` : ''} ORDER BY CREATEDTIME DESC LIMIT 300`);
+  return (rows || []).map((r) => r[table]).filter(Boolean);
+}
+
+async function vendorForPurchase(catalystApp, id) {
+  if (!isDigitsId(id)) return null;
+  return (await purchaseRows(catalystApp, 'Vendors', 'ROWID, vendor_number, name, email, phone, status', `ROWID = ${String(id)}`))[0] || null;
+}
+
+async function getPurchaseOrder(catalystApp, id) {
+  if (!isDigitsId(id)) return null;
+  const po = (await purchaseRows(catalystApp, 'PurchaseOrders', 'ROWID, po_number, vendor_id, warehouse_id, status, notes, expected_date, created_by, approved_by, received_by, created_at, approved_at, received_at, total_amount', `ROWID = ${String(id)}`))[0];
+  if (!po) return null;
+  po.items = await purchaseRows(catalystApp, 'PurchaseOrderItems', 'ROWID, purchase_order_id, product_id, quantity, received_quantity, unit_cost, tax_percentage', `purchase_order_id = '${sanitizeZcql(String(po.ROWID))}'`);
+  return po;
+}
+
+function requirePurchaseAccess(res, ctx, payables = false) {
+  const allowed = payables ? canManagePayables(purchaseRole(ctx)) : canUsePurchasing(purchaseRole(ctx));
+  if (!allowed) {
+    res.status(403).json({ success: false, error: payables ? 'This action requires Admin or Manager.' : 'Purchasing requires Admin, Manager or Storekeeper.' });
+    return false;
+  }
+  return true;
+}
+
+app.get('/api/purchases/vendors', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePurchaseAccess(res, ctx)) return;
+    const data = await purchaseRows(app, 'Vendors', 'ROWID, vendor_number, name, email, phone, address, tax_number, status, notes, created_by, created_at, updated_at');
+    res.status(200).json({ success: true, data });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.post('/api/purchases/vendors', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePurchaseAccess(res, ctx, true)) return;
+    const b = req.body || {}; const name = String(b.name || '').trim();
+    if (name === '') return res.status(400).json({ success: false, error: 'Vendor name is required.' });
+    const now = formatCatalystDateTime(new Date());
+    const row = await app.datastore().table('Vendors').insertRow({ vendor_number: purchaseNumber('VND'), name, email: String(b.email || '').trim(), phone: String(b.phone || '').trim(), address: String(b.address || '').trim(), tax_number: String(b.tax_number || '').trim(), status: String(b.status || 'Active'), notes: String(b.notes || '').trim(), created_by: await whActorEmail(req, app, ctx), created_at: now, updated_at: now });
+    res.status(201).json({ success: true, message: 'Vendor created.', vendor: { ROWID: row.ROWID, name } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.get('/api/purchases/orders', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePurchaseAccess(res, ctx)) return;
+    const data = await purchaseRows(app, 'PurchaseOrders', 'ROWID, po_number, vendor_id, warehouse_id, status, notes, expected_date, created_by, approved_by, received_by, created_at, approved_at, received_at, total_amount');
+    for (const po of data) po.items = await purchaseRows(app, 'PurchaseOrderItems', 'ROWID, purchase_order_id, product_id, quantity, received_quantity, unit_cost, tax_percentage', `purchase_order_id = '${sanitizeZcql(String(po.ROWID))}'`);
+    res.status(200).json({ success: true, data });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.post('/api/purchases/orders', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePurchaseAccess(res, ctx)) return;
+    const b = req.body || {}; const vendor = await vendorForPurchase(app, b.vendor_id); const warehouse = await findWarehouseById(app, b.warehouse_id);
+    if (!vendor) return res.status(404).json({ success: false, error: 'Vendor not found.' });
+    if (!warehouse || String(warehouse.status || 'Active') !== 'Active') return res.status(400).json({ success: false, error: 'Choose an active warehouse.' });
+    if (!Array.isArray(b.items) || b.items.length === 0) return res.status(400).json({ success: false, error: 'At least one purchase item is required.' });
+    const items = []; let total = 0;
+    for (const [index, line] of b.items.entries()) {
+      const product = await getProductForWarehouse(app, line && line.product_id); const quantity = Number(line && line.quantity); const unitCost = Number(line && line.unit_cost); const tax = Math.max(0, Number(line && line.tax_percentage) || 0);
+      if (!product) return res.status(404).json({ success: false, error: `Item ${index + 1}: product not found.` });
+      if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitCost) || unitCost < 0) return res.status(400).json({ success: false, error: `Item ${index + 1}: quantity must be positive and unit cost cannot be negative.` });
+      items.push({ product_id: String(product.ROWID), quantity, received_quantity: 0, unit_cost: unitCost, tax_percentage: tax }); total += quantity * unitCost * (1 + tax / 100);
+    }
+    const now = formatCatalystDateTime(new Date());
+    const row = await app.datastore().table('PurchaseOrders').insertRow({ po_number: purchaseNumber('PO'), vendor_id: String(vendor.ROWID), warehouse_id: String(warehouse.ROWID), status: 'Draft', notes: String(b.notes || '').trim(), expected_date: String(b.expected_date || '').trim(), created_by: await whActorEmail(req, app, ctx), approved_by: '', received_by: '', created_at: now, approved_at: '', received_at: '', total_amount: Number(total.toFixed(2)) });
+    for (const item of items) await app.datastore().table('PurchaseOrderItems').insertRow({ purchase_order_id: String(row.ROWID), ...item });
+    const order = await getPurchaseOrder(app, row.ROWID);
+    res.status(201).json({ success: true, message: `Purchase order ${order.po_number} created.`, order });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.post('/api/purchases/orders/:id/approve', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePurchaseAccess(res, ctx, true)) return;
+    const po = await getPurchaseOrder(app, req.params.id);
+    if (!po) return res.status(404).json({ success: false, error: 'Purchase order not found.' });
+    if (String(po.status) !== 'Draft') return res.status(400).json({ success: false, error: `Purchase order ${po.po_number} is ${po.status} and cannot be approved.` });
+    await app.datastore().table('PurchaseOrders').updateRow({ ROWID: po.ROWID, status: 'Approved', approved_by: await whActorEmail(req, app, ctx), approved_at: formatCatalystDateTime(new Date()) });
+    res.status(200).json({ success: true, message: `Purchase order ${po.po_number} approved.`, order: await getPurchaseOrder(app, po.ROWID) });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.post('/api/purchases/orders/:id/receive', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePurchaseAccess(res, ctx)) return;
+    const po = await getPurchaseOrder(app, req.params.id);
+    if (!po) return res.status(404).json({ success: false, error: 'Purchase order not found.' });
+    if (!['Approved', 'Partially received'].includes(String(po.status))) return res.status(400).json({ success: false, error: `Purchase order ${po.po_number} must be Approved before receiving.` });
+    const warehouse = await findWarehouseById(app, po.warehouse_id); if (!warehouse) return res.status(400).json({ success: false, error: 'The purchase order warehouse no longer exists.' });
+    const input = new Map((Array.isArray((req.body || {}).items) ? req.body.items : []).map((x) => [String(x.purchase_order_item_id || x.ROWID || ''), Number(x.quantity)]));
+    if (input.size === 0) return res.status(400).json({ success: false, error: 'Choose at least one quantity to receive.' });
+    const plan = [];
+    for (const item of po.items) {
+      const quantity = input.get(String(item.ROWID)); if (!Number.isFinite(quantity) || quantity === undefined || quantity <= 0) continue;
+      const remaining = (Number(item.quantity) || 0) - (Number(item.received_quantity) || 0); if (quantity > remaining) return res.status(400).json({ success: false, error: 'Received quantity cannot exceed the outstanding purchase order quantity.' });
+      const product = await getProductForWarehouse(app, item.product_id); if (!product) return res.status(400).json({ success: false, error: 'A product on this purchase order no longer exists.' });
+      const stock = await getWarehouseStockRow(app, po.warehouse_id, item.product_id); plan.push({ item, product, quantity, before: stock ? Number(stock.quantity) || 0 : 0 });
+    }
+    if (plan.length === 0) return res.status(400).json({ success: false, error: 'Enter a quantity greater than zero for at least one outstanding line.' });
+    const actor = await whActorEmail(req, app, ctx);
+    for (const step of plan) {
+      const after = step.before + step.quantity;
+      await setWarehouseQuantity(app, po.warehouse_id, step.item.product_id, after); await syncProductStock(app, step.item.product_id);
+      await app.datastore().table('PurchaseOrderItems').updateRow({ ROWID: step.item.ROWID, received_quantity: (Number(step.item.received_quantity) || 0) + step.quantity });
+      await logStockMovement(app, { itemRowid: step.item.product_id, sku: step.product.sku, itemName: step.product.name, movementType: 'PURCHASE', quantityChange: step.quantity, stockBefore: step.before, stockAfter: after, referenceType: 'PURCHASE', referenceId: po.po_number, reason: `Purchase receipt ${po.po_number} into ${warehouse.name}`, performedBy: actor, warehouseId: po.warehouse_id });
+    }
+    const received = await getPurchaseOrder(app, po.ROWID); const complete = received.items.every((item) => (Number(item.received_quantity) || 0) >= (Number(item.quantity) || 0));
+    await app.datastore().table('PurchaseOrders').updateRow({ ROWID: po.ROWID, status: complete ? 'Received' : 'Partially received', received_by: actor, received_at: formatCatalystDateTime(new Date()) });
+    res.status(200).json({ success: true, message: `${po.po_number} receipt recorded in ${warehouse.name}.`, order: await getPurchaseOrder(app, po.ROWID) });
+  } catch (error) { console.error('Error receiving purchase order:', error.message); res.status(500).json({ success: false, error: error.message }); }
+});
+
+async function getVendorBill(app, id) {
+  if (!isDigitsId(id)) return null;
+  return (await purchaseRows(app, 'VendorBills', 'ROWID, bill_number, vendor_id, purchase_order_id, status, bill_date, due_date, total_amount, paid_amount, notes, created_by, created_at', `ROWID = ${String(id)}`))[0] || null;
+}
+
+app.get('/api/purchases/bills', async (req, res) => {
+  try { const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx)) return; res.status(200).json({ success: true, data: await purchaseRows(app, 'VendorBills', 'ROWID, bill_number, vendor_id, purchase_order_id, status, bill_date, due_date, total_amount, paid_amount, notes, created_by, created_at') }); } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.post('/api/purchases/bills', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx, true)) return;
+    const b = req.body || {}; const vendor = await vendorForPurchase(app, b.vendor_id); const total = Number(b.total_amount);
+    if (!vendor) return res.status(404).json({ success: false, error: 'Vendor not found.' }); if (!Number.isFinite(total) || total < 0) return res.status(400).json({ success: false, error: 'Bill total must be zero or greater.' });
+    if (b.purchase_order_id && !await getPurchaseOrder(app, b.purchase_order_id)) return res.status(404).json({ success: false, error: 'Purchase order not found.' });
+    const number = purchaseNumber('BILL'); const row = await app.datastore().table('VendorBills').insertRow({ bill_number: number, vendor_id: String(vendor.ROWID), purchase_order_id: String(b.purchase_order_id || ''), status: 'Open', bill_date: String(b.bill_date || '').trim(), due_date: String(b.due_date || '').trim(), total_amount: total, paid_amount: 0, notes: String(b.notes || '').trim(), created_by: await whActorEmail(req, app, ctx), created_at: formatCatalystDateTime(new Date()) });
+    res.status(201).json({ success: true, message: 'Vendor bill created.', bill: { ROWID: row.ROWID, bill_number: number, total_amount: total, paid_amount: 0, status: 'Open' } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.get('/api/purchases/payments', async (req, res) => {
+  try { const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx)) return; res.status(200).json({ success: true, data: await purchaseRows(app, 'VendorPayments', 'ROWID, payment_number, vendor_id, bill_id, type, payment_method, payment_date, reference, amount, notes, created_by, created_at') }); } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+app.post('/api/purchases/payments', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx, true)) return;
+    const b = req.body || {}; const amount = Number(b.amount); const vendor = await vendorForPurchase(app, b.vendor_id); if (!vendor) return res.status(404).json({ success: false, error: 'Vendor not found.' }); if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, error: 'Payment amount must be greater than zero.' });
+    const bill = b.bill_id ? await getVendorBill(app, b.bill_id) : null; if (b.bill_id && (!bill || String(bill.vendor_id) !== String(vendor.ROWID))) return res.status(400).json({ success: false, error: 'Choose a bill belonging to this vendor.' });
+    if (bill && amount > (Number(bill.total_amount) || 0) - (Number(bill.paid_amount) || 0)) return res.status(400).json({ success: false, error: 'Payment exceeds the outstanding bill balance.' });
+    const type = String(b.type || 'Payment'); const paymentNumber = purchaseNumber(type === 'Credit' ? 'CRN' : 'PAY'); const row = await app.datastore().table('VendorPayments').insertRow({ payment_number: paymentNumber, vendor_id: String(vendor.ROWID), bill_id: bill ? String(bill.ROWID) : '', type, payment_method: String(b.payment_method || 'Cash'), payment_date: String(b.payment_date || '').trim(), reference: String(b.reference || '').trim(), amount, notes: String(b.notes || '').trim(), created_by: await whActorEmail(req, app, ctx), created_at: formatCatalystDateTime(new Date()) });
+    if (bill) { const paid = (Number(bill.paid_amount) || 0) + amount; await app.datastore().table('VendorBills').updateRow({ ROWID: bill.ROWID, paid_amount: paid, status: paid >= (Number(bill.total_amount) || 0) ? 'Paid' : 'Partially paid' }); }
+    res.status(201).json({ success: true, message: `${type} recorded.`, payment: { ROWID: row.ROWID, payment_number: paymentNumber, amount, type } });
+  } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+/* ===========================================================================
    CUSTOMER LOYALTY FOUNDATION (CUST-05)
    --------------------------------------------------------------------------
    New Data Store tables (provision via Catalyst Console → Data Store):

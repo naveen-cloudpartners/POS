@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### UI Polish: Primary rail and Purchasing workspace
+
+Changed:
+
+- Primary workspace rail is fixed with all main modules visible at once; the old top CloudHub home mark is removed.
+- Active rail item styling now uses a slightly larger selected border box so the current module is clearer without changing routes or behavior.
+- Purchasing workspace now has dedicated page layouts for Purchase Orders, Vendors, Receive Stock, Vendor Bills, and Payments & Credits instead of repeated in-page navigation.
+
+Notes:
+
+- CSS-only adjustment for the latest active rail border tweak; rebuild and redeploy the client to see it live.
+
 ### Storage, KOT, Pagination, Tests (all code-only, no Console changes)
 
 Added:
