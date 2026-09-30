@@ -9,6 +9,7 @@ import App from './App.tsx'
 import './styles/responsive.css'
 import './styles/product-media.css'
 import './styles/cards.css'
+import './styles/workspace-theme.css'
 import MobileAccessGate from './components/mobile/MobileAccessGate.tsx'
 
 createRoot(document.getElementById('root')!).render(

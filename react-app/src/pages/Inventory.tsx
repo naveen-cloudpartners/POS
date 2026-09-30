@@ -396,8 +396,9 @@ export default function Inventory() {
         }
       >
         {targetRow === null && target !== null && warehouses.length > 0 && (
-          <div className="ch-field" style={{ marginBottom: 12, position: 'relative' }}>
+          <div className="ch-field" style={{ marginBottom: 12 }}>
             <label className="ch-label" htmlFor="inv-warehouse-search">Warehouse (adjustment target)</label>
+            <div style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
             <input
               id="inv-warehouse-search"
               className="ch-input"
@@ -415,7 +416,7 @@ export default function Inventory() {
                 style={{
                   position: 'absolute', zIndex: 30, left: 0, right: 0, top: '100%',
                   background: 'var(--ch-card-bg, #fff)', border: '1px solid var(--ch-border-soft, #e2e8f0)',
-                  borderRadius: 10, marginTop: 4, maxHeight: 180, overflowY: 'auto',
+                  borderRadius: 10, marginTop: 0, maxHeight: 180, overflowY: 'auto',
                   boxShadow: '0 12px 32px rgba(15,27,51,.14)',
                 }}
               >
@@ -436,6 +437,7 @@ export default function Inventory() {
                 ))}
               </div>
             )}
+            </div>
             {warehouseOpen && warehouseQuery.trim() !== '' && adjustWarehouseOptions.length === 0 && (
               <span className="ch-hint">No warehouse matches “{warehouseQuery.trim()}”.</span>
             )}

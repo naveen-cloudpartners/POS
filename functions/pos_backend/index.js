@@ -6796,12 +6796,17 @@ async function recalculateCustomerMetrics(catalystApp, customerRowId, loyaltyCfg
     .pop() || '';
   const tier = calculateCustomerTier(c.lifetime_points, loyaltyCfg);
   try {
-    await catalystApp.datastore().table('Customers').updateRow({
+    const patch = {
       ROWID: c.ROWID,
       tier,
-      last_activity_at: lastOrder !== '' ? lastOrder : (c.last_activity_at || ''),
       updated_at: formatCatalystDateTime(new Date()),
-    });
+    };
+    if (lastOrder !== '') {
+      patch.last_activity_at = lastOrder;
+    } else if (c.last_activity_at) {
+      patch.last_activity_at = c.last_activity_at;
+    }
+    await catalystApp.datastore().table('Customers').updateRow(patch);
   } catch (e) {
     console.warn('[LOYALTY] Metric persist skipped:', e.message);
   }
@@ -6891,7 +6896,6 @@ async function backfillCustomers(catalystApp) {
         lifetime_points: 0,
         tier: 'New',
         joined_at: now,
-        last_activity_at: '',
         updated_at: now,
       });
       if (email !== '') emails.add(email.toLowerCase());
@@ -7267,7 +7271,6 @@ app.post('/api/customers', async (req, res) => {
       lifetime_points: 0,
       tier: 'New',
       joined_at: now,
-      last_activity_at: '',
       updated_at: now,
     });
     const created = await findCustomerById(catalystApp, row.ROWID);

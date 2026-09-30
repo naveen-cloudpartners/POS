@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Minus, Plus, Trash2, Barcode, User, Banknote, CreditCard, Landmark, CheckCircle2, ShoppingBag, X, Printer, Download, Mail, Ban } from 'lucide-react';
+import { Search, Minus, Plus, Trash2, User, Banknote, CreditCard, Landmark, CheckCircle2, ShoppingBag, X, Printer, Download, Mail, Ban } from 'lucide-react';
 import Loader from '../components/ui/Loader';
 import ErrorState from '../components/ui/ErrorState';
 import EmptyState from '../components/ui/EmptyState';
@@ -9,7 +9,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { getProducts } from '../services/productService';
 import { checkout, sendReceiptEmail, voidOrder, type PosReceipt } from '../services/orderService';
 import { getCustomers } from '../services/customerService';
-import { getPaymentMethods, getSettings, getSmtpStatus, getTaxSettings } from '../services/settingsService';
+import { getPaymentMethods, getSettings, getSmtpStatus, getTaxSettings, type TaxSettings } from '../services/settingsService';
 import { getPrinters, sendPrintJob, type KotJobPayload, type Printer as PrinterConfig, type PrintJob } from '../services/printService';
 import { useAuth } from '../context/AuthContext';
 import { currency, number, isLowStock, isOutOfStock } from '../utils/format';
@@ -33,24 +33,6 @@ interface SplitLeg {
   amount: string;
 }
 
-const CAT_EMOJI: Record<string, string> = {
-  all: '✦',
-};
-
-function catIcon(c: string): string {
-  if (c === 'all') return '✦';
-  const s = c.toLowerCase();
-  if (s.includes('food') || s.includes('meal') || s.includes('rice')) return '🍛';
-  if (s.includes('drink') || s.includes('bev') || s.includes('juice') || s.includes('tea') || s.includes('coffee')) return '🥤';
-  if (s.includes('snack') || s.includes('bakery') || s.includes('cake')) return '🍩';
-  if (s.includes('groc')) return '🧺';
-  if (s.includes('elect')) return '🔌';
-  if (s.includes('cloth') || s.includes('fashion')) return '👕';
-  if (s.includes('health') || s.includes('pharma') || s.includes('medic')) return '💊';
-  if (s.includes('book') || s.includes('station')) return '📚';
-  return '◈';
-}
-
 /* Canonical sale math lives in utils/tax (mirrors posNormalizeLine /
    posTotalsFor on the backend, SET-02 tax mode included) so tender
    validation agrees. The local round2 below serves split-tender inputs. */
@@ -68,7 +50,6 @@ export default function Pos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [barcode, setBarcode] = useState('');
   const [category, setCategory] = useState('all');
   const [cart, setCart] = useState<Array<CartLine>>([]);
   const [customerName, setCustomerName] = useState('Walk-in Guest');
@@ -91,6 +72,11 @@ export default function Pos() {
   // SET-02: live tax mode (exclusive default preserves legacy math).
   const [taxOpts, setTaxOpts] = useState<TaxOpts>({ mode: 'exclusive', round: true });
   const [taxName, setTaxName] = useState('Tax');
+  const [taxSettings, setTaxSettings] = useState<TaxSettings | null>(null);
+  const [taxSelection, setTaxSelection] = useState('default');
+  const selectedTaxRate = !taxSettings?.enabled ? 0
+    : taxSelection === 'default' ? taxSettings.default_rate
+    : taxSettings.profiles[Number(taxSelection)]?.rate ?? taxSettings.default_rate;
   // SET-05: tender methods offered follow Settings → Payment methods.
   const [tenderModes, setTenderModes] = useState<Array<PayMode>>(['Cash', 'Card', 'Bank']);
   // Preloaded once: print dispatch below must resolve the printer
@@ -101,10 +87,15 @@ export default function Pos() {
   const load = () => {
     setLoading(true);
     setError('');
-    Promise.all([getProducts(), getCustomers().catch(() => [])])
-      .then(([items, custs]) => {
+    Promise.all([getProducts(), getCustomers().catch(() => []), getTaxSettings()])
+      .then(([items, custs, tax]) => {
+        if (tax === null) throw new Error('Unable to load tax settings. Please retry before checkout.');
         setProducts(items);
         setCustomers(custs);
+        setTaxSettings(tax);
+        setTaxSelection('default');
+        setTaxOpts({ mode: tax.enabled ? tax.mode : 'exclusive', round: tax.round });
+        setTaxName(tax.name || 'Tax');
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load catalog'))
       .finally(() => setLoading(false));
@@ -125,14 +116,6 @@ export default function Pos() {
       .catch(() => undefined);
     getSmtpStatus().then((s) => setSmtpReady(s.configured)).catch(() => undefined);
     getPrinters().then(setTerminalPrinters).catch(() => undefined);
-    getTaxSettings()
-      .then((t) => {
-        if (t !== null) {
-          setTaxOpts({ mode: t.enabled ? t.mode : 'exclusive', round: t.round });
-          setTaxName(t.name || 'Tax');
-        }
-      })
-      .catch(() => undefined);
   };
 
   useEffect(load, []);
@@ -181,6 +164,8 @@ export default function Pos() {
   const setQty = (index: number, qty: number) => {
     const line = cart[index];
     if (line === undefined) return;
+    qty = Math.floor(Number(qty));
+    if (!Number.isFinite(qty)) return;
     if (qty <= 0) {
       setCart((prev) => prev.filter((_, i) => i !== index));
       return;
@@ -202,15 +187,15 @@ export default function Pos() {
   };
 
   const scanBarcode = () => {
-    const code = barcode.trim().toLowerCase();
+    const code = search.trim().toLowerCase();
     if (code === '') return;
     const hit = products.find((p) => p.sku.toLowerCase() === code || p.name.toLowerCase() === code);
     if (hit) {
       addToCart(hit);
-      setBarcode('');
+      setSearch('');
       setMessage(null);
     } else {
-      setMessage({ kind: 'err', text: `No product matches "${barcode.trim()}".` });
+      setMessage({ kind: 'err', text: `No product matches "${search.trim()}".` });
     }
   };
 
@@ -226,7 +211,7 @@ export default function Pos() {
       cart.map((l) => ({
         qty: l.qty,
         rate: Number(l.product.rate) || 0,
-        taxPct: Number(l.product.tax_percentage ?? 0),
+        taxPct: selectedTaxRate,
         discVal: Number(l.discVal) || 0,
         discType: l.discType,
       })),
@@ -239,7 +224,7 @@ export default function Pos() {
       return s + (l.discType === 'flat' ? Math.min(dv, gross) : round2((gross * Math.min(dv, 100)) / 100));
     }, 0));
     return { sub: calc.sub, tax: calc.tax, itemDisc, orderDisc: calc.orderDisc, total: calc.total, taxMode: taxOpts.mode };
-  }, [cart, discountPct, taxOpts]);
+  }, [cart, discountPct, taxOpts, selectedTaxRate]);
 
   const itemCount = cart.reduce((s, l) => s + l.qty, 0);
 
@@ -282,7 +267,7 @@ export default function Pos() {
         item_id: String(l.product.ROWID ?? l.product.sku),
         quantity: l.qty,
         rate: Number(l.product.rate) || 0,
-        tax_percentage: Number(l.product.tax_percentage ?? 0),
+        tax_percentage: selectedTaxRate,
         name: l.product.name,
         discount_value: Number(l.discVal) || 0,
         discount_type: l.discType,
@@ -413,11 +398,11 @@ export default function Pos() {
   if (error !== '' && products.length === 0) return <ErrorState message={error} onRetry={load} />;
 
   return (
-    <div className="pos-page">
+    <div className="pos-page pos-terminal">
       <div className="ch-page-head reveal">
         <div>
           <h1 className="ch-page-title">Point of Sale</h1>
-          <p className="ch-page-sub">{number(products.length)} products · {number(categories.length - 1)} categories · tap to add.</p>
+          <p className="ch-page-sub">{number(products.length)} products · {number(categories.length - 1)} categories</p>
         </div>
         <div className="ch-page-actions">
           <span className="pos-live-cart"><ShoppingBag size={14} /> {itemCount} in cart · {currency(totals.total)}</span>
@@ -444,11 +429,9 @@ export default function Pos() {
           cart?.focus({ preventScroll: true });
         }}><ShoppingBag size={18} /> View cart · {itemCount} items · {currency(totals.total)}</button>
         {/* LEFT — categories + barcode */}
-        <aside className="pos-col pos-left reveal" style={{ animationDelay: '40ms' }}>
-          <div className="pos-panel">
-            <h3 className="pos-panel-title">Categories</h3>
-            <p className="pos-panel-sub">Filter the catalog</p>
-            <div className="pos-cats">
+        <section className="pos-col pos-center reveal" aria-label="Product catalog">
+          <div className="pos-panel pos-catalog">
+            <div className="pos-cats" aria-label="Product categories">
               {categories.map((c) => {
                 const n = c === 'all' ? products.length : (catCounts.get(c) ?? 0);
                 return (
@@ -457,35 +440,14 @@ export default function Pos() {
                     type="button"
                     className={c === category ? 'pos-cat active' : 'pos-cat'}
                     onClick={() => setCategory(c)}
+                    aria-pressed={c === category}
                   >
-                    <span className="pos-cat-ic" aria-hidden="true">{catIcon(c) || CAT_EMOJI.all}</span>
                     <span className="pos-cat-lbl">{c === 'all' ? 'All items' : c}</span>
                     <span className="pos-cat-n">{n}</span>
                   </button>
                 );
               })}
             </div>
-            <div className="pos-barcode">
-              <label className="ch-label" htmlFor="pos-barcode">Barcode / SKU entry</label>
-              <div className="pos-barcode-row">
-                <span className="pos-barcode-icon" aria-hidden="true"><Barcode size={16} /></span>
-                <input
-                  id="pos-barcode"
-                  className="ch-input"
-                  value={barcode}
-                  onChange={(e) => setBarcode(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') scanBarcode(); }}
-                  placeholder="Scan or type SKU…"
-                />
-                <button type="button" className="ch-btn ch-btn-secondary ch-btn-sm" onClick={scanBarcode}>Add</button>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* CENTER — products */}
-        <section className="pos-col pos-center reveal" style={{ animationDelay: '90ms' }}>
-          <div className="pos-panel">
             <div className="pos-center-head">
               <div>
                 <h3 className="pos-panel-title">Products</h3>
@@ -493,8 +455,9 @@ export default function Pos() {
               </div>
               <span className="pos-search">
                 <Search size={15} aria-hidden="true" />
-                <input aria-label="Search products" placeholder="Search name or SKU…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <input aria-label="Search products or scan SKU" placeholder="Search products or scan SKU…" value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') scanBarcode(); }} />
               </span>
+              <button type="button" className="ch-btn ch-btn-secondary ch-btn-icon" onClick={scanBarcode} aria-label="Add scanned product" title="Add scanned product"><Plus size={18} /></button>
             </div>
             {visible.length === 0 ? (
               <EmptyState title="No products" message="No items match this filter." />
@@ -535,7 +498,7 @@ export default function Pos() {
           <div className="pos-cart">
             <div className="pos-cart-head">
               <div>
-                <h3 className="pos-panel-title">Current sale</h3>
+                <h3 className="pos-panel-title"><ShoppingBag size={17} aria-hidden="true" /> Current order</h3>
                 <p className="pos-panel-sub">{itemCount} item{itemCount === 1 ? '' : 's'} in cart</p>
               </div>
               {cart.length > 0 && (
@@ -574,7 +537,6 @@ export default function Pos() {
                 <div className="pos-empty">
                   <ShoppingBag size={26} aria-hidden="true" />
                   <b>Cart is empty</b>
-                  <span>Tap any product to add it here.</span>
                 </div>
               ) : (
                 <ul className="pos-lines">
@@ -605,7 +567,16 @@ export default function Pos() {
                       </span>
                       <span className="pos-qty">
                         <button type="button" className="ch-btn ch-btn-secondary ch-btn-icon ch-btn-sm" onClick={() => setQty(i, l.qty - 1)} aria-label={`Decrease ${l.product.name}`}><Minus size={13} /></button>
-                        <span aria-live="polite">{l.qty}</span>
+                        <input
+                          className="pos-qty-input"
+                          aria-label={`Quantity for ${l.product.name}`}
+                          type="number"
+                          min="1"
+                          max={stockOf(l.product)}
+                          value={l.qty}
+                          inputMode="numeric"
+                          onChange={(e) => setQty(i, e.currentTarget.valueAsNumber)}
+                        />
                         <button type="button" className="ch-btn ch-btn-secondary ch-btn-icon ch-btn-sm" onClick={() => setQty(i, l.qty + 1)} aria-label={`Increase ${l.product.name}`}><Plus size={13} /></button>
                       </span>
                       <span className="pos-line-total">{currency(Number(l.product.rate) * l.qty)}</span>
@@ -616,11 +587,24 @@ export default function Pos() {
               )}
             </div>
 
-            <div className="pos-meta-row">
+            <div className="pos-order-adjustments">
+              <div className="ch-field">
+                <label className="ch-label" htmlFor="pos-tax">Tax profile</label>
+                <select id="pos-tax" className="ch-select" value={taxSelection}
+                  disabled={!taxSettings?.enabled || busy}
+                  onChange={(e) => setTaxSelection(e.target.value)}>
+                  <option value="default">{taxSettings?.enabled ? `Default ${taxName} (${taxSettings.default_rate}%)` : 'Tax disabled (0%)'}</option>
+                  {taxSettings?.profiles.map((profile, index) => (
+                    <option key={`${profile.name}-${index}`} value={String(index)}>{profile.name} ({profile.rate}%)</option>
+                  ))}
+                </select>
+              </div>
               <div className="ch-field">
                 <label className="ch-label" htmlFor="pos-disc">Discount %</label>
                 <input id="pos-disc" className="ch-input" type="number" min="0" max="100" value={discountPct} onChange={(e) => setDiscountPct(e.target.value)} />
               </div>
+            </div>
+            <div className="pos-meta-row pos-payment-row">
               <div className="ch-field">
                 <span className="ch-label">Payment</span>
                 <div className="pos-pay" role="radiogroup" aria-label="Payment method">
@@ -638,7 +622,7 @@ export default function Pos() {
                     </button>
                   ))}
                 </div>
-                <button type="button" className={split ? 'ch-btn ch-btn-secondary ch-btn-sm' : 'ch-btn ch-btn-ghost ch-btn-sm'} onClick={() => setSplit((v) => !v)} aria-pressed={split} style={{ marginTop: 8 }}>
+                <button type="button" className={`pos-split-toggle ${split ? 'ch-btn ch-btn-secondary ch-btn-sm' : 'ch-btn ch-btn-ghost ch-btn-sm'}`} onClick={() => setSplit((v) => !v)} aria-pressed={split}>
                   {split ? 'Single payment' : 'Split payment'}
                 </button>
               </div>

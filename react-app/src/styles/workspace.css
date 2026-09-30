@@ -294,7 +294,7 @@
   box-shadow: var(--ch-shadow-sm);
   border-radius: 12px;
   padding: 8px 14px;
-  display: inline-flex;
+  display: none;
 }
 
 /* ---------- Header module chip ---------- */

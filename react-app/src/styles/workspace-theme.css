@@ -1,0 +1,157 @@
+/* Purchasing's visual rhythm, scoped to the authenticated workspace.
+   Keep page grids, checkout sizing, and control behavior in their owners. */
+.ch-app .ch-content {
+  --ch-radius: 12px;
+  --ch-radius-sm: 8px;
+  --ch-border: #e6eaf3;
+  --ch-border-soft: #eef1f7;
+}
+
+.ch-content :is(.ch-page-title, .ch-card-title, .ch-stat-value,
+  .ch-cell-main, .ch-label, .ch-btn, .ch-modal-title, .ch-state-title) {
+  letter-spacing: 0;
+}
+
+.ch-content .ch-page-head {
+  gap: 14px;
+  padding: 8px 0 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--ch-border);
+}
+.ch-content .ch-page-title { font-size: 24px; line-height: 1.25; }
+.ch-content .ch-page-sub { font-size: 13px; font-weight: 400; line-height: 1.45; }
+.ch-content .ch-page-actions { gap: 8px; }
+
+.ch-content .ch-card {
+  border-color: var(--ch-border);
+  border-radius: 12px;
+  box-shadow: var(--ch-shadow-sm);
+}
+.ch-content .ch-card::before { display: none; }
+.ch-content .ch-card-head {
+  padding: 17px 20px;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: #fff;
+  border-bottom-color: var(--ch-border-soft);
+}
+.ch-content .ch-card-head > div { min-width: 0; }
+.ch-content .ch-card-title { font-size: 14px; font-weight: 700; line-height: 1.4; }
+.ch-content .ch-card-sub { font-size: 12px; font-weight: 400; line-height: 1.5; }
+.ch-content .ch-card-foot { background: #fff; border-top-color: var(--ch-border-soft); }
+.ch-content .ch-card.hoverable:hover { transform: none; box-shadow: var(--ch-shadow-sm); }
+
+.ch-content .ch-grid-stats { gap: 14px; margin-bottom: 18px; }
+.ch-content :is(.ch-stat, .prod-stat, .cust-widget) {
+  padding: 17px 18px;
+  border: 1px solid var(--ch-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--ch-shadow-sm);
+}
+.ch-content :is(.ch-stat, .prod-stat, .cust-widget):hover {
+  transform: none;
+  box-shadow: var(--ch-shadow-sm);
+}
+.ch-content .ch-stat::after { display: none; }
+.ch-content :is(.ch-stat-icon, .cust-widget-ic) {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  box-shadow: none;
+}
+.ch-content :is(.ch-stat-label, .prod-stat span) {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.ch-content :is(.ch-stat-value, .prod-stat b, .cust-widget b) {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.ch-content .ch-stat-delta { margin-top: 5px; font-size: 11px; }
+
+/* Flat filter strips and lightly tinted fields match Purchasing records. */
+.ch-content .ch-toolbar {
+  padding: 0 0 14px;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--ch-border-soft);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.ch-content .ch-search { min-width: 0; }
+.ch-content .ch-search input {
+  min-height: 38px;
+  font-size: 12px;
+  border-radius: 10px;
+  background: #f9fbff;
+}
+.ch-content :is(.ch-input, .ch-select, .ch-textarea) {
+  min-width: 0;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 400;
+}
+.ch-content :is(.ch-input, .ch-select, .ch-textarea, .ch-search input):focus {
+  box-shadow: 0 0 0 3px rgba(70, 126, 247, .13);
+}
+.ch-content .ch-label { font-size: 11.5px; font-weight: 700; }
+.ch-content .ch-hint { font-size: 11.5px; line-height: 1.5; }
+.ch-content .ch-btn { font-size: 12px; border-radius: 9px; }
+.ch-content .ch-btn-sm { font-size: 11.5px; }
+.ch-content .ch-table-wrap { border-radius: 8px; border-color: var(--ch-border-soft); }
+.ch-content .ch-table thead th {
+  padding: 11px 14px;
+  background: #f6f8fc;
+  color: #667694;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+.ch-content .ch-table tbody td { padding: 12px 14px; font-size: 12px; }
+.ch-content .ch-cell-sub { margin-top: 3px; font-size: 10.5px; font-weight: 400; }
+.ch-content .ch-badge { font-size: 10.5px; }
+.ch-content .ch-badge::before { box-shadow: none; }
+
+/* Bring the older dark dashboard/customer panels into the light workspace. */
+.ch-content :is(.dash-hero, .cust-top) {
+  background: #fff;
+  color: var(--ch-ink);
+  border: 1px solid var(--ch-border);
+  box-shadow: var(--ch-shadow-sm);
+}
+.ch-content .dash-hero::after { display: none; }
+.ch-content .dash-hero-value { color: var(--ch-ink); font-size: 30px; letter-spacing: 0; }
+.ch-content :is(.dash-hero-sub, .dash-hero-bar-day, .cust-top .ch-cell-sub) { color: var(--ch-muted); }
+.ch-content :is(.dash-hero-eyebrow, .dash-hero-btn.ghost) {
+  color: var(--ch-primary-dark);
+  background: var(--ch-primary-soft);
+  border-color: var(--ch-border);
+}
+.ch-content .dash-hero-bar-track { background: #f6f8fc; border-color: var(--ch-border-soft); }
+.ch-content .cust-top-row { background: #f9fbff; border-color: var(--ch-border-soft); }
+.ch-content .cust-top-row:hover { background: var(--ch-primary-soft); }
+
+/* POS retains its own fixed-height layout and compact quantity controls. */
+.ch-content .pos-terminal .ch-card-head { padding: 10px 12px; }
+.ch-content .pos-terminal .ch-input { font-size: 12px; }
+
+@media (max-width: 680px) {
+  .ch-content .ch-page-head { padding-top: 0; gap: 10px; margin-bottom: 12px; }
+  .ch-content .ch-page-title { font-size: 21px; }
+  .ch-content .ch-card-head { padding: 14px; }
+  .ch-content :is(.ch-stat, .prod-stat, .cust-widget) { padding: 14px; }
+  .ch-content :is(.ch-stat-value, .prod-stat b, .cust-widget b) { font-size: 21px; }
+  .ch-content .ch-toolbar { gap: 8px; }
+  .ch-content .ch-filterbar { max-width: 100%; }
+  .ch-content .ch-page-actions .ch-btn { white-space: normal; }
+}
+
+@media (pointer: coarse) {
+  .ch-content :is(.ch-input, .ch-select, .ch-search input) { min-height: 44px; font-size: 16px; }
+}
