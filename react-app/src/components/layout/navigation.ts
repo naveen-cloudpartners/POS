@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   ShoppingCart,
-  Package,
   Boxes,
   Truck,
   Users,
@@ -47,7 +46,7 @@ const MANAGERS = ['Admin', 'Manager'];
 const FRONT = ['Admin', 'Manager', 'Cashier'];
 
 /* Primary order follows the SRS module order:
-   DASH → POS → PROD → INV → CUST → ORD → RPT → USR → SET.
+   DASH → POS → INV → PUR → CUST → ORD → RPT → USR → SET.
    Routes, roles and view components are untouched — only workspace
    grouping, order and nav labels changed. */
 export const WORKSPACES: Array<Workspace> = [
@@ -76,27 +75,22 @@ export const WORKSPACES: Array<Workspace> = [
     ],
   },
   {
-    id: 'products',
-    label: 'Products',
-    tagline: 'Catalog & categories',
-    icon: Package,
-    roles: STAFF,
-    children: [
-      { id: 'prod-products', label: 'Products', to: '/inventory/products', aliases: ['/products'], roles: STAFF },
-      { id: 'prod-categories', label: 'Categories', to: '/inventory/categories', roles: STAFF },
-    ],
-  },
-  {
     id: 'inventory',
     label: 'Inventory',
-    tagline: 'Stock & warehouses',
+    tagline: 'Catalog, stock & warehouses',
     icon: Boxes,
     roles: STAFF,
     children: [
+      { id: 'inv-products', label: 'Products', to: '/inventory/products', aliases: ['/products'], roles: STAFF },
+      { id: 'inv-categories', label: 'Categories', to: '/inventory/categories', roles: STAFF },
       { id: 'inv-stock', label: 'Stock', to: '/inventory', roles: STAFF },
       { id: 'inv-warehouses', label: 'Warehouses', to: '/inventory/warehouses', roles: STAFF },
       { id: 'inv-transfers', label: 'Transfers', to: '/inventory/transfers', aliases: ['/inventory/warehouses#transfers'], roles: STAFF },
       { id: 'inv-movements', label: 'Movements', to: '/inventory/movements', roles: STAFF },
+    ],
+    sections: [
+      { label: 'Catalog', childIds: ['inv-products', 'inv-categories'] },
+      { label: 'Inventory Workspace', childIds: ['inv-stock', 'inv-warehouses', 'inv-transfers', 'inv-movements'] },
     ],
   },
   {
