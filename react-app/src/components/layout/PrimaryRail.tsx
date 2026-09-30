@@ -1,5 +1,5 @@
-import { NavLink } from 'react-router-dom';
-import { ChevronsLeft } from 'lucide-react';
+import { Link, NavLink } from 'react-router-dom';
+import { ChevronsLeft, Cloud } from 'lucide-react';
 import { homeOf, type Workspace } from './navigation';
 
 interface PrimaryRailProps {
@@ -18,6 +18,9 @@ interface PrimaryRailProps {
 export default function PrimaryRail({ workspaces, activeId, role, onSelect, onCollapsePanel, panelCollapsed }: PrimaryRailProps) {
   return (
     <div className="ch-rail" role="navigation" aria-label="Workspaces">
+      <Link to="/dashboard" className="ch-rail-logo" data-tip="CloudHub POS" aria-label="CloudHub POS home">
+        <Cloud size={26} strokeWidth={2} aria-hidden="true" />
+      </Link>
       <div className="ch-rail-items">
         {workspaces.map((ws) => {
           const Icon = ws.icon;

@@ -1,6 +1,7 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Pencil, Trash2, RefreshCw, PackagePlus, CheckSquare, Eye, X, Upload, Download, ImagePlus, ImageOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, PackagePlus, Package, CheckCircle2, AlertTriangle, CircleX, CheckSquare, Eye, X, Upload, Download, ImagePlus, ImageOff } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -715,7 +716,7 @@ export default function Products() {
 
   return (
     <div>
-      <div className="ch-page-head reveal">
+      <div className="ch-page-head reveal"><PageIcon />
         <div>
           <h1 className="ch-page-title">Products</h1>
           <p className="ch-page-sub">{number(products.length)} items · {currency(counts.value)} stock value · {counts.low} low · {counts.out} out.</p>
@@ -750,20 +751,20 @@ export default function Products() {
       {/* Health strip */}
       <div className="prod-stats reveal" style={{ animationDelay: '60ms' }}>
         <button type="button" className={stockFilter === 'all' ? 'prod-stat active' : 'prod-stat'} onClick={() => setStockFilter('all')}>
-          <b>{number(counts.total)}</b><span>Total SKUs</span>
+          <i className="summary-icon" aria-hidden="true"><Package size={17} /></i><b>{number(counts.total)}</b><span>Total SKUs</span>
         </button>
         <button type="button" className={stockFilter === 'in' ? 'prod-stat active ok' : 'prod-stat ok'} onClick={() => setStockFilter(stockFilter === 'in' ? 'all' : 'in')}>
-          <b>{number(counts.healthy)}</b><span>Healthy</span>
+          <i className="summary-icon" aria-hidden="true"><CheckCircle2 size={17} /></i><b>{number(counts.healthy)}</b><span>Healthy</span>
         </button>
         <button type="button" className={stockFilter === 'low' ? 'prod-stat active warn' : 'prod-stat warn'} onClick={() => setStockFilter(stockFilter === 'low' ? 'all' : 'low')}>
-          <b>{number(counts.low)}</b><span>Low stock</span>
+          <i className="summary-icon" aria-hidden="true"><AlertTriangle size={17} /></i><b>{number(counts.low)}</b><span>Low stock</span>
         </button>
         <button type="button" className={stockFilter === 'out' ? 'prod-stat active bad' : 'prod-stat bad'} onClick={() => setStockFilter(stockFilter === 'out' ? 'all' : 'out')}>
-          <b>{number(counts.out)}</b><span>Out of stock</span>
+          <i className="summary-icon" aria-hidden="true"><CircleX size={17} /></i><b>{number(counts.out)}</b><span>Out of stock</span>
         </button>
       </div>
 
-      <Card delay={100} className="prod-table-card">
+      <Card title="Products" subtitle="Browse and manage your product catalog." delay={100} className="prod-table-card">
         <div className="ch-toolbar">
           <SearchBar value={search} onChange={setSearch} placeholder="Search name, SKU, barcode…" ariaLabel="Search products" />
           <FilterBar

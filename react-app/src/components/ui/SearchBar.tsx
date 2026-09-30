@@ -9,7 +9,7 @@ interface SearchBarProps {
 
 export default function SearchBar({ value, onChange, placeholder = 'Search…', ariaLabel = 'Search' }: SearchBarProps) {
   return (
-    <div className="ch-search">
+    <div className="ch-search purchase-search">
       <Search size={16} aria-hidden="true" />
       <input
         type="search"

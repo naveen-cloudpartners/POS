@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Building2, Package, Star, Warehouse as WarehouseIcon } from 'lucide-react';
@@ -219,7 +220,7 @@ export default function Warehouses() {
 
   return (
     <div>
-      <div className="ch-page-head">
+      <div className="ch-page-head"><PageIcon />
         <div>
           <h1 className="ch-page-title">Warehouses</h1>
           <p className="ch-page-sub">Stock locations, valuations and the default store.</p>
@@ -262,7 +263,7 @@ export default function Warehouses() {
         />
       </div>
 
-      <Card>
+      <Card title="Warehouses">
         <div className="ch-toolbar">
           <SearchBar value={search} onChange={setSearch} placeholder="Search name or code…" ariaLabel="Search warehouses" />
           <FilterBar

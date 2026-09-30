@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
@@ -279,7 +280,7 @@ export default function Inventory() {
 
   return (
     <div>
-      <div className="ch-page-head">
+      <div className="ch-page-head"><PageIcon />
         <div>
           <h1 className="ch-page-title">Inventory</h1>
           <p className="ch-page-sub">Stock levels, valuations and adjustments.</p>
@@ -295,7 +296,7 @@ export default function Inventory() {
         <StatCard label="Out of stock" value={number(visibleCounts.out + visibleCounts.backordered)} icon={checkIcon} iconBg={visibleCounts.out + visibleCounts.backordered > 0 ? 'var(--ch-danger-bg)' : 'var(--ch-success-bg)'} iconColor={visibleCounts.out + visibleCounts.backordered > 0 ? 'var(--ch-danger)' : 'var(--ch-success)'} />
       </div>
 
-      <Card>
+      <Card title="Inventory">
         <div className="ch-toolbar">
           <SearchBar value={search} onChange={setSearch} placeholder="Search SKU or name…" ariaLabel="Search inventory" />
           <FilterBar

@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import {
@@ -290,7 +291,7 @@ export default function Dashboard() {
   return (
     <div className="dash">
       {/* TOP — KPI row above the fold */}
-      <div className="ch-page-head reveal">
+      <div className="ch-page-head reveal"><PageIcon />
         <div>
           <h1 className="ch-page-title">Business overview</h1>
           <p className="ch-page-sub">

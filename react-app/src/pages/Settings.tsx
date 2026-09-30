@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Store, Mail, Link2, Unlink, Save, Percent, Boxes, HeartHandshake, ReceiptText, ShieldCheck, Bell, ImageOff, Banknote, Printer as PrinterIcon } from 'lucide-react';
@@ -496,7 +497,7 @@ export default function Settings() {
 
   return (
     <div className="settings-page">
-      <div className="ch-page-head">
+      <div className="ch-page-head"><PageIcon />
         <div>
           <h1 className="ch-page-title">Settings</h1>
           <p className="ch-page-sub">Company profile, taxes, notifications, email and integrations.</p>

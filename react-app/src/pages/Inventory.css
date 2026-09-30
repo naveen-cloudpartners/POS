@@ -1,4 +1,74 @@
-/* Inventory — glass polish, inherits shared primitives */
+/* Reference theme is limited to inventory routes and their dialogs. */
+.inventory-theme {
+  --ch-primary: #637cf5;
+  --ch-primary-dark: #5069e8;
+  --ch-primary-soft: #ebefff;
+  --ch-ink: #181f36;
+  --ch-muted: #687493;
+  --ch-border: #e2e7f2;
+  --ch-border-soft: #edf0f8;
+  --ch-bg: #f5f6fc;
+  background: radial-gradient(ellipse at 100% 0, #e8ecfb, transparent 48%), #f5f6fc;
+  color: var(--ch-ink);
+}
+.inventory-theme .ch-page-head {
+  position: relative; min-height: 124px; margin-bottom: 18px;
+  padding: 24px 24px 24px 90px; gap: 20px; align-items: center;
+  border: 1px solid var(--ch-border); border-radius: 18px;
+  background: linear-gradient(115deg, #fff 65%, #e5eafb);
+  box-shadow: 0 1px 3px #18213d08;
+}
+.inventory-theme .ch-page-head::before {
+  content: ''; position: absolute; left: 24px; top: 50%; transform: translateY(-50%);
+  width: 50px; height: 50px; border: 1px solid #d0daff; border-radius: 14px;
+  background: #ebefff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23637cf5' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 3 9 5-9 5-9-5 9-5Z M3 8v9l9 5 9-5V8 M12 13v9 M7.5 5.5l9 5'/%3E%3C/svg%3E") center / 24px no-repeat;
+}
+.inventory-theme .ch-page-head > div:first-child::before {
+  content: 'INVENTORY'; display: block; margin-bottom: 4px; color: #637cf5;
+  font-size: 10px; font-weight: 800; letter-spacing: .15em;
+}
+.inventory-theme .ch-page-title { font-size: clamp(24px, 2.3vw, 32px); letter-spacing: -.035em; line-height: 1.2; }
+.inventory-theme .ch-page-sub { margin-top: 7px; font-size: 13px; color: var(--ch-muted); }
+.inventory-theme .ch-card, .inventory-theme .ch-stat {
+  border: 1px solid var(--ch-border); background: #fff; border-radius: 13px; box-shadow: 0 1px 3px #18213d08;
+}
+.inventory-theme .ch-card-head { padding: 18px 20px; background: #fff; border-color: var(--ch-border-soft); }
+.inventory-theme .ch-grid-stats { gap: 14px; margin-bottom: 18px; }
+.inventory-theme .ch-stat { --inventory-tint: #ebefff; --inventory-icon: #637cf5; min-height: 152px; padding: 24px 18px 18px; display: block; }
+.inventory-theme .ch-stat:nth-child(2) { --inventory-tint: #fcf1df; --inventory-icon: #b76b17; }
+.inventory-theme .ch-stat:nth-child(3) { --inventory-tint: #e6f6ee; --inventory-icon: #337b50; }
+.inventory-theme .ch-stat:nth-child(4) { --inventory-tint: #f0eaff; --inventory-icon: #7752dc; }
+.inventory-theme .ch-stat::after { top: auto; bottom: -48px; right: -30px; width: 116px; height: 116px; background: var(--inventory-tint); opacity: .55; }
+.inventory-theme .ch-stat-icon {
+  position: absolute; top: 18px; right: 18px; width: 32px; height: 32px; border-radius: 10px;
+  background: var(--inventory-tint) !important; color: var(--inventory-icon) !important; box-shadow: none;
+}
+.inventory-theme .ch-stat-icon svg { width: 17px; height: 17px; stroke-width: 1.8; }
+.inventory-theme .ch-stat-label { padding-right: 42px; min-height: 28px; font-size: 11px; letter-spacing: .025em; }
+.inventory-theme .ch-stat-value { position: relative; z-index: 1; margin-top: 12px; font-size: 30px; }
+.inventory-theme .ch-stat-delta { padding: 0; margin-top: 8px; background: transparent; color: var(--ch-muted); font-size: 12px; font-weight: 400; }
+.inventory-theme .ch-btn-primary { background: linear-gradient(135deg, #7b90fa, #5570ef); border: 1px solid #91a2ff; border-radius: 10px; color: #fff; box-shadow: 0 7px 18px #637cf540; }
+.inventory-theme .ch-btn-primary:hover:not(:disabled) { background: #526bea; }
+.inventory-theme .ch-btn-secondary { background: #fff; border-color: var(--ch-border); color: var(--ch-muted); }
+.inventory-theme .ch-search, .inventory-theme .ch-input, .inventory-theme .ch-select { border-color: var(--ch-border); border-radius: 10px; background-color: #f9faff; }
+.inventory-theme :is(button, input, select, a):focus-visible { outline: 2px solid #637cf5; outline-offset: 3px; }
+.inventory-theme .ch-toolbar { gap: 12px; }
+.inventory-theme .ch-state { padding: 74px 24px; }
+.inventory-theme .ch-state-icon { width: 64px; height: 64px; border-radius: 16px; background: #ebefff; border: 1px solid #d0daff; color: #637cf5; box-shadow: none; }
+.inventory-theme .ch-state-title { font-size: 19px; }
+.inventory-theme .ch-state-text { font-size: 13px; color: var(--ch-muted); }
+.inventory-theme .ch-modal { background: #fff; border: 1px solid var(--ch-border); border-radius: 18px; }
+.inventory-theme .ch-modal-head, .inventory-theme .ch-modal-foot { background: #f9faff; border-color: var(--ch-border); }
+@media (max-width: 760px) {
+  .inventory-theme .ch-page-head { padding: 22px 18px 22px 82px; flex-wrap: wrap; }
+  .inventory-theme .ch-page-head::before { left: 18px; top: 26px; transform: none; }
+  .inventory-theme .ch-page-actions { width: 100%; }
+  .inventory-theme .ch-grid-stats:is(.cols-3, .cols-4) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .inventory-theme .ch-state { padding: 52px 18px; }
+}
+@media (max-width: 420px) {
+  .inventory-theme .ch-grid-stats:is(.cols-3, .cols-4) { grid-template-columns: 1fr; }
+}
 
 /* Warehouses: one responsive, equal-height card grid. Keeping the detail
    content and action rail in each card avoids a second, duplicate table. */

@@ -40,18 +40,20 @@
   pointer-events: none;
 }
 .ch-rail-logo {
-  width: 44px; height: 44px;
+  width: 48px; height: 48px;
+  flex-shrink: 0;
   border-radius: 14px;
   background: linear-gradient(135deg, #7ba4ff, var(--ch-primary-dark));
   color: #fff;
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 20px;
   box-shadow: 0 8px 20px rgba(93, 142, 249, 0.5), inset 0 1px 0 rgba(255,255,255,0.4);
-  margin-bottom: 8px;
+  margin-bottom: 20px;
   position: relative;
   transition: transform 0.15s var(--ch-ease);
 }
 .ch-rail-logo:hover { transform: scale(1.05); }
+.ch-rail-logo svg { width: 30px; height: 30px; }
 /* The workspace rail is deliberately a fixed, no-scroll control. Buttons are
    compact enough that every workspace is visible at one time on desktop. */
 .ch-rail-items {
@@ -60,8 +62,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 3px;
+  justify-content: flex-start;
+  gap: 12px;
   overflow: hidden;
   width: 100%;
 }
@@ -104,9 +106,9 @@
 .ch-rail-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 .ch-rail-btn.active {
   width: 62px;
-  height: 62px;
-  min-height: 62px;
-  flex-basis: 62px;
+  height: 58px;
+  min-height: 58px;
+  flex-basis: 58px;
   background: linear-gradient(135deg, rgba(93, 142, 249, 0.4), rgba(58, 118, 248, 0.22));
   border-color: rgba(123, 164, 255, 0.35);
   border-radius: 12px;
@@ -155,6 +157,10 @@
 .ch-rail-logo[data-tip]:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
 .ch-rail-collapse { color: var(--ch-sidebar-muted); margin-top: 0; flex: 0 0 auto; }
 .ch-rail-collapse .flipped { transform: rotate(180deg); }
+@media (max-height: 820px) {
+  .ch-rail-items { gap: 6px; }
+  .ch-rail-items .ch-rail-btn { height: 48px; min-height: 48px; flex-basis: 48px; }
+}
 
 /* ---------- Level 2: context panel (solid white) ---------- */
 .ch-panel {

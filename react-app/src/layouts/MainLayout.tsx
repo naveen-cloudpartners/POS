@@ -19,6 +19,7 @@ import {
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { getCompanyProfile } from '../services/settingsService';
 import { setCurrencyCode } from '../utils/format';
+import '../styles/purchasing-design.css';
 
 function fallbackWorkspace(role: string): Workspace {
   const stored = getStoredWorkspace();
@@ -127,7 +128,7 @@ function Shell() {
           subtitle={activeWorkspace.tagline}
           onMenu={() => setDrawerOpen(true)}
         />
-        <main className="ch-content" key={location.pathname}>
+        <main className="ch-content workspace-design" style={{ '--workspace-label': `"${activeWorkspace.label.toUpperCase()}"` } as React.CSSProperties} key={location.pathname}>
           <Breadcrumbs items={crumbs} />
           <Outlet />
         </main>

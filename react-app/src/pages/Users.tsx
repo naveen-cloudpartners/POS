@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { UserPlus, Pencil, Trash2, KeyRound, UserCheck, UserX } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -303,7 +304,7 @@ export default function Users() {
 
   return (
     <div>
-      <div className="ch-page-head">
+      <div className="ch-page-head"><PageIcon />
         <div>
           <h1 className="ch-page-title">Users</h1>
           <p className="ch-page-sub">
@@ -322,7 +323,7 @@ export default function Users() {
       {notice !== '' && <div className="ch-alert ch-alert-success">{notice}</div>}
       {error !== '' && <div className="ch-alert ch-alert-error">{error}</div>}
 
-      <Card>
+      <Card title="Users">
         <div className="ch-toolbar">
           <SearchBar value={search} onChange={setSearch} placeholder="Search name, email or phone…" ariaLabel="Search users" />
           <FilterBar

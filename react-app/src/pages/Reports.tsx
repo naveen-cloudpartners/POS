@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Download, FileText, RefreshCw, TrendingUp, TrendingDown, Wallet, ReceiptText, Package, Users } from 'lucide-react';
@@ -383,7 +384,7 @@ export default function Reports() {
 
   return (
     <div className="reports-page">
-      <div className="ch-page-head reveal">
+      <div className="ch-page-head reveal"><PageIcon />
         <div>
           <h1 className="ch-page-title">Reports</h1>
           <p className="ch-page-sub">Sales, growth and inventory analytics · {rangeLabel}.</p>

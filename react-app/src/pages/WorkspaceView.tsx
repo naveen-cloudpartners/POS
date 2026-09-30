@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -68,7 +69,7 @@ import './WorkspaceView.css';
 
 function ViewHead({ title, sub, actions }: { title: string; sub: string; actions?: ReactNode }) {
   return (
-    <div className="ch-page-head reveal">
+    <div className="ch-page-head reveal"><PageIcon />
       <div>
         <h1 className="ch-page-title">{title}</h1>
         <p className="ch-page-sub">{sub}</p>

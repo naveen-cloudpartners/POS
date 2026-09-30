@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { Download, ArrowLeftRight } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -108,7 +109,7 @@ export default function Movements() {
 
   return (
     <div>
-      <div className="ch-page-head">
+      <div className="ch-page-head"><PageIcon />
         <div>
           <h1 className="ch-page-title">Stock Movements</h1>
           <p className="ch-page-sub">Every stock-affecting event — sales, adjustments, transfers, returns.</p>
@@ -128,7 +129,7 @@ export default function Movements() {
         <StatCard label="Units out" value={number(summary.units_out)} icon={<ArrowLeftRight size={20} />} iconBg="#fef1e1" iconColor="#b25a09" />
       </div>
 
-      <Card>
+      <Card title="Stock movements">
         <div className="ch-toolbar">
           <SearchBar value={search} onChange={setSearch} placeholder="Search product, reason, actor…" ariaLabel="Search movements" />
           <FilterBar

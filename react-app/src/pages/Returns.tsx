@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Undo2 } from 'lucide-react';
@@ -129,7 +130,7 @@ export default function Returns() {
 
   return (
     <div>
-      <div className="ch-page-head">
+      <div className="ch-page-head"><PageIcon />
         <div>
           <h1 className="ch-page-title">Returns</h1>
           <p className="ch-page-sub">Return merchandise authorisations against settled orders.</p>

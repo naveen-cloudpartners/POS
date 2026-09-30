@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { UserPlus, Users, Crown, ReceiptText, Mail, Phone, Building2, Download, Pencil, Trash2, Sparkles } from 'lucide-react';
@@ -285,7 +286,7 @@ export default function Customers() {
 
   return (
     <div>
-      <div className="ch-page-head reveal">
+      <div className="ch-page-head reveal"><PageIcon />
         <div>
           <h1 className="ch-page-title">Customers</h1>
           <p className="ch-page-sub">{rows.length} customers · {currency(summary.totalValue)} lifetime value · {summary.vips} VIP.</p>

@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download, Eye, Printer, ReceiptText } from 'lucide-react';
@@ -242,7 +243,7 @@ export default function Orders() {
 
   return (
     <div>
-      <div className="ch-page-head">
+      <div className="ch-page-head"><PageIcon />
         <div>
           <h1 className="ch-page-title">Orders</h1>
           <p className="ch-page-sub">{orders.length} orders · {currency(total)} total.</p>
@@ -257,7 +258,7 @@ export default function Orders() {
       {notice !== '' && <div className="ch-alert ch-alert-success">{notice}</div>}
       {error !== '' && <div className="ch-alert ch-alert-error">{error}</div>}
 
-      <Card>
+      <Card title="Orders">
         <div className="ch-toolbar">
           <SearchBar value={search} onChange={setSearch} placeholder="Search order, invoice, customer…" ariaLabel="Search orders" />
           <FilterBar

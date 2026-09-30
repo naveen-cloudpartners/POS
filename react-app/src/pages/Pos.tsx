@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Minus, Plus, Trash2, User, Banknote, CreditCard, Landmark, CheckCircle2, ShoppingBag, X, Printer, Download, Mail, Ban } from 'lucide-react';
 import Loader from '../components/ui/Loader';
@@ -399,7 +400,7 @@ export default function Pos() {
 
   return (
     <div className="pos-page pos-terminal">
-      <div className="ch-page-head reveal">
+      <div className="ch-page-head reveal"><PageIcon />
         <div>
           <h1 className="ch-page-title">Point of Sale</h1>
           <p className="ch-page-sub">{number(products.length)} products · {number(categories.length - 1)} categories</p>

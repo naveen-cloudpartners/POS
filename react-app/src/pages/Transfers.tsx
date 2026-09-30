@@ -1,3 +1,4 @@
+import PageIcon from '../components/ui/PageIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeftRight, ArrowRight, Plus } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -207,7 +208,7 @@ export default function Transfers() {
 
   return (
     <div>
-      <div className="ch-page-head">
+      <div className="ch-page-head"><PageIcon />
         <div>
           <h1 className="ch-page-title">Transfers</h1>
           <p className="ch-page-sub">Move stock between warehouses with a full audit trail.</p>
@@ -231,7 +232,7 @@ export default function Transfers() {
         <StatCard label="Completed" value={number(stats.completed)} icon={<ArrowLeftRight size={20} />} iconBg="#e3f6ec" iconColor="#147a50" />
       </div>
 
-      <Card>
+      <Card title="Stock transfers">
         <div className="ch-toolbar">
           <SearchBar value={search} onChange={setSearch} placeholder="Search transfer number or notes…" ariaLabel="Search transfers" />
           <FilterBar
