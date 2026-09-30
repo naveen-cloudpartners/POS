@@ -32,7 +32,7 @@ const STATUS_OPTIONS = [
   'Paid',
   'Partially Paid',
   'Unpaid',
-  'Offline Pending',
+  'Completed',
   'Synced',
   'Refunded',
   'Voided',

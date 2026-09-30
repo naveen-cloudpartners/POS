@@ -1,5 +1,18 @@
 # CloudHub POS — Function Prerequisites & Verification Checklist
 
+## Shared UI Review - 30 Sep 2026
+
+- [x] TypeScript project check passed for the shared Purchasing-style theme update.
+- [x] Vite production build passed (large-chunk warning remains).
+- [ ] Review Dashboard, Products, Inventory, Customers, Orders, Reports, Administration, Settings, and Purchasing with an authenticated session.
+- [ ] Verify page actions remain visible and clickable in the workspace.
+- [ ] Check summary values, selected product filters, empty states, and keyboard focus outlines.
+- [ ] Check narrow screens for clipped text, overlapping controls, and unexpected horizontal scrolling.
+- [ ] Verify POS with the context panel open and closed, including large quantities and checkout controls.
+- [ ] Deploy the client and repeat the visual checks on the deployed app.
+
+These checks track the latest CSS update only; unchecked items have not been verified.
+
 Companion to the end-to-end flow explanation. Same order: for every function,
 what must exist **before** it can work, which UI + API + table to check,
 and the usual fault + fix. Work top to bottom — each section's green checks

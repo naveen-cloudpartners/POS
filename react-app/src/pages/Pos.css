@@ -1,7 +1,9 @@
 /* Desktop terminal owns the remaining viewport; only item lists scroll. */
 @media (min-width: 761px) {
   .ch-main:has(.pos-terminal) { height: 100dvh; min-height: 0; overflow: hidden; }
-  .ch-app .ch-content:has(.pos-terminal) { display: flex; flex-direction: column; min-height: 0; padding: 12px 24px; max-width: none; overflow: hidden; }
+  .ch-app .ch-content:has(.pos-terminal) { display: flex; flex-direction: column; min-height: 0; padding: 12px 24px 12px calc(var(--ch-panel-w) + 24px); max-width: none; overflow: hidden; }
+  .ch-app.no-panel .ch-content:has(.pos-terminal),
+  .ch-app.panel-collapsed .ch-content:has(.pos-terminal) { padding-left: 24px; }
   .ch-content:has(.pos-terminal) > .ch-crumbs { display: none; }
   .ch-app .pos-terminal.pos-page { flex: 1; min-height: 0; margin: 0; display: flex; flex-direction: column; }
   .ch-app .pos-terminal .pos-layout { flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(440px, 38%); gap: 14px; }

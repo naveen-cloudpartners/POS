@@ -7,12 +7,12 @@
 /* ---------- Side container ---------- */
 .ch-side {
   position: fixed;
-  left: var(--ch-side-gap);
-  top: var(--ch-side-gap);
-  bottom: var(--ch-side-gap);
+  left: 0;
+  top: 0;
+  bottom: 0;
   z-index: 40;
   display: flex;
-  gap: var(--ch-side-gap);
+  gap: 0;
 }
 
 /* ---------- Level 1: primary rail ---------- */
@@ -20,7 +20,7 @@
   width: var(--ch-rail-w);
   background: linear-gradient(180deg, var(--ch-sidebar-bg) 0%, var(--ch-sidebar-bg-2) 100%);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 16px;
+  border-radius: 0;
   box-shadow: 0 20px 60px rgba(8, 14, 32, 0.4);
   display: flex;
   flex-direction: column;
@@ -109,7 +109,7 @@
   flex-basis: 62px;
   background: linear-gradient(135deg, rgba(93, 142, 249, 0.4), rgba(58, 118, 248, 0.22));
   border-color: rgba(123, 164, 255, 0.35);
-  border-radius: 6px;
+  border-radius: 12px;
   color: #fff;
   box-shadow: 0 0 18px rgba(58, 118, 248, 0.45), inset 0 1px 0 rgba(255,255,255,0.15);
 }
@@ -120,7 +120,7 @@
   top: 22%;
   bottom: 22%;
   width: 3px;
-  border-radius: 99px;
+  border-radius: 12px;
   background: linear-gradient(180deg, #7ba4ff, var(--ch-primary-dark));
   box-shadow: 0 0 12px rgba(93, 142, 249, 0.95);
   animation: ch-rail-bar 200ms var(--ch-ease) both;
@@ -159,9 +159,11 @@
 /* ---------- Level 2: context panel (solid white) ---------- */
 .ch-panel {
   width: var(--ch-panel-w);
+  height: calc(100svh - var(--ch-header-h));
+  margin-top: var(--ch-header-h);
   background: #fff;
   border: 1px solid var(--ch-border);
-  border-radius: 16px;
+  border-radius: 0;
   box-shadow: var(--ch-shadow-md);
   display: flex;
   flex-direction: column;
@@ -314,7 +316,8 @@
 }
 
 /* ---------- Workspace geometry: rail-only mode (single-section modules) ---------- */
-.ch-app.no-panel .ch-main { margin-left: calc(var(--ch-rail-w) + var(--ch-side-gap) * 2); }
+.ch-app.no-panel .ch-main { margin-left: var(--ch-rail-w); }
+.ch-app.no-panel .ch-content { padding-left: 24px; }
 
 /* ---------- Responsive: rail / panel / drawer ---------- */
 @media (min-width: 1025px) {

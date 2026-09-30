@@ -89,6 +89,20 @@ function groupBy<T>(rows: Array<T>, key: (r: T) => string): Map<string, Array<T>
   return m;
 }
 
+function orderStatus(o: Order): string {
+  return String(o.status ?? '').trim().toLowerCase();
+}
+
+function countsAsSale(o: Order): boolean {
+  const st = orderStatus(o);
+  return st !== 'voided' && st !== 'void' && st !== 'cancelled' && st !== 'canceled' && st !== 'refunded';
+}
+
+function orderValue(o: Order): number {
+  const paid = Number(o.paid_total);
+  return Number.isFinite(paid) ? paid : 0;
+}
+
 /* ---------------- Categories (first-class management) ---------------- */
 
 interface CategoryRow {
@@ -640,12 +654,13 @@ function PaymentsView() {
   }, []);
 
   const byPay = useMemo(() => {
-    const g = groupBy(orders, (o) => o.payment_mode ?? 'Unknown');
+    const settled = orders.filter((o) => countsAsSale(o) && orderValue(o) > 0);
+    const g = groupBy(settled, (o) => o.payment_mode ?? 'Unknown');
     return [...g.entries()]
       .map(([method, items]) => ({
         method,
         orders: items.length,
-        revenue: items.reduce((s, o) => s + (Number(o.total) || 0), 0),
+        revenue: items.reduce((s, o) => s + orderValue(o), 0),
         last: items.map((o) => String(o.CREATEDTIME ?? '')).filter(Boolean).sort().pop() ?? '',
       }))
       .sort((a, b) => b.revenue - a.revenue);
@@ -654,14 +669,15 @@ function PaymentsView() {
   if (loading) return <Loader message="Loading payments…" skeleton="page" />;
   if (error !== '') return <ErrorState message={error} onRetry={() => window.location.reload()} />;
 
-  const revenue = orders.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const settledOrders = orders.filter((o) => countsAsSale(o) && orderValue(o) > 0);
+  const revenue = settledOrders.reduce((s, o) => s + orderValue(o), 0);
   const total = Math.max(1, revenue);
 
   return (
     <div>
       <ViewHead
         title="Payments"
-        sub={`${number(orders.length)} settled transactions · ${currency(revenue)} collected across ${byPay.length} methods.`}
+        sub={`${number(settledOrders.length)} settled transactions · ${currency(revenue)} collected across ${byPay.length} methods.`}
         actions={<Link to="/sales/orders" className="ch-btn ch-btn-secondary ch-btn-sm">All orders <ArrowRight size={13} /></Link>}
       />
       <div className="ws-pay-grid">
@@ -1798,7 +1814,7 @@ function AutomationView() {
   }, []);
 
   const synced = useMemo(() => orders.filter((o) => (o.status ?? '').toLowerCase() === 'synced').length, [orders]);
-  const offline = useMemo(() => orders.filter((o) => (o.status ?? '').toLowerCase() === 'offline pending').length, [orders]);
+  const completedLocal = useMemo(() => orders.filter((o) => ['completed', 'offline pending'].includes((o.status ?? '').toLowerCase())).length, [orders]);
   const connected = zoho?.connected === true;
 
   if (loading) return <Loader message="Loading automations…" skeleton="page" />;
@@ -1808,7 +1824,7 @@ function AutomationView() {
     { id: 'inv', label: 'Invoice posting', desc: 'POS sales posted to Books automatically on sync.', on: connected },
     { id: 'stock', label: 'Inventory sync', desc: 'Catalog and stock levels mirrored from Books.', on: connected },
     { id: 'mail', label: 'Email receipts', desc: 'SMTP delivery for receipts and notifications.', on: smtp?.configured === true },
-    { id: 'queue', label: 'Offline queue drain', desc: `${number(offline)} orders waiting to sync.`, on: offline === 0 },
+    { id: 'queue', label: 'Local checkout', desc: `${number(completedLocal)} completed local orders.`, on: true },
   ];
 
   return (
@@ -1821,7 +1837,7 @@ function AutomationView() {
       <div className="ch-grid-stats">
         <StatCard label="Books connection" value={connected ? 'Active' : 'Off'} delta={zoho?.org_id ? `Org ${zoho.org_id}` : 'Not connected'} deltaTone={connected ? 'up' : 'down'} icon={<Workflow size={20} />} delay={40} />
         <StatCard label="Synced orders" value={number(synced)} icon={<ClipboardCheck size={20} />} iconBg="#e3f6ec" iconColor="#147a50" delay={100} />
-        <StatCard label="Offline queue" value={number(offline)} delta={offline === 0 ? 'Queue clear' : 'Drains on reconnect'} deltaTone={offline === 0 ? 'up' : 'down'} icon={<RefreshCw size={20} />} iconBg="#fef1e1" iconColor="#b25a09" delay={160} />
+        <StatCard label="Local orders" value={number(completedLocal)} delta="Completed in POS" deltaTone="up" icon={<RefreshCw size={20} />} iconBg="#fef1e1" iconColor="#b25a09" delay={160} />
       </div>
       <Card title="Flows" subtitle="Status derived from live integration state" delay={200}>
         <ul className="ws-feed">

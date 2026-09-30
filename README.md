@@ -21,6 +21,12 @@ Catalyst is the hosting (like cPanel), `react-app/dist` is the
 | `scripts/deploy.sh` | Local deploy mirroring CI: build → syntax check → `catalyst deploy` (`all`/`functions`/`client`). |
 | `docs/CI_CD_Guide.md` | Pipeline architecture, secrets setup, dev/production workflows, roadmap. |
 
+## Shared workspace styling
+
+`react-app/src/styles/workspace-theme.css` is imported after the base styles in `src/main.tsx` and aligns the authenticated workspace with the Purchasing UI. It covers shared cards, summary widgets, filters, tables, empty states, and responsive spacing. Page-owned layouts, including the compact POS terminal, remain in their page stylesheets.
+
+The 30 Sep 2026 styling update passed TypeScript and the Vite production build. Visual checks across authenticated pages remain pending. See `CHANGELOG.md` and `docs/POS_Function_Checklist.md` for the checkpoint and review tasks.
+
 ## Data model (Catalyst Data Store)
 
 - Catalog table is **`Products`** (renamed from `Items`). All ZCQL + `table()` calls use `Products`. API routes stay `/api/items*` for backward compatibility.

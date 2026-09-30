@@ -14,7 +14,7 @@ import {
   Package,
   Zap,
   FileCheck,
-  WifiOff,
+  CheckCircle2,
   RefreshCw,
   FileText,
 } from 'lucide-react';
@@ -64,6 +64,16 @@ function statusOf(o: Order): string {
   return (o.status ?? '').trim().toLowerCase();
 }
 
+function countsAsSale(o: Order): boolean {
+  const st = statusOf(o);
+  return st !== 'voided' && st !== 'void' && st !== 'cancelled' && st !== 'canceled' && st !== 'refunded';
+}
+
+function orderValue(o: Order): number {
+  const paid = Number(o.paid_total);
+  return Number.isFinite(paid) ? paid : 0;
+}
+
 interface Reco {
   tone: 'ok' | 'warn' | 'bad';
   title: string;
@@ -107,17 +117,18 @@ export default function Dashboard() {
 
     // Legacy client-side aggregates — used for growth/chart plus as a
     // fallback when the backend predates GET /api/dashboard/summary.
-    const legacyRevenue = data.orders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-    const legacyTodayOrders = data.orders.filter((o) => String(o.CREATEDTIME ?? '').slice(0, 10) === today);
-    const legacyTodayRevenue = legacyTodayOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+    const salesOrders = data.orders.filter((o) => countsAsSale(o) && orderValue(o) > 0);
+    const legacyRevenue = salesOrders.reduce((sum, o) => sum + orderValue(o), 0);
+    const legacyTodayOrders = salesOrders.filter((o) => String(o.CREATEDTIME ?? '').slice(0, 10) === today);
+    const legacyTodayRevenue = legacyTodayOrders.reduce((sum, o) => sum + orderValue(o), 0);
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
-    const prevRevenue = data.orders
+    const prevRevenue = salesOrders
       .filter((o) => {
         const d = String(o.CREATEDTIME ?? '').slice(0, 10);
         return d !== '' && d < today && d >= weekAgo.toISOString().slice(0, 10);
       })
-      .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+      .reduce((sum, o) => sum + orderValue(o), 0);
     const growth = prevRevenue <= 0 ? (legacyRevenue > 0 ? 100 : 0) : ((legacyRevenue - prevRevenue) / prevRevenue) * 100;
 
     // DASH-01: server buckets when available, legacy lifetime fallback.
@@ -128,10 +139,10 @@ export default function Dashboard() {
 
     // DASH-02: server pipeline when available, legacy mapping fallback.
     const pending = s?.orderCounts.pending ?? data.orders.filter((o) => statusOf(o) === 'pending').length;
-    const offline = s?.orderCounts.offline ?? data.orders.filter((o) => statusOf(o) === 'offline pending').length;
+    const offline = s?.orderCounts.offline ?? data.orders.filter((o) => ['completed', 'offline pending'].includes(statusOf(o))).length;
     const synced = s?.orderCounts.synced ?? data.orders.filter((o) => statusOf(o) === 'synced').length;
     const toInvoice = s?.orderCounts.toInvoice ?? data.orders.filter((o) => (o.books_invoice_id ?? '') === '' && (o.invoice_number ?? '') === '').length;
-    const orderTotal = s?.orderCounts.total ?? data.orders.length;
+    const orderTotal = s?.orderCounts.total ?? salesOrders.length;
     const todayOrderCount = s?.orderCounts.today ?? legacyTodayOrders.length;
 
     // DASH-03: server customer summary; directory count always available.
@@ -190,9 +201,9 @@ export default function Dashboard() {
     if (data === null) return [];
     const days = last7Days();
     const totals = new Map<string, number>();
-    for (const o of data.orders) {
+    for (const o of data.orders.filter((row) => countsAsSale(row) && orderValue(row) > 0)) {
       const day = String(o.CREATEDTIME ?? '').slice(0, 10);
-      totals.set(day, (totals.get(day) ?? 0) + (Number(o.total) || 0));
+      totals.set(day, (totals.get(day) ?? 0) + orderValue(o));
     }
     const max = Math.max(1, ...days.map((d) => totals.get(d) ?? 0));
     return days.map((d) => ({
@@ -222,9 +233,6 @@ export default function Dashboard() {
     if (stats.slowMovers.length > 0 && slowValue > 0) {
       out.push({ tone: 'warn', title: `${stats.slowMovers.length} slow movers tie up ${currency(slowValue)}`, sub: `Consider offers on ${stats.slowMovers.slice(0, 2).map((m) => m.name).join(', ')}` });
     }
-    if (stats.offline > 0) {
-      out.push({ tone: 'warn', title: `${stats.offline} offline order${stats.offline === 1 ? '' : 's'} awaiting Books sync`, sub: 'Reconnect Zoho Books to clear the queue' });
-    }
     if (stats.toInvoice > 0) {
       out.push({ tone: 'warn', title: `${stats.toInvoice} order${stats.toInvoice === 1 ? '' : 's'} missing invoices`, sub: 'Issue invoices from Orders' });
     }
@@ -237,10 +245,10 @@ export default function Dashboard() {
   // DASH-05: orders + stock-movement audit trail, chronological; undated alerts last.
   const activity = useMemo(() => {
     if (data === null || stats === null) return [];
-    const orderEvents = data.orders.slice(0, 6).map((o) => ({
+    const orderEvents = data.orders.filter((row) => countsAsSale(row) && orderValue(row) > 0).slice(0, 6).map((o) => ({
       id: `o-${String(o.ROWID ?? o.invoice_number)}`,
       kind: 'order' as const,
-      text: `Order ${o.invoice_number ?? o.ROWID} — ${o.customer_name ?? 'Walk-in'} · ${currency(o.total)}`,
+      text: `Order ${o.invoice_number ?? o.ROWID} — ${o.customer_name ?? 'Walk-in'} · ${currency(orderValue(o))}`,
       time: String(o.CREATEDTIME ?? ''),
     }));
     const movementEvents = stats.movements.slice(0, 6).map((m) => {
@@ -357,10 +365,10 @@ export default function Dashboard() {
             <span className="sa-cap">Qty</span>
             <span className="sa-lbl"><ClipboardList size={13} /> PENDING</span>
           </Link>
-          <Link to="/sales/orders?status=offline+pending" className="sa-cell">
+          <Link to="/sales/orders?status=Completed" className="sa-cell">
             <b className="sa-red">{number(stats.offline)}</b>
             <span className="sa-cap">Pkgs</span>
-            <span className="sa-lbl"><WifiOff size={13} /> OFFLINE PENDING</span>
+            <span className="sa-lbl"><CheckCircle2 size={13} /> COMPLETED</span>
           </Link>
           <Link to="/sales/orders?status=synced" className="sa-cell">
             <b className="sa-green">{number(stats.synced)}</b>
@@ -444,7 +452,7 @@ export default function Dashboard() {
             </li>
             <li>
               <span className="dash-insight-ic ok"><FileText size={15} /></span>
-              <span><b>{number(stats.synced)} orders synced</b><span className="ch-cell-sub">{number(stats.offline)} offline pending · {number(stats.toInvoice)} to invoice</span></span>
+              <span><b>{number(stats.synced)} orders synced</b><span className="ch-cell-sub">{number(stats.offline)} completed locally · {number(stats.toInvoice)} to invoice</span></span>
             </li>
             {recos.map((r, i) => (
               <li key={`reco-${i}`}>
@@ -542,14 +550,14 @@ export default function Dashboard() {
 
       {/* Orders supplement (ORD): pending + top cashier from loaded orders only */}
       {(() => {
-        const pending = data.orders.filter((o) => ['pending', 'offline pending'].includes(statusOf(o))).length;
+        const pending = data.orders.filter((o) => statusOf(o) === 'pending').length;
         const byCashier = new Map<string, { orders: number; revenue: number }>();
-        for (const o of data.orders) {
+        for (const o of data.orders.filter((row) => countsAsSale(row) && orderValue(row) > 0)) {
           const name = String(o.cashier_name ?? o.created_by ?? '').trim();
           if (name === '') continue;
           const cur = byCashier.get(name) ?? { orders: 0, revenue: 0 };
           cur.orders += 1;
-          cur.revenue += Number(o.total) || 0;
+          cur.revenue += orderValue(o);
           byCashier.set(name, cur);
         }
         const top = [...byCashier.entries()].sort((a, b) => b[1].revenue - a[1].revenue)[0];
@@ -559,7 +567,7 @@ export default function Dashboard() {
             <StatCard
               label="Pending orders"
               value={number(pending)}
-              delta={pending > 0 ? 'Awaiting sync or review' : 'Queue clear'}
+              delta={pending > 0 ? 'Awaiting review' : 'Queue clear'}
               deltaTone={pending > 0 ? 'down' : 'up'}
               icon={<ClipboardList size={20} />}
               iconBg="#fef1e1"

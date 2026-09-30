@@ -124,6 +124,7 @@ function Shell() {
         <Header
           title={childLabel}
           module={activeWorkspace.label}
+          subtitle={activeWorkspace.tagline}
           onMenu={() => setDrawerOpen(true)}
         />
         <main className="ch-content" key={location.pathname}>

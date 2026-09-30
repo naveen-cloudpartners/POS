@@ -8,6 +8,7 @@ import { companyLogoUrl, getCompanyProfile } from '../../services/settingsServic
 interface HeaderProps {
   title: string;
   module: string;
+  subtitle?: string;
   onMenu: () => void;
 }
 
@@ -21,7 +22,7 @@ const MODULE_SUB: Record<string, string> = {
   Settings: 'Store configuration',
 };
 
-export default function Header({ title, module, onMenu }: HeaderProps) {
+export default function Header({ title, module, subtitle, onMenu }: HeaderProps) {
   const { user, role } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export default function Header({ title, module, onMenu }: HeaderProps) {
   const qaRef = useRef<HTMLDivElement | null>(null);
   const userRef = useRef<HTMLDivElement | null>(null);
 
-  const sub = MODULE_SUB[module] ?? 'CloudHub POS · Enterprise';
+  const sub = subtitle ?? MODULE_SUB[module] ?? 'CloudHub POS · Enterprise';
   const initial = (user?.name ?? user?.email ?? 'U').trim().charAt(0).toUpperCase() || 'U';
 
   useEffect(() => {

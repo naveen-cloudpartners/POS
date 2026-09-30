@@ -7,6 +7,21 @@
   --ch-border-soft: #eef1f7;
 }
 
+@media (min-width: 1025px) {
+  .ch-app .ch-rail,
+  .ch-app .ch-header,
+  .ch-app .ch-side > .ch-panel {
+    border-radius: 0;
+  }
+
+  .ch-app .ch-header-search,
+  .ch-app .ch-env-pill,
+  .ch-app .ch-header-right > .ch-badge,
+  .ch-app .ch-header-right .ch-notif-wrap:has(.ch-btn-primary) {
+    display: none;
+  }
+}
+
 .ch-content :is(.ch-page-title, .ch-card-title, .ch-stat-value,
   .ch-cell-main, .ch-label, .ch-btn, .ch-modal-title, .ch-state-title) {
   letter-spacing: 0;
@@ -17,6 +32,21 @@
   padding: 8px 0 14px;
   margin-bottom: 18px;
   border-bottom: 1px solid var(--ch-border);
+}
+.ch-content .ch-page-head:not(:has(.ch-page-actions)) {
+  display: none;
+}
+.ch-content .ch-page-head:has(.ch-page-actions) {
+  justify-content: flex-end;
+  padding: 0 0 12px;
+  margin-bottom: 14px;
+  border-bottom: 0;
+}
+.ch-content .ch-page-head:has(.ch-page-actions) > div:first-child {
+  display: none;
+}
+.ch-content .ch-page-head .ch-page-actions {
+  margin-left: 0;
 }
 .ch-content .ch-page-title { font-size: 24px; line-height: 1.25; }
 .ch-content .ch-page-sub { font-size: 13px; font-weight: 400; line-height: 1.45; }
@@ -41,7 +71,7 @@
 .ch-content .ch-card-foot { background: #fff; border-top-color: var(--ch-border-soft); }
 .ch-content .ch-card.hoverable:hover { transform: none; box-shadow: var(--ch-shadow-sm); }
 
-.ch-content .ch-grid-stats { gap: 14px; margin-bottom: 18px; }
+.ch-content :is(.ch-grid-stats, .prod-stats, .cust-widgets) { gap: 14px; margin-bottom: 18px; }
 .ch-content :is(.ch-stat, .prod-stat, .cust-widget) {
   padding: 17px 18px;
   border: 1px solid var(--ch-border);
@@ -74,6 +104,34 @@
   overflow-wrap: anywhere;
 }
 .ch-content .ch-stat-delta { margin-top: 5px; font-size: 11px; }
+
+/* Purchasing-style summaries keep labels, values and icons in stable tracks. */
+.ch-content .ch-stat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: start;
+  gap: 12px;
+  min-height: 132px;
+}
+.ch-content .ch-stat-icon { grid-column: 2; grid-row: 1; }
+.ch-content .ch-stat > div {
+  grid-column: 1;
+  grid-row: 1;
+}
+.ch-content .ch-stat-label { min-height: 32px; display: flex; align-items: center; }
+.ch-content .ch-stat-value { margin-top: 12px; font-size: 29px; }
+.ch-content .ch-stat-delta { margin-top: 14px; }
+.ch-content .prod-stat { min-height: 132px; gap: 16px; justify-content: center; }
+.ch-content .prod-stat span { order: -1; }
+.ch-content .prod-stat b { font-size: 29px; }
+.ch-content .prod-stat.active {
+  border-color: var(--ch-primary);
+  box-shadow: 0 0 0 2px var(--ch-primary-ring);
+}
+.ch-content .cust-widget { min-height: 132px; align-items: flex-start; }
+.ch-content .cust-widget > span:last-child { gap: 10px; }
+.ch-content .cust-widget b { font-size: 29px; }
+.ch-content :is(.ch-grid-stats, .prod-stats, .cust-widgets) > * { min-width: 0; }
 
 /* Flat filter strips and lightly tinted fields match Purchasing records. */
 .ch-content .ch-toolbar {
@@ -118,22 +176,47 @@
 .ch-content .ch-badge { font-size: 10.5px; }
 .ch-content .ch-badge::before { box-shadow: none; }
 
-/* Bring the older dark dashboard/customer panels into the light workspace. */
-.ch-content :is(.dash-hero, .cust-top) {
+.ch-content .ch-state { padding: 56px 20px; }
+.ch-content .ch-state-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  color: var(--ch-primary-dark);
+  background: var(--ch-primary-soft);
+  border: 1px solid rgba(70, 126, 247, .17);
+  box-shadow: none;
+}
+.ch-content .ch-state-title { font-size: 18px; line-height: 1.4; }
+.ch-content .ch-state-text { font-size: 13px; line-height: 1.5; }
+.ch-content .ch-table tbody tr:hover { background: #f9fbff; }
+.ch-content .ch-btn:focus-visible {
+  outline: 2px solid var(--ch-primary);
+  outline-offset: 3px;
+}
+
+/* Bring the older customer panel into the light workspace. */
+.ch-content .cust-top {
   background: #fff;
   color: var(--ch-ink);
   border: 1px solid var(--ch-border);
   box-shadow: var(--ch-shadow-sm);
 }
-.ch-content .dash-hero::after { display: none; }
-.ch-content .dash-hero-value { color: var(--ch-ink); font-size: 30px; letter-spacing: 0; }
-.ch-content :is(.dash-hero-sub, .dash-hero-bar-day, .cust-top .ch-cell-sub) { color: var(--ch-muted); }
-.ch-content :is(.dash-hero-eyebrow, .dash-hero-btn.ghost) {
-  color: var(--ch-primary-dark);
-  background: var(--ch-primary-soft);
-  border-color: var(--ch-border);
+.ch-content .dash-hero {
+  background: #101a35;
+  color: #eef2ff;
+  border: 1px solid #22335f;
+  box-shadow: 0 18px 44px rgba(11,18,38,0.24);
 }
-.ch-content .dash-hero-bar-track { background: #f6f8fc; border-color: var(--ch-border-soft); }
+.ch-content .dash-hero::after { display: none; }
+.ch-content .dash-hero-value { color: #fff; font-size: 30px; letter-spacing: 0; }
+.ch-content :is(.dash-hero-sub, .dash-hero-bar-day) { color: #aebce0; }
+.ch-content .cust-top .ch-cell-sub { color: var(--ch-muted); }
+.ch-content :is(.dash-hero-eyebrow, .dash-hero-btn.ghost) {
+  color: #dce7ff;
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.18);
+}
+.ch-content .dash-hero-bar-track { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); }
 .ch-content .cust-top-row { background: #f9fbff; border-color: var(--ch-border-soft); }
 .ch-content .cust-top-row:hover { background: var(--ch-primary-soft); }
 
@@ -146,10 +229,19 @@
   .ch-content .ch-page-title { font-size: 21px; }
   .ch-content .ch-card-head { padding: 14px; }
   .ch-content :is(.ch-stat, .prod-stat, .cust-widget) { padding: 14px; }
+  .ch-content :is(.ch-stat, .prod-stat, .cust-widget) { min-height: 112px; }
+  .ch-content .cust-widgets { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .ch-content .ch-state { padding: 32px 14px; }
   .ch-content :is(.ch-stat-value, .prod-stat b, .cust-widget b) { font-size: 21px; }
   .ch-content .ch-toolbar { gap: 8px; }
   .ch-content .ch-filterbar { max-width: 100%; }
   .ch-content .ch-page-actions .ch-btn { white-space: normal; }
+}
+
+@media (max-width: 420px) {
+  .ch-content :is(.ch-grid-stats, .prod-stats, .cust-widgets) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
 }
 
 @media (pointer: coarse) {

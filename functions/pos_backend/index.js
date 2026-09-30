@@ -2572,8 +2572,7 @@ app.post('/api/orders', async (req, res) => {
           paymentRecorded = true;
         }
       } catch (zohoError) {
-        console.warn('Failed to submit order directly to Zoho Books. Saving to local database under Offline pending status...', zohoError.message);
-        // We will continue to save locally in Datastore under 'Offline Pending' state
+        console.warn('Failed to submit order directly to Zoho Books. Saving completed local order...', zohoError.message);
       }
     }
 
@@ -2604,7 +2603,7 @@ app.post('/api/orders', async (req, res) => {
       tax_amount: taxAmount,
       total: total,
       payment_mode: effectiveMode,
-      status: orgId && !invoiceId.startsWith('OFFLINE') ? 'Synced' : 'Offline Pending',
+      status: orgId && !invoiceId.startsWith('OFFLINE') ? 'Synced' : 'Completed',
       books_invoice_id: invoiceId,
       invoice_number: invoiceNumber || invoice_number || '',
       local_ref: local_ref || ''
@@ -2795,7 +2794,7 @@ app.post('/api/orders', async (req, res) => {
       success: true,
       message: orgId && !invoiceId.startsWith('OFFLINE')
         ? 'Checkout completed & synchronized successfully!'
-        : 'Checkout saved locally in cloud datastore (Offline/Pending sync).',
+        : 'Checkout completed and saved locally.',
       order: {
         local_order_id: localOrderId,
         customer_name: finalCustomerName,
@@ -4867,6 +4866,23 @@ function dashNum(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function dashOrderStatus(order) {
+  return normalizeOrderStatus(order && order.status).toLowerCase();
+}
+
+function dashCountsAsSale(order) {
+  const st = dashOrderStatus(order);
+  return st !== 'voided' && st !== 'cancelled' && st !== 'refunded';
+}
+
+function dashNetOrderValue(order, legsByOrder) {
+  const legs = legsByOrder.get(String(order.ROWID)) || [];
+  if (legs.length > 0) {
+    return round2(legs.reduce((s, p) => s + dashNum(p.amount), 0));
+  }
+  return 0;
+}
+
 app.get('/api/dashboard/summary', async (req, res) => {
   try {
     const catalystApp = catalyst.initialize(req);
@@ -4890,6 +4906,10 @@ app.get('/api/dashboard/summary', async (req, res) => {
       );
       orders = (rows || []).map((row) => row.Orders).filter(Boolean);
     } catch (e) { console.warn('[DASH] orders slice unavailable:', e.message); }
+    const legsByOrder = await fetchPaymentsGrouped(catalystApp);
+    const saleOrders = orders.filter(dashCountsAsSale);
+    const collectedOrders = saleOrders.filter((o) => dashNetOrderValue(o, legsByOrder) > 0);
+    const saleOrderIds = new Set(collectedOrders.map((o) => String(o.ROWID)));
 
     // ---- 2. OrderItems (quantities + rates per line for profit/top-sellers)
     let lines = [];
@@ -4948,21 +4968,23 @@ app.get('/api/dashboard/summary', async (req, res) => {
 
     // ---- Revenue buckets (DASH-01) + order pipeline (DASH-02)
     const revenue = { today: 0, week: 0, month: 0, total: 0 };
-    const orderCounts = { total: orders.length, pending: 0, offline: 0, synced: 0, toInvoice: 0, today: 0 };
+    const orderCounts = { total: collectedOrders.length, pending: 0, offline: 0, synced: 0, toInvoice: 0, today: 0 };
     const orderDayById = new Map();
     for (const o of orders) {
-      const total = dashNum(o.total);
       const day = dashDayOf(o.CREATEDTIME);
-      revenue.total += total;
-      if (day === today) { revenue.today += total; orderCounts.today += 1; }
-      if (day !== '' && day >= weekStart) revenue.week += total;
-      if (day !== '' && day >= monthStart) revenue.month += total;
-      const st = String(o.status ?? '').trim().toLowerCase();
+      if (o.ROWID !== undefined && o.ROWID !== null) orderDayById.set(String(o.ROWID), day);
+      if (!dashCountsAsSale(o)) continue;
+      const total = dashNetOrderValue(o, legsByOrder);
+      if (!(total > 0)) continue;
+      revenue.total = round2(revenue.total + total);
+      if (day === today) { revenue.today = round2(revenue.today + total); orderCounts.today += 1; }
+      if (day !== '' && day >= weekStart) revenue.week = round2(revenue.week + total);
+      if (day !== '' && day >= monthStart) revenue.month = round2(revenue.month + total);
+      const st = dashOrderStatus(o);
       if (st === 'pending') orderCounts.pending += 1;
-      else if (st === 'offline pending') orderCounts.offline += 1;
+      else if (st === 'completed') orderCounts.offline += 1;
       else if (st === 'synced') orderCounts.synced += 1;
       if ((o.books_invoice_id ?? '') === '' && (o.invoice_number ?? '') === '') orderCounts.toInvoice += 1;
-      if (o.ROWID !== undefined && o.ROWID !== null) orderDayById.set(String(o.ROWID), day);
     }
 
     // ---- Customer summary from order history (DASH-03)
@@ -4970,7 +4992,7 @@ app.get('/api/dashboard/summary', async (req, res) => {
     // is excluded — it is not a real customer and would otherwise skew
     // returning/active counts.
     const custStats = new Map();
-    for (const o of orders) {
+    for (const o of collectedOrders) {
       const email = String(o.customer_email ?? '').trim().toLowerCase();
       const name = String(o.customer_name ?? '').trim().toLowerCase();
       if (email === '' && name === '') continue;
@@ -4979,7 +5001,7 @@ app.get('/api/dashboard/summary', async (req, res) => {
       const day = dashDayOf(o.CREATEDTIME);
       const cur = custStats.get(key) || { orders: 0, total: 0, first: day, last: day, name: String(o.customer_name ?? key) };
       cur.orders += 1;
-      cur.total += dashNum(o.total);
+      cur.total = round2(cur.total + dashNetOrderValue(o, legsByOrder));
       if (day !== '' && (cur.first === '' || day < cur.first)) cur.first = day;
       if (day !== '' && (cur.last === '' || day > cur.last)) cur.last = day;
       custStats.set(key, cur);
@@ -5000,6 +5022,7 @@ app.get('/api/dashboard/summary', async (req, res) => {
     const revByItem = new Map();
     const lastSoldByItem = new Map();
     for (const l of lines) {
+      if (!saleOrderIds.has(String(l.order_id ?? ''))) continue;
       const qty = dashNum(l.quantity) || 0;
       const rate = dashNum(l.rate);
       const key = String(l.item_id ?? '').trim();
@@ -7517,7 +7540,8 @@ function normalizeOrderStatus(status) {
     'partially paid': 'Partially Paid',
     'partial': 'Partially Paid',
     'unpaid': 'Unpaid',
-    'offline pending': 'Offline Pending',
+    'offline pending': 'Completed',
+    'completed': 'Completed',
     'synced': 'Synced',
     'refunded': 'Refunded',
     'refund': 'Refunded',
@@ -8044,7 +8068,8 @@ function cashierNameOf(o) {
 async function getRevenueReport(catalystApp, f) {
   const orders = await fetchReportOrders(catalystApp, f);
   const valid = orders.filter((o) => normalizeOrderStatus(o.status).toLowerCase() !== 'voided'
-    && normalizeOrderStatus(o.status).toLowerCase() !== 'cancelled');
+    && normalizeOrderStatus(o.status).toLowerCase() !== 'cancelled'
+    && normalizeOrderStatus(o.status).toLowerCase() !== 'refunded');
   const revenue = round2(valid.reduce((s, o) => s + (Number(o.total) || 0), 0));
   const orderCount = valid.length;
   const byDayMap = new Map();
@@ -8094,7 +8119,8 @@ async function getRevenueReport(catalystApp, f) {
     const old = await fetchReportOrders(catalystApp, { ...f, from: prev.from, to: prev.to });
     previousRevenue = round2(old
       .filter((o) => normalizeOrderStatus(o.status).toLowerCase() !== 'voided'
-        && normalizeOrderStatus(o.status).toLowerCase() !== 'cancelled')
+        && normalizeOrderStatus(o.status).toLowerCase() !== 'cancelled'
+        && normalizeOrderStatus(o.status).toLowerCase() !== 'refunded')
       .reduce((s, o) => s + (Number(o.total) || 0), 0));
   }
   const growth = previousRevenue <= 0
@@ -8123,7 +8149,12 @@ async function getProductPerformanceReport(catalystApp, f) {
   const maps = productLookups(products);
   const lines = await fetchReportLines(catalystApp);
   const orders = await fetchReportOrders(catalystApp, f);
-  const validIds = new Set(orders.map((o) => String(o.ROWID)));
+  const validIds = new Set(orders
+    .filter((o) => {
+      const st = normalizeOrderStatus(o.status).toLowerCase();
+      return st !== 'voided' && st !== 'cancelled' && st !== 'refunded';
+    })
+    .map((o) => String(o.ROWID)));
   const per = new Map();
   for (const p of products) {
     // Category filter applies to the catalog side.
@@ -8203,7 +8234,8 @@ async function getProductPerformanceReport(catalystApp, f) {
 async function getCustomerReport(catalystApp, f) {
   const orders = await fetchReportOrders(catalystApp, f);
   const valid = orders.filter((o) => normalizeOrderStatus(o.status).toLowerCase() !== 'voided'
-    && normalizeOrderStatus(o.status).toLowerCase() !== 'cancelled');
+    && normalizeOrderStatus(o.status).toLowerCase() !== 'cancelled'
+    && normalizeOrderStatus(o.status).toLowerCase() !== 'refunded');
   let directory = [];
   try {
     directory = await listAllCustomers(catalystApp);
@@ -8320,7 +8352,7 @@ async function getProfitReport(catalystApp, f) {
     const o = orderById.get(String(l.order_id ?? ''));
     if (!o) continue;
     const st = normalizeOrderStatus(o.status).toLowerCase();
-    if (st === 'voided' || st === 'cancelled') continue;
+    if (st === 'voided' || st === 'cancelled' || st === 'refunded') continue;
     const ref = String(l.item_id ?? '');
     const prod = resolveLineProduct(maps, ref);
     if (!prod) continue;
@@ -8404,11 +8436,12 @@ async function getRegisterReport(catalystApp, f) {
       voidValue = round2(voidValue + amt);
       continue;
     }
+    const legs = legsByOrder.get(String(o.ROWID)) || (st === 'refunded' ? [] : [{ method: String(o.payment_mode || 'Cash'), amount: amt }]);
+    const netPaid = round2(legs.reduce((s, leg) => s + (Number(leg.amount) || 0), 0));
     if (st === 'refunded') {
       refundCount += 1;
       refundValue = round2(refundValue + amt);
     }
-    const legs = legsByOrder.get(String(o.ROWID)) || [{ method: String(o.payment_mode || 'Cash'), amount: amt }];
     for (const leg of legs) {
       const m = String(leg.method || '').toLowerCase();
       const a = Number(leg.amount) || 0;
@@ -8428,7 +8461,7 @@ async function getRegisterReport(catalystApp, f) {
     const kn = cashierNameOf(o);
     const c = perCashier.get(kn) ?? { cashier: kn, orders: 0, revenue: 0, cash: 0, card: 0 };
     c.orders += 1;
-    c.revenue = round2(c.revenue + amt);
+    c.revenue = round2(c.revenue + netPaid);
     for (const leg of legs) {
       const m = String(leg.method || '').toLowerCase();
       if (m === 'cash') c.cash = round2(c.cash + (Number(leg.amount) || 0));

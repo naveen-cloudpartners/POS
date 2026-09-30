@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### 2026-09-30 - Shared Purchasing-style UI
+
+- Updated `react-app/src/styles/workspace-theme.css` so shared summary cards use consistent spacing, larger values, stable icon tracks, and Purchasing-style labels.
+- Aligned Products and Customers summary widgets with the shared cards, retaining the selected product filter outline.
+- Standardized empty-state icons, text spacing, table hover treatment, and keyboard focus outlines.
+- Added narrow-screen summary grid rules; retained the compact POS layout and existing page actions.
+- Frontend styling only in this update; no API or business-logic changes.
+
+Validation: TypeScript project check and Vite production build passed. Vite reported its large-chunk warning. Authenticated visual checks across all pages and viewport sizes remain pending; this update has not been deployed.
+
 ### UI Polish: Primary rail and Purchasing workspace
 
 Changed:

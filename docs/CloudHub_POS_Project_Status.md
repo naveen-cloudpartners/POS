@@ -16,6 +16,14 @@
 
 ---
 
+## UI Checkpoint - 30 Sep 2026
+
+The shared authenticated workspace theme now follows the Purchasing reference for summary cards, labels, spacing, empty states, and table interactions. Products and Customers widgets share the same visual treatment, with responsive summary grids on narrow screens. POS retains its compact layout; page actions remain in the workspace after the top-bar action experiment was rolled back.
+
+Implementation: `react-app/src/styles/workspace-theme.css`, imported after the base styles in `react-app/src/main.tsx`. This checkpoint covers frontend CSS only and does not change business calculations or APIs.
+
+Verification: TypeScript and the Vite production build passed. The existing large JavaScript chunk warning remains. Full authenticated visual regression checks, including POS with the context panel open and mobile layouts, are still pending. No deployment was performed for this update. The older report sections below retain their original assessment date and are not a new whole-system audit.
+
 ## Executive Summary
 
 CloudHub POS is a cloud-native retail management system on Zoho Catalyst unifying POS billing, inventory, customers, orders, reports, users/roles and business configuration for retail SMEs.

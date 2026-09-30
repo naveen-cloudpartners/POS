@@ -140,7 +140,7 @@ button { font-family: inherit; }
 .ch-main {
   flex: 1;
   min-width: 0;
-  margin-left: calc(var(--ch-rail-w) + var(--ch-panel-w) + var(--ch-side-gap) * 3);
+  margin-left: var(--ch-rail-w);
   display: flex;
   flex-direction: column;
   min-height: 100svh;
@@ -148,11 +148,11 @@ button { font-family: inherit; }
   z-index: 1;
   transition: margin-left 0.25s var(--ch-ease);
 }
-.ch-app.panel-collapsed .ch-main { margin-left: calc(var(--ch-rail-w) + var(--ch-side-gap) * 2); }
+.ch-app.panel-collapsed .ch-main { margin-left: var(--ch-rail-w); }
 
 .ch-content {
   flex: 1;
-  padding: 12px 24px 36px;
+  padding: 12px 24px 36px calc(var(--ch-panel-w) + 24px);
   max-width: none;
   width: 100%;
   margin: 0 auto;
@@ -297,13 +297,13 @@ button { font-family: inherit; }
 /* ---------- Header (solid white) ---------- */
 .ch-header {
   position: sticky;
-  top: 12px;
+  top: 0;
   z-index: 30;
-  margin: 12px 24px 0;
+  margin: 0;
   min-height: var(--ch-header-h);
   background: #fff;
   border: 1px solid var(--ch-border);
-  border-radius: 18px;
+  border-radius: 0;
   box-shadow: var(--ch-shadow-md);
   display: flex;
   align-items: center;

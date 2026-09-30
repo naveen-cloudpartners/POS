@@ -10,7 +10,8 @@ const { normalizeOrderStatus, derivePaymentStatus } = loadFunctions([
 describe('normalizeOrderStatus', () => {
   it('canonicalizes known states and passes the rest through', () => {
     assert.equal(normalizeOrderStatus('paid'), 'Paid');
-    assert.equal(normalizeOrderStatus('OFFLINE PENDING'), 'Offline Pending');
+    assert.equal(normalizeOrderStatus('OFFLINE PENDING'), 'Completed');
+    assert.equal(normalizeOrderStatus('completed'), 'Completed');
     assert.equal(normalizeOrderStatus('void'), 'Voided');
     assert.equal(normalizeOrderStatus('refund'), 'Refunded');
     assert.equal(normalizeOrderStatus(''), 'Pending');
