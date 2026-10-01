@@ -7,6 +7,10 @@ const printers = [{ enabled: true, transport: 'qz', osPrinter: 'Receipt printer'
 const now = Date.now();
 const request = { call: 'print', timestamp: now, params: { printer: { name: 'Receipt printer' }, options: { copies: 1 }, data: [{ type: 'pixel', format: 'html', flavor: 'plain', data: '<html><body>Receipt</body></html>' }] } };
 const allowed = (value) => qzSigningRequestAllowed(JSON.stringify(value), printers, now);
+let runtimeEncryptionKey;
+const unlock = new Function('require', 'qzEncryptionKey', 'decryptQzPrivateKey',
+  `${extractSource('function qzConfigurationError(')}\n${extractSource('function unlockQzSigningMaterial(')}; return unlockQzSigningMaterial;`
+)(require, () => runtimeEncryptionKey, cryptoHelpers.decryptQzPrivateKey);
 describe('QZ request signing scope', () => {
   it('allows inline receipts to an enabled company printer', () => assert.equal(allowed(request), true));
   it('allows discovery but blocks device commands and stale requests', () => {
@@ -52,5 +56,17 @@ describe('QZ request signing scope', () => {
     const digest = crypto.createHash('sha256').update(message).digest('hex');
     assert.equal(crypto.verify('RSA-SHA512', Buffer.from(digest), publicKey, signature), true);
     assert.equal(crypto.verify('RSA-SHA512', Buffer.from(message), publicKey, signature), false);
+  });
+  it('unlocks the same company signing key regardless of the caller role', () => {
+    const crypto = require('crypto');
+    runtimeEncryptionKey = crypto.randomBytes(32);
+    const encryptedKey = cryptoHelpers.encryptQzPrivateKey('test signing material', runtimeEncryptionKey, 'company-1');
+    const saved = { certificate: 'public certificate', encryptedKey, orgId: 'company-1', keyFingerprint: crypto.createHash('sha256').update(runtimeEncryptionKey).digest('hex') };
+    for (const role of ['Admin', 'Manager', 'Cashier']) assert.equal(unlock({ ...saved, role }).privateKey, 'test signing material');
+    runtimeEncryptionKey = null;
+    assert.throws(() => unlock(saved), (error) => error.qzCode === 'QZ_ENCRYPTION_SECRET_MISSING');
+    runtimeEncryptionKey = crypto.randomBytes(32);
+    assert.throws(() => unlock(saved), (error) => error.qzCode === 'QZ_ENCRYPTION_SECRET_CHANGED');
+    assert.throws(() => unlock({ ...saved, keyFingerprint: undefined }), (error) => error.qzCode === 'QZ_KEY_UNLOCK_FAILED');
   });
 });

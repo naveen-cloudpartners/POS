@@ -25,6 +25,14 @@ Catalyst invokes it — no `app.listen()`). Reads go through `safeZcql()`
 `datastore().table()`; interpolated values pass `sanitizeZcql()`; datetimes use
 `formatCatalystDateTime()` (UTC `YYYY-MM-DD HH:mm:ss`).
 
+## Zoho Books connection (1 October 2026)
+
+`booksIntegration.js` owns Admin setup and OAuth; `zohoBooksService.js` handles Books API calls. The saved connection is scoped to the authenticated POS company, resolved on the server and shared with authorized sellers. Client-supplied Books tokens/organization headers are ignored. OAuth does not create users or grant POS roles.
+
+Configurations stores company credentials, expiring OAuth state, pending organization selection, the selected connection and import status. Books credentials are optional at startup, and this flow requires no Catalyst Connection. Product import requires `Products.org_id` and fails closed when company storage is unavailable.
+
+Checkout posts contacts, invoices and supported payments to Books while retaining local sales in Catalyst. Product import pulls Books data into Catalyst manually; changes are not pushed to the POS in real time. Local purchasing, stock adjustments, voids/returns and historical orders are outside automatic sync. See [setup and current limits](docs/zoho-books-integration.md).
+
 ## 3. Data Store tables
 
 | Table | Purpose | Key columns |

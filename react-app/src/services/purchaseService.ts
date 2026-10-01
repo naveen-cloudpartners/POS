@@ -17,3 +17,24 @@ export const getVendorBills = () => data<Array<VendorBill>>('/purchases/bills');
 export const createVendorBill = (body: Partial<VendorBill>) => apiFetch('/purchases/bills', { method: 'POST', body });
 export const getVendorPayments = () => data<Array<VendorPayment>>('/purchases/payments');
 export const createVendorPayment = (body: Partial<VendorPayment>) => apiFetch('/purchases/payments', { method: 'POST', body });
+
+/** Preserve successful sections when an unrelated purchasing table is unavailable. */
+export async function getPurchasingRecords(includePayables = true) {
+  const results = await Promise.allSettled([
+    getVendors(), getPurchaseOrders(),
+    includePayables ? getVendorBills() : Promise.resolve([] as VendorBill[]),
+    includePayables ? getVendorPayments() : Promise.resolve([] as VendorPayment[]),
+  ] as const);
+  const errors: Partial<Record<'vendors' | 'orders' | 'bills' | 'payments', string>> = {};
+  const names = ['vendors', 'orders', 'bills', 'payments'] as const;
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') errors[names[index]] = result.reason instanceof Error ? result.reason.message : 'Could not load this section.';
+  });
+  return {
+    vendors: results[0].status === 'fulfilled' ? results[0].value : [],
+    orders: results[1].status === 'fulfilled' ? results[1].value : [],
+    bills: results[2].status === 'fulfilled' ? results[2].value : [],
+    payments: results[3].status === 'fulfilled' ? results[3].value : [],
+    errors,
+  };
+}

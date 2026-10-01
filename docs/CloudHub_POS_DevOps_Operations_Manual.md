@@ -11,6 +11,12 @@
 
 ---
 
+## Books operational checkpoint — 1 October 2026
+
+Deploy both backend and frontend to enable the new Admin Settings → Integrations flow. No extra Catalyst Connection is required. Company OAuth credentials may be saved through the form; ZOHO_CLIENT_ID/ZOHO_CLIENT_SECRET environment variables are optional shared defaults. Confirm Configurations access and Products.org_id before product import, then register the exact environment callback and authorize/select the Books company.
+
+Local build/type checks and mocked integration tests passed; live authorization remains pending. Verify seller checkout invoice/payment totals after connecting. Product changes made in Books appear only after manual import. Inspect partial invoices/payments before retrying failed posting; void/return reversal and historical backfill remain manual. Follow [Books setup and limits](zoho-books-integration.md).
+
 # 1. Purpose
 
 **Why DevOps exists.** Code that works on a laptop is not a product. Production operations — repeatable deploys, guarded configuration, watched integrations, recoverable data, and practiced incident response — is what turns the CloudHub POS codebase into a store owners can trust with real money, tax records, and customer data.

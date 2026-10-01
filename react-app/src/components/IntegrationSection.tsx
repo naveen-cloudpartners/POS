@@ -4,15 +4,7 @@ import { useReveal } from '../hooks/useReveal';
 
 const IntegrationSection: React.FC = () => {
   const { ref, visible } = useReveal<HTMLElement>();
-  const connectZoho = async () => {
-    try {
-      const response = await fetch('/api/auth/url');
-      const data = await response.json();
-      if (data.url) window.location.href = data.url;
-    } catch (error) {
-      console.error('Failed to get auth URL:', error);
-    }
-  };
+  const connectZoho = () => { window.location.href = '/app/settings#integrations'; };
 
   return (
     <section ref={ref} id="integration" className={`section reveal${visible ? ' is-visible' : ''}`} style={{ background: '#e9f1ff', color: '#0f172a', overflow: 'clip' }}>

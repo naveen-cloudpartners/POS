@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### 2026-10-01 - Purchasing access and error handling
+
+- Switched purchasing table operations to server SDK scope after authentication and existing role checks, addressing Catalyst table privilege failures for authorized POS staff.
+- Preserved successfully loaded purchasing sections when another section fails; kept validation errors visible inside open dialogs.
+- Hid supplier creation/approval controls from Storekeeper and skipped its payables requests.
+- Included live Books item/tax fields in sale product lookup so checkout can use the saved accounting mappings.
+
+Validation: 81 backend and 8 frontend regression tests passed, with TypeScript and scoped ESLint checks passing. Changes are local; deployed Purchasing and live Books posting require verification.
+
+### 2026-10-01 - Company Books setup and integration
+
+- Added Admin integration setup for Client ID/Secret, region, callback URL, authorization, organization selection, connection testing, product import and disconnect.
+- Kept OAuth tokens on the server and bound authorization state to the initiating Admin/company. Removed browser token exposure, hardcoded credential defaults and global account adoption.
+- Made Books credentials optional at backend startup; the OAuth flow does not require a Catalyst Connection.
+- Corrected Books organization IDs during product import; added pagination, company-scoped matching and zero-stock preservation.
+- Used live product/tax mappings and discounted net rates during checkout; recorded supported split payment legs and reported incomplete posting.
+- Documented manual Books-to-POS product import and the absence of full two-way sync, historical backfill and automatic void/return reversal.
+
+Validation: 78 backend tests and 6 receipt-printing tests passed; TypeScript, ESLint (no errors) and the Vite production build passed. Existing lint/bundle warnings remain. Live Zoho authorization and accounting verification are pending; this checkpoint is local, not deployed.
+
 ### 2026-09-30 - Shared Purchasing-style UI
 
 - Updated `react-app/src/styles/workspace-theme.css` so shared summary cards use consistent spacing, larger values, stable icon tracks, and Purchasing-style labels.

@@ -1822,8 +1822,8 @@ function AutomationView() {
   if (error !== '') return <ErrorState message={error} onRetry={() => window.location.reload()} />;
 
   const rows = [
-    { id: 'inv', label: 'Invoice posting', desc: 'POS sales posted to Books automatically on sync.', on: connected },
-    { id: 'stock', label: 'Inventory sync', desc: 'Catalog and stock levels mirrored from Books.', on: connected },
+    { id: 'inv', label: 'Invoice posting', desc: 'New checkout sales attempt invoice and payment posting.', on: connected },
+    { id: 'stock', label: 'Inventory sync', desc: 'Import catalog and stock manually from integration settings.', on: connected },
     { id: 'mail', label: 'Email receipts', desc: 'SMTP delivery for receipts and notifications.', on: smtp?.configured === true },
     { id: 'queue', label: 'Local checkout', desc: `${number(completedLocal)} completed local orders.`, on: true },
   ];

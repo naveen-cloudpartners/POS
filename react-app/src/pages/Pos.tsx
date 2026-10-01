@@ -297,7 +297,7 @@ export default function Pos() {
             setPrintMessage(result.ok ? (result.transport === 'qz' ? 'Receipt sent to printer.' : 'Use Print to print this receipt.') : `Sale completed. Receipt was not printed: ${result.error} Use Print to retry.`);
           }).finally(() => setReceiptPrinting(false));
         }
-        setMessage({ kind: 'ok', text: res.message ?? 'Sale completed.' });
+        setMessage({ kind: 'ok', text: res.zoho_books?.warning || res.message || 'Sale completed.' });
         setCart([]);
         setSplits([{ mode: 'Cash', amount: '' }]);
         // Silent refresh: stock changed server-side, but a full load()

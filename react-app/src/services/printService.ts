@@ -157,7 +157,7 @@ export async function discoverQzPrinters(): Promise<{ connected: boolean; printe
   }
 }
 
-export interface QzCertificateStatus { configured: boolean; uploadReady: boolean; subject: string; expires: string }
+export interface QzCertificateStatus { configured: boolean; uploadReady: boolean; subject: string; expires: string; signingReady?: boolean; signingError?: string }
 export const getQzCertificateStatus = () => apiFetch<QzCertificateStatus>('/settings/printers/qz-certificate');
 export async function saveQzCertificateFiles(certificate: File, privateKey: File) {
   if (!certificate.size || !privateKey.size) throw new Error('One of the files is empty. Regenerate the QZ certificate files.');

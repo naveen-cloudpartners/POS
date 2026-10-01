@@ -83,6 +83,7 @@ interface CheckoutResponse {
     payment_mode?: string;
   };
   zoho_books?: {
+    warning?: string;
     invoice_id?: string;
     invoice_number?: string;
     books_customer_id?: string;

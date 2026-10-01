@@ -294,7 +294,12 @@ Configurations (settings/SMTP/creds/crm_*) · Shifts (API-only)
 ```
 
 ## 4.5 Current Integrations
-Active: **Zoho Books** (OAuth connect, org/item/contact pull, invoice + payment recording on checkout, catalog sync, ~460-line service) · **SMTP** (configurable; password never returned; approval/status mails). Planned (absent): payment gateway (modes are labels), WhatsApp, AI.
+
+**Books checkpoint — 1 October 2026 (local, not deployed):** Admin settings now include company OAuth credentials/region, callback URL, authorization, organization selection, test, product import and disconnect. Seller checkout uses the saved company connection; tokens remain server-side and authorization does not change POS roles. No additional Catalyst Connection is required. Credentials are optional at startup; product import requires Products.org_id.
+
+Books-to-POS products update through manual import. New POS checkouts attempt contact/invoice/payment posting; purchasing, stock adjustments, historical backfill and void/return reversal are not automatic. Local build/type checks and 84 tests passed; live Books authorization and accounting checks remain pending. See [Books setup](zoho-books-integration.md).
+
+SMTP remains configurable for approval/status mails and receipts. Payment gateway integration, WhatsApp and AI remain planned.
 
 ## 4.6 Current Hosting
 Zoho Catalyst hosts both tiers (function `pos_backend` + static client at `/app`). Vite build with `base: '/app/'`; SPA fallback via generated `dist/404.html`. API base same-origin `/server/pos_backend/api` in PROD (`localhost:3000` in dev). Development + Production envs provisioned.
@@ -371,7 +376,7 @@ Notes: `/customers/membership` and the Reports `#register` section exist in code
 | `GET /api/auth/me` | Session truth (401 if none) | AuthContext, guards, Login, RootEntry | ✅ |
 | `GET /api/auth/url`, `GET /api/auth/callback` | Zoho OAuth chain (Books) | Settings connect | ✅ |
 | `POST /api/auth/disconnect` | Unlink Books | Settings | ✅ |
-| `POST /api/auth/save-master-credentials`, `/seed-credentials` | Dev credential seeding | — (manual/ops) | ⚠️ unused by UI |
+| `GET/PUT /api/settings/books` + organization/test routes | Company OAuth setup and verification | Admin Settings → Integrations | Local implementation; live verification pending |
 | `GET /api/organizations`, `GET /api/organization` | Books orgs / current org | — | ⚠️ unused by UI |
 | `POST /api/organizations/register`, `GET /api/admin/approve-org`, `/reject-org` | Onboarding + email approval + Catalyst user creation | Register | ✅ |
 | `GET /api/users`, `POST /api/users/update-role`, `POST /api/users/delete` | Roster (session+OrgUsers+legacy merge), role change, remove | Users, AuthContext | ✅ |

@@ -2,16 +2,12 @@
 // variables directly at runtime, so a missing module must never crash boot
 // (a top-level require here took down the whole function, hanging /health).
 try {
-  require('dotenv').config();
+  require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 } catch {
   // Running on Catalyst (or any env without dotenv installed) — the
   // platform-provided environment is used as-is.
 }
 
-if (!process.env.ZOHO_CLIENT_ID)
-  throw new Error('ZOHO_CLIENT_ID missing');
-if (!process.env.ZOHO_CLIENT_SECRET)
-  throw new Error('ZOHO_CLIENT_SECRET missing');
 
 // Local env check — booleans only, never prints secret values.
 console.log('[ENV] ZOHO_CLIENT_ID:', !!process.env.ZOHO_CLIENT_ID);
@@ -23,6 +19,7 @@ const express = require('express');
 const axios = require('axios');
 const catalyst = require('zcatalyst-sdk-node');
 const ZohoBooksService = require('./zohoBooksService');
+const booksIntegration = require('./booksIntegration');
 const nodemailer = require('nodemailer');
 const zlib = require('zlib'); // core module: PNG inflate for PDF logo embedding
 
@@ -159,6 +156,20 @@ app.use((req, res, next) => {
 // blocks the request it observes.
 app.use(auditMiddleware);
 app.use(enforceApiPermissions);
+booksIntegration.install(app, { catalyst, axios, getCurrentOrgUser, requirePermission, buildRedirectUri });
+// Company credentials are resolved on the server for staff as well as Admins.
+app.use(async (req, res, next) => {
+  if (!/^\/api\/(orders|items|sync|organization|organizations)(\/|$)/.test(req.path)) return next();
+  try {
+    const context = await getCurrentOrgUser(req, catalyst.initialize(req));
+    if (context) req._booksTenant = await booksIntegration.tenant(catalyst.initialize(req, { scope: 'admin' }), context.orgUser.org_id);
+    if (!req._booksTenant && /^\/api\/(sync|organization|organizations)(\/|$)/.test(req.path)) return res.status(400).json({ success: false, error: 'Connect Books and select your organization in Settings first.' });
+    next();
+  } catch (error) {
+    res.status(503).json({ success: false, error: 'Could not load your company Books connection. Please retry.' });
+  }
+});
+
 
 /**
  * Sanitize a value before interpolating into a ZCQL string.
@@ -442,19 +453,19 @@ async function resolveProductForSale(catalystApp, line) {
     const booksKey = sanitizeZcql(line.books_item_id || '');
     if (booksKey !== '') {
       const hit = await safeZcql(catalystApp,
-        `SELECT ROWID, sku, name, stock, status, reorder_level FROM Products WHERE books_item_id = '${booksKey}'`);
+        `SELECT ROWID, sku, name, stock, status, reorder_level, books_item_id, tax_id, tax_percentage FROM Products WHERE books_item_id = '${booksKey}'`);
       if (hit && hit[0]) return hit[0].Products;
     }
     const ref = String(line.item_id ?? '').trim();
     if (/^[0-9]+$/.test(ref)) {
       const hit = await safeZcql(catalystApp,
-        `SELECT ROWID, sku, name, stock, status, reorder_level FROM Products WHERE ROWID = ${ref}`);
+        `SELECT ROWID, sku, name, stock, status, reorder_level, books_item_id, tax_id, tax_percentage FROM Products WHERE ROWID = ${ref}`);
       if (hit && hit[0]) return hit[0].Products;
     }
     const skuKey = sanitizeZcql(line.item_id || line.sku || '');
     if (skuKey !== '') {
       const hit = await safeZcql(catalystApp,
-        `SELECT ROWID, sku, name, stock, status, reorder_level FROM Products WHERE sku = '${skuKey}'`);
+        `SELECT ROWID, sku, name, stock, status, reorder_level, books_item_id, tax_id, tax_percentage FROM Products WHERE sku = '${skuKey}'`);
       if (hit && hit[0]) return hit[0].Products;
     }
   } catch (e) { /* resolution failure reads as "not found" below */ }
@@ -595,14 +606,7 @@ function adminResultPage({ title, heading, message, tone }) {
 
 // Middleware helper to extract tenant headers
 function getTenantConfig(req) {
-  const refreshToken = req.header('x-zoho-refresh-token');
-  const orgId = req.header('x-zoho-org-id');
-  const dc = req.header('x-zoho-dc') || 'US';
-
-  if (refreshToken || orgId) {
-    return { refreshToken, orgId, dc };
-  }
-  return null;
+  return req._booksTenant || null;
 }
 
 /**
@@ -856,45 +860,6 @@ app.get('/api/setup/status', async (req, res) => {
  * GET /api/auth/status
  * Check connection availability - Catalyst connection first, then Master Credentials
  */
-app.get('/api/auth/status', async (req, res) => {
-  try {
-    const catalystApp = catalyst.initialize(req);
-    const orgUserContext = await getCurrentOrgUser(req, catalystApp);
-    if (!orgUserContext) {
-      return res.status(401).json({ success: false, error: 'Not authenticated' });
-    }
-    const booksService = new ZohoBooksService(catalystApp);
-
-    // Check Catalyst connection first (SDK v3.2.0+)
-    let catalystConnAvailable = false;
-    try {
-      const connCredentials = await catalystApp.connections().getConnectionCredentials('zohobooks_conn');
-      catalystConnAvailable = !!(connCredentials && connCredentials.headers && connCredentials.headers['Authorization']);
-    } catch (e) {
-      // Catalyst connection not configured or SDK < v3.2.0
-    }
-
-    // Transparently ensure SaaS master credentials exist (merchants never see these)
-    const master = await ensureMasterCredentials(booksService);
-    const orgId = await booksService.getConfig('zoho_org_id');
-
-    const lastConnectedStr = await booksService.getConfig('last_connected_org');
-    const lastConnected = lastConnectedStr ? JSON.parse(lastConnectedStr) : null;
-
-    res.status(200).json({
-      success: true,
-      catalyst_connection: catalystConnAvailable,
-      master_configured: !!(master.client_id && master.client_secret),
-      dc: master.dc,
-      org_id: orgId || (lastConnected ? lastConnected.orgId : null),
-      connected: !!lastConnected,
-      connection: lastConnected
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 /**
  * GET /api/organizations
  * Fetch all Zoho Books organizations for the authenticated account across all DCs or a specific DC
@@ -906,7 +871,6 @@ app.get('/api/organizations', async (req, res) => {
     if (!orgUserContext) {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
-    const dcQuery = req.query.dc || null;
     const tenantConfig = getTenantConfig(req);
 
     // Strict multi-tenant isolation: do not fetch organizations using the project-level
@@ -921,10 +885,10 @@ app.get('/api/organizations', async (req, res) => {
       });
     }
 
-    const booksService = new ZohoBooksService(catalystApp, tenantConfig);
+    const booksService = new ZohoBooksService(tenantConfig?.serverManaged ? catalyst.initialize(req, { scope: 'admin' }) : catalystApp, tenantConfig);
 
     console.log('Retrieving Zoho Books organizations for current account connection...');
-    const organizations = await booksService.getOrganizations(dcQuery);
+    const organizations = await booksService.getOrganizations(tenantConfig.dc);
 
     res.status(200).json({
       success: true,
@@ -1299,66 +1263,6 @@ app.get('/api/admin/reject-org', async (req, res) => {
  * POST /api/auth/save-master-credentials
  * Saves global Master Developer credentials from Settings panel
  */
-app.post('/api/auth/save-master-credentials', async (req, res) => {
-  try {
-    const catalystApp = catalyst.initialize(req);
-    const orgUserContext = await getCurrentOrgUser(req, catalystApp);
-    if (!orgUserContext) {
-      return res.status(401).json({ success: false, error: 'Not authenticated' });
-    }
-    if (!requirePermission(orgUserContext, res, 'manage_settings', 'Master credentials require Admin.')) return;
-    const booksService = new ZohoBooksService(catalystApp);
-    const { client_id, client_secret, dc } = req.body;
-
-    if (!client_id || !client_secret) {
-      return res.status(400).json({ success: false, error: 'Client ID and Client Secret are required' });
-    }
-
-    await booksService.saveConfig('zoho_client_id', client_id);
-    await booksService.saveConfig('zoho_client_secret', client_secret);
-    await booksService.saveConfig('zoho_dc', dc || 'US');
-
-    res.status(200).json({ success: true, message: 'SaaS Master Client Credentials saved successfully!' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * POST /api/auth/seed-credentials
- * One-time seeding of default Zoho API Console credentials
- */
-app.post('/api/auth/seed-credentials', async (req, res) => {
-  try {
-    const catalystApp = catalyst.initialize(req);
-    const orgUserContext = await getCurrentOrgUser(req, catalystApp);
-    if (!orgUserContext) {
-      return res.status(401).json({ success: false, error: 'Not authenticated' });
-    }
-    if (!requirePermission(orgUserContext, res, 'manage_settings', 'Seeding credentials requires Admin.')) return;
-    const booksService = new ZohoBooksService(catalystApp);
-
-    // Check if already configured
-    const existingId = await booksService.getConfig('zoho_client_id');
-    if (existingId) {
-      return res.status(200).json({ success: true, message: 'Credentials already configured, skipping seed.' });
-    }
-
-    const { client_id, client_secret, dc } = req.body;
-    if (!client_id || !client_secret) {
-      return res.status(400).json({ success: false, error: 'Client ID and Client Secret are required' });
-    }
-
-    await booksService.saveConfig('zoho_client_id', client_id);
-    await booksService.saveConfig('zoho_client_secret', client_secret);
-    await booksService.saveConfig('zoho_dc', dc || 'com');
-
-    res.status(200).json({ success: true, message: 'Default Zoho credentials seeded successfully!' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 /**
  * GET /api/auth/me
  * Catalyst authenticates identity; the current POS roster supplies privileges.
@@ -1387,411 +1291,6 @@ app.get('/api/auth/me', async (req, res) => {
  * GET /api/auth/url
  * Returns the authorization link to redirect users to Zoho Accounts using Master Client ID
  */
-app.get('/api/auth/url', async (req, res) => {
-  try {
-    const catalystApp = catalyst.initialize(req);
-    const booksService = new ZohoBooksService(catalystApp);
-
-    const master = await ensureMasterCredentials(booksService);
-    const clientId = master.client_id;
-
-    const redirectUri = buildRedirectUri(req);
-    const oauthUrl = `https://accounts.zoho.com/oauth/v2/auth?scope=ZohoBooks.fullaccess.all&client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&access_type=offline&prompt=consent`;
-
-    res.send(`<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Connect Zoho Books</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  * { box-sizing: border-box; }
-  body { font-family: 'Inter', sans-serif; background: #f1f5f9; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
-  .card { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.08); max-width: 480px; width: 100%; overflow: hidden; border: 1px solid #e2e8f0; }
-  .header { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); padding: 24px 28px; color: white; }
-  .header h1 { font-family: 'Outfit', 'Inter', sans-serif; font-size: 20px; margin: 0 0 4px 0; font-weight: 600; }
-  .header p { font-size: 13px; opacity: 0.75; margin: 0; }
-  .body { padding: 24px 28px; }
-  .option { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }
-  .option:hover { border-color: #94a3b8; }
-  .option.active { border-color: #3b82f6; background: #eff6ff; }
-  .option-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-  .icon-current { background: #dbeafe; color: #2563eb; }
-  .icon-different { background: #fef3c7; color: #d97706; }
-  .option-text h3 { font-size: 14px; margin: 0 0 3px 0; font-weight: 600; color: #0f172a; }
-  .option-text p { font-size: 12px; margin: 0; color: #64748b; line-height: 1.4; }
-  .steps { display: none; margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; }
-  .steps.visible { display: block; }
-  .steps ol { margin: 0 0 14px 0; padding-left: 20px; }
-  .steps li { font-size: 13px; color: #334155; margin-bottom: 8px; line-height: 1.5; }
-  .steps li strong { color: #0f172a; }
-  .oauth-link-wrap { background: #f1f5f9; padding: 10px 14px; border-radius: 8px; word-break: break-all; font-size: 11px; color: #475569; border: 1px solid #e2e8f0; margin-bottom: 10px; max-height: 80px; overflow-y: auto; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; justify-content: center; transition: all 0.2s; }
-  .btn-primary { background: #3b82f6; color: white; }
-  .btn-primary:hover { background: #2563eb; }
-  .btn-secondary { background: #e2e8f0; color: #475569; }
-  .btn-secondary:hover { background: #cbd5e1; }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .info-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 12px 14px; margin-top: 12px; font-size: 12px; color: #0369a1; line-height: 1.5; }
-  .hidden { display: none; }
-</style></head>
-<body>
-<div class="card">
-  <div class="header">
-    <h1>🔗 Connect Zoho Books</h1>
-    <p>Link your Zoho Books account to sync inventory and invoices</p>
-  </div>
-  <div class="body">
-    <p style="font-size: 13px; color: #475569; margin: 0 0 16px 0; line-height: 1.5;">
-      Choose how you'd like to connect:
-    </p>
-
-    <div class="option active" id="option-current" onclick="selectOption('current')">
-      <div class="option-icon icon-current">👤</div>
-      <div class="option-text">
-        <h3>Use current Zoho session</h3>
-        <p>Connect with the Zoho account you're already signed in as (fastest)</p>
-      </div>
-    </div>
-
-    <div class="option" id="option-different" onclick="selectOption('different')">
-      <div class="option-icon icon-different">🔄</div>
-      <div class="option-text">
-        <h3>Use a different Zoho account</h3>
-        <p>Sign out first, then log in with a different Zoho Books account</p>
-      </div>
-    </div>
-
-    <div id="steps-different" class="steps">
-      <ol>
-        <li><strong>First sign out</strong> — <a href="https://accounts.zoho.com" target="_blank" rel="noopener">Click here to open Zoho Accounts</a> in a new tab and sign out</li>
-        <li><strong>Then come back</strong> to this popup and click the button below</li>
-      </ol>
-      <button class="btn btn-primary" onclick="window.location.href=oauthUrl" style="margin-bottom: 8px;">
-        🔗 Continue to Zoho Login →
-      </button>
-      <div style="font-size: 11px; color: #94a3b8; text-align: center;">After signing out, clicking this will show the Zoho login screen where you can log in with any account</div>
-    </div>
-
-    <div class="info-box" id="statusBox">
-      <span id="statusText">Ready to connect. Click "Continue" below.</span>
-    </div>
-
-    <button class="btn btn-primary" onclick="proceed()" id="proceedBtn" style="margin-top: 16px;">
-      Continue →
-    </button>
-  </div>
-</div>
-
-<script>
-  var oauthUrl = ${JSON.stringify(oauthUrl)};
-  var selectedOption = 'current';
-
-  function selectOption(opt) {
-    selectedOption = opt;
-    document.getElementById('option-current').classList.toggle('active', opt === 'current');
-    document.getElementById('option-different').classList.toggle('active', opt === 'different');
-    document.getElementById('steps-different').classList.toggle('visible', opt === 'different');
-    document.getElementById('statusBox').classList.toggle('hidden', opt === 'different');
-    document.getElementById('proceedBtn').textContent = opt === 'current' ? 'Continue →' : 'Continue →';
-  }
-
-  function proceed() {
-    if (selectedOption === 'current') {
-      window.location.href = oauthUrl;
-    } else {
-      // For "different account": redirects to Zoho OAuth in same popup
-      // User should sign out of Zoho in a new tab first, then click proceed
-      window.location.href = oauthUrl;
-    }
-  }
-</script>
-</body></html>`);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * GET /api/auth/callback
- * Zoho OAuth redirect callback that exchanges the code, fetches linked Organizations, and posts to parent window
- */
-app.get('/api/auth/callback', async (req, res) => {
-  try {
-    const catalystApp = catalyst.initialize(req);
-    const booksService = new ZohoBooksService(catalystApp);
-    const code = req.query.code;
-
-    if (!code) {
-      return res.status(400).send('Authentication code is missing from Zoho redirection.');
-    }
-
-    const master = await ensureMasterCredentials(booksService);
-    const clientId = master.client_id;
-    const clientSecret = master.client_secret;
-
-    const redirectUri = buildRedirectUri(req);
-
-    // Always exchange on accounts.zoho.com — Zoho routes to correct DC internally
-    console.log('Exchanging auth code for tokens on accounts.zoho.com...');
-    const response = await axios.post('https://accounts.zoho.com/oauth/v2/token', null, {
-      params: {
-        code: code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code'
-      }
-    });
-
-    if (response.data && response.data.refresh_token) {
-      const refreshToken = response.data.refresh_token;
-      const accessToken = response.data.access_token;
-      console.log('Token exchange successful. Access token prefix:', accessToken.substring(0, 15) + '...');
-
-      // Zoho auto-routes the code exchange to the correct DC, so the access token
-      // we just got is already for the right DC. Use it directly to probe /items
-      // on each DC's API endpoint — the correct DC will return code 0.
-      const allDcs = ['US', 'EU', 'IN', 'AU', 'JP'];
-      let organizations = [];
-      let foundDc = null;
-
-      // First: get the org list from ANY DC (works cross-DC)
-      let allOrgs = [];
-      for (const probeDc of allDcs) {
-        try {
-          const probeDomains = booksService.getDomainUrls(probeDc);
-          const orgsUrl = `${probeDomains.api}/organizations`;
-          console.log(`Fetching orgs from ${probeDc}: ${orgsUrl}`);
-          const orgsResponse = await axios.get(orgsUrl, {
-            headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-            timeout: 5000
-          });
-          if (orgsResponse.data && orgsResponse.data.code === 0 && orgsResponse.data.organizations && orgsResponse.data.organizations.length > 0) {
-            allOrgs = orgsResponse.data.organizations;
-            console.log(`Found ${allOrgs.length} org(s) via ${probeDc} DC: ${allOrgs.map(o => o.organization_id).join(', ')}`);
-            break; // /organizations works cross-DC, one probe is enough
-          }
-        } catch (probeErr) {
-          console.warn(`Org probe on ${probeDc} failed:`, probeErr.message);
-        }
-      }
-
-      if (allOrgs.length === 0) {
-        throw new Error('No Zoho Books organizations found for this account.');
-      }
-
-      // Second: find the correct DC by testing /items on each DC with the original access token
-      // /items is DC-restricted, so only the correct DC will return code 0
-      for (const probeDc of allDcs) {
-        try {
-          const probeDomains = booksService.getDomainUrls(probeDc);
-          const testOrgId = allOrgs[0].organization_id;
-          const itemsUrl = `${probeDomains.api}/items?organization_id=${testOrgId}&status=active`;
-          console.log(`Testing /items on ${probeDc}: ${itemsUrl}`);
-
-          const itemsResp = await axios.get(itemsUrl, {
-            headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-            timeout: 8000
-          });
-
-          if (itemsResp.data && itemsResp.data.code === 0) {
-            foundDc = probeDc;
-            organizations = allOrgs.map(org => ({ ...org, dc: probeDc }));
-            console.log(`CORRECT DC FOUND: ${foundDc} — /items returned ${itemsResp.data.items ? itemsResp.data.items.length : 0} items`);
-            break;
-          } else {
-            console.warn(`DC ${probeDc} /items returned code ${itemsResp.data.code}: ${itemsResp.data.message}`);
-          }
-        } catch (itemErr) {
-          const errMsg = itemErr.response ? `HTTP ${itemErr.response.status}: ${JSON.stringify(itemErr.response.data)}` : itemErr.message;
-          console.warn(`DC ${probeDc} /items failed: ${errMsg}`);
-        }
-      }
-
-      // Fallback: if no DC passed the /items test, default to US
-      if (!foundDc) {
-        foundDc = 'US';
-        organizations = allOrgs.map(org => ({ ...org, dc: 'US' }));
-        console.warn('WARNING: No DC verified via /items test. Defaulting to US. Orgs:', JSON.stringify(organizations));
-      }
-
-      // Resolve user email from Zoho user info API
-      let userEmail = 'merchant@zoho.books';
-      try {
-        const userInfoResp = await axios.get('https://accounts.zoho.com/oauth/user/info', {
-          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-          timeout: 5000
-        });
-        if (userInfoResp.data && userInfoResp.data.ZUID) {
-          userEmail = userInfoResp.data.Email || (organizations.length > 0 ? organizations[0].email : 'merchant@zoho.books');
-        }
-      } catch (e) {
-        userEmail = organizations.length > 0 ? organizations[0].email : 'merchant@zoho.books';
-      }
-
-      // Save admin user to Configurations (so they appear in Users section)
-      const adminName = userEmail.split('@')[0] || 'Admin';
-      const adminUserKey = `user_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      const adminPayload = { email: userEmail, name: adminName, role: 'Admin', permissions: getRolePermissions('Admin'), status: 'active', invited_at: Date.now(), verified_at: Date.now() };
-      await safeUpsertConfig(catalystApp, adminUserKey, JSON.stringify(adminPayload));
-
-      // Save the exchanged tokens for each organization in Configurations
-      for (const org of organizations) {
-        console.log(`Persisting secure OAuth configs in Datastore for org ${org.organization_id} (${org.name})...`);
-        await safeUpsertConfig(catalystApp, `zoho_refresh_token_${org.organization_id}`, refreshToken);
-        await safeUpsertConfig(catalystApp, `zoho_dc_${org.organization_id}`, foundDc);
-        await safeUpsertConfig(catalystApp, `zoho_org_name_${org.organization_id}`, org.name);
-        await safeUpsertConfig(catalystApp, `zoho_books_connected_${org.organization_id}`, 'true');
-      }
-
-      // Save last_connected_org for client-side polling fallback
-      if (organizations.length > 0) {
-        const lastConnectedPayload = {
-          refreshToken,
-          dc: foundDc || 'US',
-          orgId: organizations[0].organization_id,
-          orgName: organizations[0].name,
-          email: userEmail
-        };
-        await safeUpsertConfig(catalystApp, 'last_connected_org', JSON.stringify(lastConnectedPayload));
-      }
-
-      // Return secure handshaking landing page that sends credentials to parent window
-      res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <title>Zoho Connection Authorized</title>
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
-          <style>
-            body {
-              font-family: 'Inter', sans-serif;
-              background-color: #f8fafc;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              min-height: 100vh;
-              margin: 0;
-            }
-            .success-card {
-              background: white;
-              padding: 40px;
-              border-radius: 16px;
-              box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-              text-align: center;
-              max-width: 400px;
-              border: 1px solid #e2e8f0;
-            }
-            .icon {
-              color: #16a34a;
-              font-size: 64px;
-              margin-bottom: 20px;
-            }
-            h2 {
-              font-family: 'Outfit', sans-serif;
-              font-size: 24px;
-              margin: 0 0 10px 0;
-              color: #0f172a;
-            }
-            p {
-              color: #64748b;
-              font-size: 14px;
-              line-height: 1.5;
-              margin: 0 0 20px 0;
-            }
-            .spinner {
-              border: 3px solid #f3f3f3;
-              border-top: 3px solid #16a34a;
-              border-radius: 50%;
-              width: 24px;
-              height: 24px;
-              animation: spin 1s linear infinite;
-              margin: 0 auto;
-            }
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="success-card">
-            <div class="icon">✓</div>
-            <h2>Authorization Approved!</h2>
-            <p>Your Zoho Books account has been successfully linked. Fetching business units and closing...</p>
-            <div class="spinner"></div>
-          </div>
-          <script>
-            const authResult = {
-              type: 'zoho_auth_success',
-              email: ${JSON.stringify(userEmail)},
-              refreshToken: ${JSON.stringify(refreshToken)},
-              dc: ${JSON.stringify(foundDc)},
-              organizations: ${JSON.stringify(organizations)}
-            };
-            
-            if (window.opener) {
-              // Restrict postMessage to our own origin to prevent token theft.
-              // Note: document.referrer points to Zoho Accounts after the redirect, which blocks delivery to the opener.
-              const targetOrigin = window.location.origin;
-              window.opener.postMessage(authResult, targetOrigin);
-              console.log('Credentials posted to opener origin:', targetOrigin);
-              setTimeout(() => {
-                window.close();
-              }, 1200);
-            } else {
-              // No opener (e.g., opened directly in a tab): show data for manual entry
-              document.querySelector('.success-card').innerHTML = \`
-                <div class="icon">✓</div>
-                <h2>Connection Successful!</h2>
-                <p>Your Zoho Books account has been linked. Return to the POS app — it will detect this connection automatically.</p>
-                <p style="font-size:12px;color:#94a3b8;">If the app doesn't detect it, try closing this tab and clicking "Connect" in the POS app again.</p>
-                <button onclick="window.close()" style="padding:10px 24px;border:none;border-radius:10px;background:#3b82f6;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Close this window</button>
-              \`;
-              // Also try to reach any open window on our origin via BroadcastChannel
-              try {
-                const bc = new BroadcastChannel('zoho_auth');
-                bc.postMessage(authResult);
-                bc.close();
-              } catch(e) {}
-            }
-          </script>
-        </body>
-        </html>
-      `);
-    } else {
-      throw new Error(response.data.error || 'Failed to exchange credentials from code');
-    }
-  } catch (error) {
-    console.error('Error in OAuth callback exchange:', error.message);
-    const errorHtml = `<!DOCTYPE html><html><head><title>Connection Error</title>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-      <style>body{font-family:'Inter',sans-serif;background:#fef2f2;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
-      .err{background:#fff;padding:32px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.08);text-align:center;max-width:380px;border:1px solid #fecaca;}
-      h2{color:#b91c1c;font-size:18px;margin:0 0 8px;} p{color:#64748b;font-size:13px;line-height:1.5;margin:0 0 16px;}
-      .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:none;border-radius:8px;background:#ef4444;color:#fff;font-size:13px;font-weight:600;cursor:pointer;}</style></head>
-      <body><div class="err"><h2>Connection Failed</h2>
-      <p>${error.message.includes('redirect_uri') ? 'The redirect URI does not match what is configured in the Zoho API Console. Please verify the Authorized Redirect URI in your Zoho API Console settings.' : error.message}</p>
-      <button class="btn" onclick="window.close()"><i class="fa-solid fa-xmark"></i> Close</button>
-      </div></body></html>`;
-    res.status(500).send(errorHtml);
-  }
-});
-
-/**
- * POST /api/auth/disconnect
- * Dynamic client session disconnection
- */
-app.post('/api/auth/disconnect', async (req, res) => {
-  try {
-    const catalystApp = catalyst.initialize(req);
-    await safeUpsertConfig(catalystApp, 'last_connected_org', '');
-    res.status(200).json({ success: true, message: 'Successfully disconnected Zoho session' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 /* ==========================================================================
    USER MANAGEMENT — INVITE, OTP, LOGIN
    ========================================================================== */
@@ -1980,7 +1479,7 @@ app.get('/api/organization', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
     const tenantConfig = getTenantConfig(req);
-    const booksService = new ZohoBooksService(catalystApp, tenantConfig);
+    const booksService = new ZohoBooksService(tenantConfig?.serverManaged ? catalyst.initialize(req, { scope: 'admin' }) : catalystApp, tenantConfig);
 
     if (!tenantConfig || !tenantConfig.orgId) {
       return res.status(400).json({ success: false, error: 'No active Zoho Books organization connected.' });
@@ -2038,7 +1537,7 @@ app.get('/api/sync/diagnose', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
     const tenantConfig = getTenantConfig(req);
-    const booksService = new ZohoBooksService(catalystApp, tenantConfig);
+    const booksService = new ZohoBooksService(tenantConfig?.serverManaged ? catalyst.initialize(req, { scope: 'admin' }) : catalystApp, tenantConfig);
     const orgId = tenantConfig ? tenantConfig.orgId : 'not set';
     const dc = tenantConfig ? tenantConfig.dc : 'not set';
 
@@ -2048,7 +1547,7 @@ app.get('/api/sync/diagnose', async (req, res) => {
     let headers;
     try {
       headers = await booksService.getHeaders();
-      diagnosis.steps.push({ name: 'Auth Token', status: 'OK', prefix: headers.Authorization ? headers.Authorization.substring(0, 25) + '...' : 'none' });
+      diagnosis.steps.push({ name: 'Auth Token', status: 'OK', configured: !!headers.Authorization });
     } catch (err) {
       diagnosis.steps.push({ name: 'Auth Token', status: 'FAILED', error: err.message });
       return res.status(200).json({ success: false, diagnosis });
@@ -2181,15 +1680,15 @@ app.post('/api/sync/books', async (req, res) => {
     }
     if (!requirePermission(orgUserContext, res, 'manage_products', 'Books sync requires Admin or Manager.')) return;
 
-    const { orgUser, org } = orgUserContext;
+    const { orgUser } = orgUserContext;
     const posOrgId = orgUser.org_id;
 
     const headerConfig = getTenantConfig(req);
     const tenantConfig = {
       ...headerConfig,
       posOrgId: posOrgId,
-      orgId: headerConfig ? headerConfig.orgId : org.zoho_books_org_id,
-      dc: headerConfig ? headerConfig.dc : 'com'
+      orgId: headerConfig ? headerConfig.orgId : '',
+      dc: headerConfig ? headerConfig.dc : 'US'
     };
 
     console.log('[SYNC] Resolved multi-tenant configuration:', JSON.stringify({ posOrgId: tenantConfig.posOrgId, orgId: tenantConfig.orgId, dc: tenantConfig.dc }));
@@ -2199,22 +1698,16 @@ app.post('/api/sync/books', async (req, res) => {
 
     let headers;
     try {
-      headers = await new ZohoBooksService(catalystApp, tenantConfig).getHeaders();
-      console.log('[SYNC] Got headers, Auth:', headers.Authorization ? headers.Authorization.substring(0, 30) + '...' : 'NONE');
+      headers = await new ZohoBooksService(tenantConfig?.serverManaged ? catalyst.initialize(req, { scope: 'admin' }) : catalystApp, tenantConfig).getHeaders();
+      console.log('[SYNC] Books authorization ready');
     } catch (headerErr) {
       console.error('[SYNC] getHeaders() failed:', headerErr.message, headerErr.stack);
       return res.status(500).json({ success: false, error: `HeaderError: ${headerErr.message}` });
     }
     
-    const domains = { 
-      'US': { api: 'https://www.zohoapis.com/books/v3' },
-      'EU': { api: 'https://www.zohoapis.eu/books/v3' },
-      'IN': { api: 'https://www.zohoapis.in/books/v3' },
-      'AU': { api: 'https://www.zohoapis.com.au/books/v3' },
-      'JP': { api: 'https://www.zohoapis.co.jp/books/v3' }
-    };
-    const apiBase = (domains[dc.toUpperCase()] || domains['US']).api;
-    const apiUrl = `${apiBase}/items?organization_id=${orgId}&status=active`;
+    if (!tenantConfig.orgId) return res.status(400).json({ success: false, error: 'Connect Books and select an organization in Settings first.' });
+    const apiBase = new ZohoBooksService(catalystApp).getDomainUrls(dc).api;
+    const apiUrl = `${apiBase}/items?organization_id=${tenantConfig.orgId}&status=active`;
     console.log('[SYNC] Calling:', apiUrl);
 
     // axios is required at top of file; using that reference
@@ -2238,39 +1731,38 @@ app.post('/api/sync/books', async (req, res) => {
       return res.status(500).json({ success: false, error: `Zoho Books error: ${response.data.message}` });
     }
 
-    const booksItems = response.data.items || [];
+    const booksItems = [...(response.data.items || [])];
+    let page = 1;
+    while (response.data.page_context?.has_more_page) {
+      if (++page > 100) throw new Error('Books catalog exceeds import limit. Contact support.');
+      response = await axios.get(apiUrl, { headers, timeout: 30000, params: { page, per_page: 200 } });
+      if (response.data.code !== 0) throw new Error('Books item page could not be loaded.');
+      booksItems.push(...(response.data.items || []));
+    }
     console.log('[SYNC] Got', booksItems.length, 'items from Books. Syncing to datastore...');
 
     console.log(`[SYNC STEP 2] Accessing Products table in Datastore...`);
     const productsTable = catalystApp.datastore().table('Products');
     
-    // Check if org_id column exists by trying a query with it
-    let hasOrgIdColumn = true;
-    let existingResult = [];
+    // A company import must never fall back to scanning another company's products.
+    const hasOrgIdColumn = true;
+    let existingResult;
     try {
       existingResult = await catalystApp.zcql().executeZCQLQuery(
-        `SELECT ROWID, books_item_id FROM Products WHERE org_id = '${orgId}'`
+        `SELECT ROWID, books_item_id FROM Products WHERE org_id = '${sanitizeZcql(orgId)}' LIMIT 300`
       );
-      console.log(`[SYNC STEP 2] OK — found ${existingResult.length} existing products with org_id`);
-    } catch (colErr) {
-      console.error(`[SYNC STEP 2] ZCQL query error:`, colErr.message);
-      if (colErr.message && (colErr.message.includes('Unknown') || colErr.message.includes('org_id') || colErr.message.includes('No privileges'))) {
-        hasOrgIdColumn = false;
-        console.warn('[SYNC STEP 2] org_id column missing or no privileges — inserting without org_id');
-        try {
-          existingResult = await catalystApp.zcql().executeZCQLQuery(
-            'SELECT ROWID, books_item_id FROM Products'
-          );
-          console.log(`[SYNC STEP 2] Fallback OK — found ${existingResult.length} existing products`);
-        } catch (fallbackErr) {
-          console.error(`[SYNC STEP 2] Fallback also failed:`, fallbackErr.message);
-          existingResult = [];
-        }
-      } else {
-        throw colErr;
+    } catch {
+      throw new Error('Company product storage is unavailable. Ensure Products has an org_id column and the company has access before importing.');
+    }
+    if (existingResult.length === 300) {
+      let offset = 300;
+      while (true) {
+        const batch = await catalystApp.zcql().executeZCQLQuery(`SELECT ROWID, books_item_id FROM Products WHERE org_id = '${sanitizeZcql(orgId)}' LIMIT ${offset}, 300`);
+        existingResult.push(...batch);
+        if (batch.length < 300) break;
+        offset += 300;
       }
     }
-    
     const existingMap = {};
     existingResult.forEach(row => {
       existingMap[row.Products.books_item_id] = row.Products.ROWID;
@@ -2288,7 +1780,7 @@ app.post('/api/sync/books', async (req, res) => {
         sku: item.sku || '',
         tax_id: item.tax_id || '',
         tax_percentage: parseFloat(item.tax_percentage) || 0.0,
-        stock: parseFloat(item.stock_on_hand) || 999.0,
+        stock: Number.isFinite(Number(item.stock_on_hand)) ? Number(item.stock_on_hand) : 0,
         category: item.category || 'General'
       };
 
@@ -2312,16 +1804,7 @@ app.post('/api/sync/books', async (req, res) => {
           failed++;
           console.error(`[SYNC] updateRow failed for '${item.name}': ${updateErr.message}`);
           // If update fails (e.g. org_id column issue), try without it
-          if (hasOrgIdColumn && updateErr.message && updateErr.message.includes('org_id')) {
-            try {
-              const { org_id, ...itemDataNoOrg } = itemData;
-              await productsTable.updateRow({ ROWID: rowId, ...itemDataNoOrg });
-              updated++;
-              failed--;
-            } catch (e) {
-              console.error(`[SYNC] updateRow fallback also failed for '${item.name}': ${e.message}`);
-            }
-          }
+
         }
       } else {
         try {
@@ -2331,16 +1814,7 @@ app.post('/api/sync/books', async (req, res) => {
           failed++;
           console.error(`[SYNC] insertRow failed for '${item.name}': ${insertErr.message}`);
           // If insert fails (e.g. org_id column issue), try without it
-          if (hasOrgIdColumn && insertErr.message && insertErr.message.includes('org_id')) {
-            try {
-              const { org_id, ...itemDataNoOrg } = itemData;
-              await productsTable.insertRow(itemDataNoOrg);
-              inserted++;
-              failed--;
-            } catch (e) {
-              console.error(`[SYNC] insertRow fallback also failed for '${item.name}': ${e.message}`);
-            }
-          }
+
         }
       }
     }
@@ -2351,8 +1825,7 @@ app.post('/api/sync/books', async (req, res) => {
 
     // SET-05: last-sync stamp for the integration health card.
     try {
-      await safeUpsertConfig(catalystApp, 'last_books_sync_at', formatCatalystDateTime(new Date()));
-      await safeUpsertConfig(catalystApp, 'last_books_sync_result', syncMsg);
+      await booksIntegration.write(catalyst.initialize(req, { scope: 'admin' }), posOrgId, 'sync', { at: new Date().toISOString(), message: syncMsg });
     } catch (e) { /* stamp is best-effort */ }
 
     res.status(200).json({
@@ -2365,7 +1838,7 @@ app.post('/api/sync/books', async (req, res) => {
         sku: item.sku || '',
         tax_id: item.tax_id || '',
         tax_percentage: parseFloat(item.tax_percentage) || 0.0,
-        stock: parseFloat(item.stock_on_hand) || 999.0,
+        stock: Number.isFinite(Number(item.stock_on_hand)) ? Number(item.stock_on_hand) : 0,
         category: item.category || 'General'
         // NOTE: no `industry` field here on purpose. Books items are real inventory,
         // not a demo preset — they should show under whichever industry template is
@@ -2379,14 +1852,14 @@ app.post('/api/sync/books', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error syncing items with Zoho Books:', error);
+    console.error('[Books import] Failed');
 
     // SET-04/05: stamp the failure and alert (best-effort, preference-gated).
     try {
       const failApp = catalyst.initialize(req);
       const rawMsg = error.response ? JSON.stringify(error.response.data) : error.message;
-      await safeUpsertConfig(failApp, 'last_books_sync_at', formatCatalystDateTime(new Date()));
-      await safeUpsertConfig(failApp, 'last_books_sync_result', `Failed: ${String(rawMsg).slice(0, 200)}`);
+      const context = await getCurrentOrgUser(req, failApp);
+      if (context) await booksIntegration.write(catalyst.initialize(req, { scope: 'admin' }), context.orgUser.org_id, 'sync', { at: new Date().toISOString(), message: 'Product import failed. Check the Books connection and retry.' });
       const failCtx = await getCurrentOrgUser(req, failApp).catch(() => null);
       const failOrgId = failCtx && failCtx.orgUser ? String(failCtx.orgUser.org_id || '') : '';
       const prefs = await getNotificationSettings(failApp, failOrgId);
@@ -2433,18 +1906,18 @@ app.post('/api/orders', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
 
-    const { orgUser, org } = orgUserContext;
+    const { orgUser } = orgUserContext;
     const posOrgId = orgUser.org_id;
 
     const headerConfig = getTenantConfig(req);
     const tenantConfig = {
       ...headerConfig,
       posOrgId: posOrgId,
-      orgId: headerConfig ? headerConfig.orgId : org.zoho_books_org_id,
-      dc: headerConfig ? headerConfig.dc : 'com'
+      orgId: headerConfig ? headerConfig.orgId : '',
+      dc: headerConfig ? headerConfig.dc : 'US'
     };
-    const booksService = new ZohoBooksService(catalystApp, tenantConfig);
-    const orgId = posOrgId;
+    const booksService = new ZohoBooksService(tenantConfig?.serverManaged ? catalyst.initialize(req, { scope: 'admin' }) : catalystApp, tenantConfig);
+    const orgId = tenantConfig.orgId || '';
 
     const {
       customer_name,
@@ -2566,9 +2039,9 @@ app.post('/api/orders', async (req, res) => {
     // Books records a single settlement mode: use the first payment leg.
     // Local totals (plus the full split ledger) remain the source of truth.
     const booksPayMode = payList.length > 0 ? payList[0].mode : payment_mode;
-    let immediatePayment = ['Cash', 'Card', 'UPI'].includes(booksPayMode);
     let paymentRecorded = false;
     let paymentId = null;
+    let booksWarning = '';
 
     // Check if we are connected to Zoho Books (we have tenant headers)
     if (orgId) {
@@ -2581,19 +2054,22 @@ app.post('/api/orders', async (req, res) => {
         // 2. Create Invoice in Zoho Books
         const roomNote = room_number ? `${room_number}${kitchen_notes ? ' | Note: ' + kitchen_notes : ''}` : kitchen_notes;
         console.log(`Creating Zoho Books Invoice for customer ${booksCustomerId}...`);
-        const booksInvoice = await booksService.createInvoice(booksCustomerId, line_items, booksPayMode, roomNote);
+        const booksLines = booksIntegration.saleLines(resolvedLines, orderPct);
+        const booksInvoice = await booksService.createInvoice(booksCustomerId, booksLines, booksPayMode, roomNote);
         invoiceId = booksInvoice.invoice_id;
         invoiceNumber = booksInvoice.invoice_number;
 
-        // 3. Record immediate payments in Books
-        if (immediatePayment) {
-          console.log(`Recording payment for invoice ${invoiceId}...`);
-          const booksPayment = await booksService.recordPayment(booksCustomerId, invoiceId, booksInvoice.total, booksPayMode);
+        if (Math.abs(Number(booksInvoice.total) - calc.total) > 0.015) throw new Error('Books invoice total differs from the POS total. Review its taxes before recording payment.');
+        // Record each split leg, never silently collapse it into the first mode.
+        for (const leg of payList) {
+          if (!['Cash', 'Card', 'UPI'].includes(leg.mode)) continue;
+          const booksPayment = await booksService.recordPayment(booksCustomerId, invoiceId, leg.amount, leg.mode);
           paymentId = booksPayment.payment_id;
-          paymentRecorded = true;
         }
+        paymentRecorded = payList.every((leg) => ['Cash', 'Card', 'UPI'].includes(leg.mode));
       } catch (zohoError) {
-        console.warn('Failed to submit order directly to Zoho Books. Saving completed local order...', zohoError.message);
+        booksWarning = 'Sale saved in POS. Books posting is incomplete; review the invoice/payment in Books before retrying.';
+        console.warn('[Books checkout] Posting incomplete; local sale continues.');
       }
     }
 
@@ -2624,7 +2100,7 @@ app.post('/api/orders', async (req, res) => {
       tax_amount: taxAmount,
       total: total,
       payment_mode: effectiveMode,
-      status: orgId && !invoiceId.startsWith('OFFLINE') ? 'Synced' : 'Completed',
+      status: orgId && !invoiceId.startsWith('OFFLINE') && !booksWarning ? 'Synced' : 'Completed',
       books_invoice_id: invoiceId,
       invoice_number: invoiceNumber || invoice_number || '',
       local_ref: local_ref || ''
@@ -2836,6 +2312,7 @@ app.post('/api/orders', async (req, res) => {
         invoice_id: invoiceId,
         invoice_number: invoiceNumber,
         books_customer_id: booksCustomerId,
+        warning: booksWarning,
         payment_recorded: paymentRecorded,
         payment_id: paymentId
       }
@@ -4516,7 +3993,7 @@ app.get('/api/contacts', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Not authenticated' });
     }
     const tenantConfig = getTenantConfig(req);
-    const booksService = new ZohoBooksService(catalystApp, tenantConfig);
+    const booksService = new ZohoBooksService(tenantConfig?.serverManaged ? catalyst.initialize(req, { scope: 'admin' }) : catalystApp, tenantConfig);
 
     if (tenantConfig && tenantConfig.orgId) {
       // Pull from Zoho Books
@@ -6500,6 +5977,15 @@ app.post('/api/transfers/:id/cancel', async (req, res) => {
 function purchaseRole(ctx) { return normWhRole(ctx.orgUser && ctx.orgUser.role); }
 function canUsePurchasing(role) { return ['Admin', 'Manager', 'Storekeeper'].includes(role); }
 function canManagePayables(role) { return ['Admin', 'Manager'].includes(role); }
+function purchaseDataApp(req, context) {
+  if (!context?.user || !context.orgUser?.org_id || !canUsePurchasing(purchaseRole(context))) {
+    throw new Error('Purchasing access is required.');
+  }
+  // POS roles gate actions; Catalyst table ACLs must not independently block
+  // authorized staff from the dedicated project's purchasing records.
+  return catalyst.initialize(req, { scope: 'admin' });
+}
+
 function purchaseNumber(prefix) { return `${prefix}-${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 1296).toString(36).toUpperCase().padStart(2, '0')}`; }
 
 async function purchaseRows(catalystApp, table, fields, where = '') {
@@ -6531,9 +6017,9 @@ function requirePurchaseAccess(res, ctx, payables = false) {
 
 app.get('/api/purchases/vendors', async (req, res) => {
   try {
-    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    let app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
     if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
-    if (!requirePurchaseAccess(res, ctx)) return;
+    if (!requirePurchaseAccess(res, ctx)) return; app = purchaseDataApp(req, ctx);
     const data = await purchaseRows(app, 'Vendors', 'ROWID, vendor_number, name, email, phone, address, tax_number, status, notes, created_by, created_at, updated_at');
     res.status(200).json({ success: true, data });
   } catch (error) { res.status(500).json({ success: false, error: error.message }); }
@@ -6541,9 +6027,9 @@ app.get('/api/purchases/vendors', async (req, res) => {
 
 app.post('/api/purchases/vendors', async (req, res) => {
   try {
-    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    let app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
     if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
-    if (!requirePurchaseAccess(res, ctx, true)) return;
+    if (!requirePurchaseAccess(res, ctx, true)) return; app = purchaseDataApp(req, ctx);
     const b = req.body || {}; const name = String(b.name || '').trim();
     if (name === '') return res.status(400).json({ success: false, error: 'Vendor name is required.' });
     const now = formatCatalystDateTime(new Date());
@@ -6554,9 +6040,9 @@ app.post('/api/purchases/vendors', async (req, res) => {
 
 app.get('/api/purchases/orders', async (req, res) => {
   try {
-    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    let app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
     if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
-    if (!requirePurchaseAccess(res, ctx)) return;
+    if (!requirePurchaseAccess(res, ctx)) return; app = purchaseDataApp(req, ctx);
     const data = await purchaseRows(app, 'PurchaseOrders', 'ROWID, po_number, vendor_id, warehouse_id, status, notes, expected_date, created_by, approved_by, received_by, created_at, approved_at, received_at, total_amount');
     for (const po of data) po.items = await purchaseRows(app, 'PurchaseOrderItems', 'ROWID, purchase_order_id, product_id, quantity, received_quantity, unit_cost, tax_percentage', `purchase_order_id = '${sanitizeZcql(String(po.ROWID))}'`);
     res.status(200).json({ success: true, data });
@@ -6565,9 +6051,9 @@ app.get('/api/purchases/orders', async (req, res) => {
 
 app.post('/api/purchases/orders', async (req, res) => {
   try {
-    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    let app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
     if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
-    if (!requirePurchaseAccess(res, ctx)) return;
+    if (!requirePurchaseAccess(res, ctx)) return; app = purchaseDataApp(req, ctx);
     const b = req.body || {}; const vendor = await vendorForPurchase(app, b.vendor_id); const warehouse = await findWarehouseById(app, b.warehouse_id);
     if (!vendor) return res.status(404).json({ success: false, error: 'Vendor not found.' });
     if (!warehouse || String(warehouse.status || 'Active') !== 'Active') return res.status(400).json({ success: false, error: 'Choose an active warehouse.' });
@@ -6589,9 +6075,9 @@ app.post('/api/purchases/orders', async (req, res) => {
 
 app.post('/api/purchases/orders/:id/approve', async (req, res) => {
   try {
-    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    let app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
     if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
-    if (!requirePurchaseAccess(res, ctx, true)) return;
+    if (!requirePurchaseAccess(res, ctx, true)) return; app = purchaseDataApp(req, ctx);
     const po = await getPurchaseOrder(app, req.params.id);
     if (!po) return res.status(404).json({ success: false, error: 'Purchase order not found.' });
     if (String(po.status) !== 'Draft') return res.status(400).json({ success: false, error: `Purchase order ${po.po_number} is ${po.status} and cannot be approved.` });
@@ -6602,9 +6088,9 @@ app.post('/api/purchases/orders/:id/approve', async (req, res) => {
 
 app.post('/api/purchases/orders/:id/receive', async (req, res) => {
   try {
-    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
+    let app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app);
     if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' });
-    if (!requirePurchaseAccess(res, ctx)) return;
+    if (!requirePurchaseAccess(res, ctx)) return; app = purchaseDataApp(req, ctx);
     const po = await getPurchaseOrder(app, req.params.id);
     if (!po) return res.status(404).json({ success: false, error: 'Purchase order not found.' });
     if (!['Approved', 'Partially received'].includes(String(po.status))) return res.status(400).json({ success: false, error: `Purchase order ${po.po_number} must be Approved before receiving.` });
@@ -6638,12 +6124,12 @@ async function getVendorBill(app, id) {
 }
 
 app.get('/api/purchases/bills', async (req, res) => {
-  try { const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx)) return; res.status(200).json({ success: true, data: await purchaseRows(app, 'VendorBills', 'ROWID, bill_number, vendor_id, purchase_order_id, status, bill_date, due_date, total_amount, paid_amount, notes, created_by, created_at') }); } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+  try { let app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx)) return; app = purchaseDataApp(req, ctx); res.status(200).json({ success: true, data: await purchaseRows(app, 'VendorBills', 'ROWID, bill_number, vendor_id, purchase_order_id, status, bill_date, due_date, total_amount, paid_amount, notes, created_by, created_at') }); } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
 app.post('/api/purchases/bills', async (req, res) => {
   try {
-    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx, true)) return;
+    let app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx, true)) return; app = purchaseDataApp(req, ctx);
     const b = req.body || {}; const vendor = await vendorForPurchase(app, b.vendor_id); const total = Number(b.total_amount);
     if (!vendor) return res.status(404).json({ success: false, error: 'Vendor not found.' }); if (!Number.isFinite(total) || total < 0) return res.status(400).json({ success: false, error: 'Bill total must be zero or greater.' });
     if (b.purchase_order_id && !await getPurchaseOrder(app, b.purchase_order_id)) return res.status(404).json({ success: false, error: 'Purchase order not found.' });
@@ -6653,12 +6139,12 @@ app.post('/api/purchases/bills', async (req, res) => {
 });
 
 app.get('/api/purchases/payments', async (req, res) => {
-  try { const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx)) return; res.status(200).json({ success: true, data: await purchaseRows(app, 'VendorPayments', 'ROWID, payment_number, vendor_id, bill_id, type, payment_method, payment_date, reference, amount, notes, created_by, created_at') }); } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+  try { let app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx)) return; app = purchaseDataApp(req, ctx); res.status(200).json({ success: true, data: await purchaseRows(app, 'VendorPayments', 'ROWID, payment_number, vendor_id, bill_id, type, payment_method, payment_date, reference, amount, notes, created_by, created_at') }); } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
 app.post('/api/purchases/payments', async (req, res) => {
   try {
-    const app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx, true)) return;
+    let app = catalyst.initialize(req); const ctx = await getCurrentOrgUser(req, app); if (!ctx) return res.status(401).json({ success: false, error: 'Not authenticated' }); if (!requirePurchaseAccess(res, ctx, true)) return; app = purchaseDataApp(req, ctx);
     const b = req.body || {}; const amount = Number(b.amount); const vendor = await vendorForPurchase(app, b.vendor_id); if (!vendor) return res.status(404).json({ success: false, error: 'Vendor not found.' }); if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, error: 'Payment amount must be greater than zero.' });
     const bill = b.bill_id ? await getVendorBill(app, b.bill_id) : null; if (b.bill_id && (!bill || String(bill.vendor_id) !== String(vendor.ROWID))) return res.status(400).json({ success: false, error: 'Choose a bill belonging to this vendor.' });
     if (bill && amount > (Number(bill.total_amount) || 0) - (Number(bill.paid_amount) || 0)) return res.status(400).json({ success: false, error: 'Payment exceeds the outstanding bill balance.' });
@@ -11092,39 +10578,11 @@ async function saveNotificationSettings(catalystApp, orgId, input) {
 }
 
 async function getIntegrationHealth(catalystApp, orgUserContext) {
-  const booksService = new ZohoBooksService(catalystApp, null);
-  const orgId = orgUserContext && orgUserContext.orgUser ? String(orgUserContext.orgUser.org_id || '') : '';
-  const health = {
-    books: { connected: false, org_id: '', dc: '', token_expires_at: '', last_sync_at: '', last_sync_result: '' },
-  };
-  try {
-    const connected = await booksService.getConfig(`zoho_books_connected_${orgId}`)
-      || await booksService.getConfig('zoho_books_connected');
-    health.books.connected = String(connected ?? '').toLowerCase() === 'true';
-  } catch (e) { /* disconnected */ }
-  try {
-    const org = orgUserContext && orgUserContext.org ? orgUserContext.org : {};
-    health.books.org_id = String(org.zoho_books_org_id || (await booksService.getConfig('zoho_org_id')) || '');
-    health.books.dc = String(await booksService.getConfig(`zoho_dc_${orgId}`) || await booksService.getConfig('zoho_dc') || '');
-  } catch (e) { /* blanks */ }
-  // Token expiry derives from the SDK's 50-minute access-token cache stamp.
-  try {
-    const stamp = await booksService.getConfig(`zoho_token_time_${orgId}`)
-      || await booksService.getConfig('zoho_token_time');
-    const t = parseInt(String(stamp || ''), 10);
-    if (Number.isFinite(t) && t > 0) {
-      health.books.token_expires_at = new Date(t + 50 * 60 * 1000).toISOString();
-    } else {
-      health.books.token_expires_at = 'unknown';
-    }
-  } catch (e) {
-    health.books.token_expires_at = 'unknown';
-  }
-  try {
-    health.books.last_sync_at = String(await booksService.getConfig('last_books_sync_at') || '');
-    health.books.last_sync_result = String(await booksService.getConfig('last_books_sync_result') || '');
-  } catch (e) { /* blanks */ }
-  return health;
+  const orgId = orgUserContext.orgUser.org_id;
+  const connection = await booksIntegration.read(catalystApp, orgId, 'connection');
+  const sync = await booksIntegration.read(catalystApp, orgId, 'sync');
+  return { books: { connected: !!connection?.refreshToken, org_id: connection?.orgId || '', dc: connection?.dc || '',
+    token_expires_at: '', last_sync_at: sync?.at || '', last_sync_result: sync?.message || '' } };
 }
 
 /* ---------------- Personal staff profiles (self-service only) ---------------- */
@@ -11168,15 +10626,44 @@ function decryptQzPrivateKey(encrypted, key, orgId) {
   return Buffer.concat([decipher.update(Buffer.from(encrypted.data, 'base64')), decipher.final()]).toString('utf8');
 }
 
-async function readQzSigningMaterial(app, orgId) {
-  const rows = await safeZcql(app, `SELECT config_value FROM Configurations WHERE config_key = 'org_${orgId}_qz_signing' LIMIT 1`);
+function qzConfigurationError(code, message) {
+  return Object.assign(new Error(message), { qzCode: code });
+}
+
+async function readQzSigningConfiguration(app, orgId) {
+  let rows;
+  try { rows = await safeZcql(app, `SELECT config_value FROM Configurations WHERE config_key = 'org_${sanitizeZcql(orgId)}_qz_signing' LIMIT 1`); }
+  catch (_) { throw qzConfigurationError('QZ_CONFIG_READ_FAILED', 'Could not read the company QZ certificate. Contact your POS administrator.'); }
   if (rows?.length) {
-    const saved = JSON.parse(rows[0].Configurations.config_value);
-    const key = qzEncryptionKey();
-    if (!key) throw new Error('QZ encryption secret is not configured on the server.');
-    return { ...saved, privateKey: decryptQzPrivateKey(saved.encryptedKey, key, orgId) };
+    try { return JSON.parse(rows[0].Configurations.config_value); }
+    catch (_) { throw qzConfigurationError('QZ_CONFIG_INVALID', 'The saved QZ configuration is invalid. Admin must save the certificate files again.'); }
   }
   return { certificate: process.env.QZ_CERTIFICATE?.replace(/\\n/g, '\n') || '', privateKey: process.env.QZ_PRIVATE_KEY?.replace(/\\n/g, '\n') || '' };
+}
+
+function unlockQzSigningMaterial(saved) {
+  if (saved.encryptedKey) {
+    const key = qzEncryptionKey();
+    if (!key) throw qzConfigurationError('QZ_ENCRYPTION_SECRET_MISSING', 'The backend QZ encryption secret is missing. Configure the original QZ_KEY_ENCRYPTION_SECRET in Catalyst; no user-role change is needed.');
+    if (saved.keyFingerprint && saved.keyFingerprint !== require('crypto').createHash('sha256').update(key).digest('hex')) {
+      throw qzConfigurationError('QZ_ENCRYPTION_SECRET_CHANGED', 'The backend QZ encryption secret changed. Restore the original secret, or have Admin save the certificate files again with the current secret.');
+    }
+    try { return { ...saved, privateKey: decryptQzPrivateKey(saved.encryptedKey, key, saved.orgId) }; }
+    catch (_) { throw qzConfigurationError('QZ_KEY_UNLOCK_FAILED', 'The saved QZ key cannot be decrypted. Restore the original backend encryption secret, or have Admin save the certificate files again.'); }
+  }
+  if (saved.certificate && !saved.privateKey) throw qzConfigurationError('QZ_KEY_MISSING', 'The saved certificate has no signing key. Admin must save both QZ certificate files again.');
+  return saved;
+}
+
+async function readQzSigningMaterial(app, orgId) {
+  return unlockQzSigningMaterial({ ...await readQzSigningConfiguration(app, orgId), orgId: String(orgId) });
+}
+
+function respondQzConfigurationError(res, error) {
+  const code = error.qzCode || 'QZ_CONFIGURATION_FAILED';
+  // Only a diagnostic code is logged; never certificate/key contents or SDK payloads.
+  console.error('[QZ configuration]', code);
+  return res.status(503).json({ code, error: error.qzCode ? error.message : 'QZ configuration is unavailable. Contact your POS administrator.' });
 }
 
 app.get('/api/settings/printers/qz-certificate', async (req, res) => {
@@ -11185,10 +10672,15 @@ app.get('/api/settings/printers/qz-certificate', async (req, res) => {
     const context = await requireAuth(req, app);
     if (!context) return res.status(401).json({ error: 'Not authenticated' });
     if (!requirePermission(context, res, 'manage_settings')) return;
-    const material = await readQzSigningMaterial(printerSettingsApp(req, context), String(context.orgUser.org_id));
+    const orgId = String(context.orgUser.org_id);
+    const saved = await readQzSigningConfiguration(printerSettingsApp(req, context), orgId);
+    let material;
+    let signingError = '';
+    try { material = unlockQzSigningMaterial({ ...saved, orgId }); }
+    catch (error) { signingError = error.message; }
     res.set('Cache-Control', 'no-store');
-    res.json({ configured: !!(material.certificate && material.privateKey), uploadReady: !!qzEncryptionKey(), subject: material.subject || '', expires: material.expires || '' });
-  } catch (_) { res.status(500).json({ error: 'Could not read certificate settings. Check the server encryption secret.' }); }
+    res.json({ configured: !!(saved.certificate && (saved.encryptedKey || saved.privateKey)), signingReady: !!(material?.certificate && material?.privateKey), signingError, uploadReady: !!qzEncryptionKey(), subject: saved.subject || '', expires: saved.expires || '' });
+  } catch (error) { respondQzConfigurationError(res, error); }
 });
 
 app.put('/api/settings/printers/qz-certificate', async (req, res) => {
@@ -11204,10 +10696,10 @@ app.put('/api/settings/printers/qz-certificate', async (req, res) => {
     catch (error) { return res.status(400).json({ error: error.message }); }
     const orgId = String(context.orgUser.org_id);
     const { privateKey, ...publicFields } = material;
-    const saved = { ...publicFields, encryptedKey: encryptQzPrivateKey(privateKey, key, orgId) };
+    const saved = { ...publicFields, keyFingerprint: require('crypto').createHash('sha256').update(key).digest('hex'), encryptedKey: encryptQzPrivateKey(privateKey, key, orgId) };
     await safeUpsertConfig(printerSettingsApp(req, context), `org_${orgId}_qz_signing`, JSON.stringify(saved));
     res.set('Cache-Control', 'no-store');
-    res.json({ configured: true, uploadReady: true, subject: saved.subject, expires: saved.expires });
+    res.json({ configured: true, signingReady: true, signingError: '', uploadReady: true, subject: saved.subject, expires: saved.expires });
   } catch (_) { res.status(500).json({ error: 'Could not save certificate settings.' }); }
 });
 
@@ -11238,7 +10730,7 @@ app.get('/api/printing/qz/certificate', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const material = await readQzSigningMaterial(printerSettingsApp(req, context), String(context.orgUser.org_id));
     res.json({ certificate: material.privateKey ? material.certificate : '' });
-  } catch (_) { res.status(500).json({ error: 'Could not load QZ configuration.' }); }
+  } catch (error) { respondQzConfigurationError(res, error); }
 });
 
 function createQzRequestSignature(message, privateKey) {
@@ -11261,7 +10753,7 @@ app.post('/api/printing/qz/sign', async (req, res) => {
     const signature = createQzRequestSignature(message, material.privateKey);
     res.set('Cache-Control', 'no-store');
     res.json({ signature });
-  } catch (_) { res.status(500).json({ error: 'Could not sign the print request.' }); }
+  } catch (error) { respondQzConfigurationError(res, error); }
 });
 
 function personalProfileKey(context) {
@@ -12834,7 +12326,7 @@ app.get('/api/settings/integrations', async (req, res) => {
     if (!['Admin', 'Manager'].includes(role)) {
       return res.status(403).json({ success: false, error: 'Integration health requires Admin or Manager.' });
     }
-    res.status(200).json({ success: true, integrations: await getIntegrationHealth(catalystApp, orgUserContext) });
+    res.status(200).json({ success: true, integrations: await getIntegrationHealth(catalyst.initialize(req, { scope: 'admin' }), orgUserContext) });
   } catch (error) {
     console.error('Error reading integration health:', error.message);
     res.status(500).json({ success: false, error: error.message });

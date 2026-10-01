@@ -1,5 +1,20 @@
 # CloudHub POS — Function Prerequisites & Verification Checklist
 
+## Books integration verification - 1 Oct 2026
+
+- [x] Local backend tests (78), receipt-printing tests (6), TypeScript and production build passed.
+- [x] Mocked OAuth verifies Admin permissions, company/user-bound state, expiry, organization selection and token-free browser responses.
+- [ ] Deploy both function and client to the intended environment.
+- [ ] Verify Configurations read/write access and Products.org_id before importing.
+- [ ] Register the displayed callback URI, save credentials/region, authorize and choose the company.
+- [ ] Test the connection and verify product import preserves zero stock and local categories.
+- [ ] Verify Cashier/Manager sales use the Admin-created company connection.
+- [ ] Compare Books invoice taxes, discounts, totals and split payments against the POS receipt.
+- [ ] Confirm incomplete posting is visible and review any partial remote invoice before retrying.
+- [ ] Change a Books product and confirm it appears after manual import; disconnect and confirm POS records remain.
+
+No extra Catalyst Connection is required. Live checks remain pending. See [Books setup](zoho-books-integration.md).
+
 ## Shared UI Review - 30 Sep 2026
 
 - [x] TypeScript project check passed for the shared Purchasing-style theme update.
@@ -28,7 +43,7 @@ are the next section's prerequisites.
 |---|---|---|---|
 | 0.1 | Function `pos_backend` (Node 18, Advanced I/O) **deployed** | Console → Functions | MCP: function status = deployed, recent update time |
 | 0.2 | Client (`react-app/dist`) **deployed** (incl. `404.html` SPA fallback) | Console → Client / Hosting | Deep link `/app/admin/users` loads instead of 404 |
-| 0.3 | Env vars: `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET` (required at boot), optional `STRATUS_ASSETS_BUCKET` (default `companyassets`), `CATALYST_APP_DOMAIN` | Console → Functions → Environment | Function cold-start log shows `[ENV]` true + `[BUILD]` stamp |
+| 0.3 | Env vars: `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET` (optional shared Books credentials; company setup can use Admin settings), optional `STRATUS_ASSETS_BUCKET` (default `companyassets`), `CATALYST_APP_DOMAIN` | Console → Functions → Environment | Function cold-start log shows `[ENV]` true + `[BUILD]` stamp |
 | 0.4 | Data Store tables exist (see table map in §11) | Console → Data Store | `GET /api/setup/status` → `all_tables_ready: true` |
 | 0.5 | Stratus bucket `companyassets` exists + policy allows authenticated `GetObject, PutObject, DeleteObject` on `companyassets::/*` | Console → Stratus | Logo/product image round-trip works (§3) |
 | 0.6 | Same project + environment everywhere (CloudPartners → POS → **Development**) | Console / MCP prompts | Always pin org + project + env in every check |

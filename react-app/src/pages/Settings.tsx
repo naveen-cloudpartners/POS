@@ -1,23 +1,19 @@
+import BooksSetup from '../components/settings/BooksSetup';
 import PageIcon from '../components/ui/PageIcon';
 import QzCertificateSetup from '../components/settings/QzCertificateSetup';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Store, Mail, Link2, Unlink, Save, Percent, Boxes, HeartHandshake, ReceiptText, ShieldCheck, Bell, ImageOff, Banknote, Printer as PrinterIcon } from 'lucide-react';
+import { Store, Mail, Save, Percent, Boxes, HeartHandshake, ReceiptText, ShieldCheck, Bell, ImageOff, Banknote, Printer as PrinterIcon } from 'lucide-react';
 import Card from '../components/ui/Card';
-import StatusBadge from '../components/ui/StatusBadge';
 import Loader from '../components/ui/Loader';
 import ErrorState from '../components/ui/ErrorState';
-import API_BASE from '../services/api';
 import {
   companyLogoUrl,
-  disconnectZoho,
   getCompanyProfile,
-  getIntegrationHealth,
   getNotificationSettings,
   getPaymentMethods,
   getSettings,
   getTaxSettings,
-  getZohoStatus,
   removeCompanyLogo,
   saveCompanyProfile,
   saveNotificationSettings,
@@ -27,7 +23,6 @@ import {
   sendLowStockDigest,
   uploadCompanyLogo,
   type CompanyProfile,
-  type IntegrationHealth,
   type NotificationPrefs,
   type PaymentMethod,
   type TaxSettings,
@@ -49,7 +44,7 @@ import { useAuth } from '../context/AuthContext';
 import { calcLine } from '../utils/tax';
 import { currency } from '../utils/format';
 import type { PosReceipt } from '../services/orderService';
-import type { Product, StoreSettings, ZohoStatus } from '../types';
+import type { Product, StoreSettings } from '../types';
 import './Settings.css';
 
 const NOTIFICATION_GROUPS: Array<{ title: string; keys: Array<{ key: string; label: string; hint: string }> }> = [
@@ -103,9 +98,7 @@ export default function Settings() {
   const [company, setCompany] = useState<Partial<CompanyProfile>>({});
   const [tax, setTax] = useState<TaxSettings | null>(null);
   const [notif, setNotif] = useState<NotificationPrefs | null>(null);
-  const [health, setHealth] = useState<IntegrationHealth | null>(null);
   const [products, setProducts] = useState<Array<Product>>([]);
-  const [zoho, setZoho] = useState<ZohoStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -141,24 +134,20 @@ export default function Settings() {
       getCompanyProfile().catch(() => ({} as Partial<CompanyProfile>)),
       getTaxSettings(),
       getNotificationSettings(),
-      getIntegrationHealth(),
       getPaymentMethods().catch(() => [] as Array<PaymentMethod>),
       getPrinters().catch(() => [] as Array<Printer>),
       getPrintRouting(),
-      getZohoStatus(),
       getProducts().catch(() => [] as Array<Product>),
     ])
-      .then(([s, co, tx, nt, he, pm, pr, rt, z, prods]) => {
+      .then(([s, co, tx, nt, pm, pr, rt, prods]) => {
         setSettings(s);
         setCompany(co);
         setTax(tx);
         setNotif(nt);
-        setHealth(he);
         setPayMethods(pm);
         setPrinters(pr);
         setRouting(rt);
         setProducts(prods);
-        setZoho(z);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load settings'))
       .finally(() => setLoading(false));
@@ -455,19 +444,6 @@ export default function Settings() {
       .finally(() => setLogoBusy(false));
   };
 
-  const connectZoho = () => {
-    window.open(`${API_BASE}/auth/url`, '_blank', 'width=560,height=680');
-  };
-
-  const disconnect = () => {
-    disconnectZoho()
-      .then(() => {
-        setNotice('Zoho Books disconnected.');
-        load();
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Disconnect failed'));
-  };
-
   const previewRateOptions = tax === null
     ? []
     : [String(tax.default_rate), ...tax.profiles.map((profile) => String(profile.rate))];
@@ -504,7 +480,7 @@ export default function Settings() {
   );
 
   if (loading) return <Loader message="Loading settings…" skeleton="page" />;
-  if (error !== '' && zoho === null && Object.keys(settings).length === 0) {
+  if (error !== '' && Object.keys(settings).length === 0) {
     return <ErrorState message={error} onRetry={load} />;
   }
 
@@ -1165,42 +1141,7 @@ export default function Settings() {
         </Card>
 
         )}
-        {activeSection === 'integrations' && (
-        <Card
-          id="integrations"
-          title="Zoho Books"
-          subtitle="Inventory sync, invoice posting and connection health"
-          action={zoho?.connected === true ? <StatusBadge status="Connected" /> : <StatusBadge status="Pending" />}
-        >
-          <dl className="settings-zoho">
-            <div><dt>Connection</dt><dd>{zoho?.connected === true ? 'Active' : 'Not connected'}</dd></div>
-            <div><dt>Organisation</dt><dd>{health?.books?.org_id || zoho?.org_id || '—'}</dd></div>
-            <div><dt>Data centre</dt><dd>{health?.books?.dc || zoho?.dc || '—'}</dd></div>
-            <div><dt>Developer keys</dt><dd>{zoho?.master_configured === true ? 'Configured' : 'Missing'}</dd></div>
-            <div><dt>Token expires</dt><dd>{typeof health?.books?.token_expires_at === 'string' ? health.books.token_expires_at.slice(0, 16).replace('T', ' ') || '—' : '—'}</dd></div>
-            <div><dt>Last sync</dt><dd>{typeof health?.books?.last_sync_at === 'string' ? health.books.last_sync_at.slice(0, 16).replace('T', ' ') || '—' : '—'}</dd></div>
-            <div><dt>Last sync result</dt><dd>{health?.books?.last_sync_result || '—'}</dd></div>
-            <div><dt>SMTP engine</dt><dd>{health?.smtp === undefined ? 'Status unavailable' : health.smtp?.configured === true ? 'Configured' : 'Not configured'}</dd></div>
-          </dl>
-          {isAdmin && (
-            <div className="ch-row" style={{ marginTop: 12 }}>
-              {zoho?.connected === true ? (
-                <button type="button" className="ch-btn ch-btn-secondary" onClick={disconnect}>
-                  <Unlink size={15} /> Disconnect
-                </button>
-              ) : (
-                <button type="button" className="ch-btn ch-btn-primary" onClick={connectZoho}>
-                  <Link2 size={15} /> Connect Zoho Books
-                </button>
-              )}
-            </div>
-          )}
-          <p className="ch-hint" style={{ marginTop: 10 }}>
-            Connecting opens the secure Zoho authorisation page. After approval, return here and refresh — the connection is verified server-side.
-          </p>
-        </Card>
-
-        )}
+        {activeSection === 'integrations' && isAdmin && <BooksSetup />}
         {activeSection === 'payments' && (
         <Card
           id="payments"

@@ -1,12 +1,8 @@
 const axios = require('axios');
 
-// Fallback credentials — must be configured via Catalyst Environment Variables.
+// Fallback credentials â€” must be configured via Catalyst Environment Variables.
 // Never hardcode credentials in source code.
-const FALLBACK_MASTER_CREDENTIALS = {
-  client_id: process.env.ZOHO_CLIENT_ID || '1000.LJHGWKVRX6WJDTB4MDO7B0NQ3GZ4UR',
-  client_secret: process.env.ZOHO_CLIENT_SECRET || 'd7800a427101467e28dacef9d688e47f03266f343d',
-  dc: process.env.ZOHO_DC || 'com'
-};
+const FALLBACK_MASTER_CREDENTIALS = { client_id: process.env.ZOHO_CLIENT_ID || '', client_secret: process.env.ZOHO_CLIENT_SECRET || '', dc: process.env.ZOHO_DC || 'US' };
 
 class ZohoBooksService {
   /**
@@ -27,7 +23,10 @@ class ZohoBooksService {
       'EU': { accounts: 'https://accounts.zoho.eu', api: 'https://www.zohoapis.eu/books/v3' },
       'IN': { accounts: 'https://accounts.zoho.in', api: 'https://www.zohoapis.in/books/v3' },
       'AU': { accounts: 'https://accounts.zoho.com.au', api: 'https://www.zohoapis.com.au/books/v3' },
-      'JP': { accounts: 'https://accounts.zoho.jp', api: 'https://www.zohoapis.co.jp/books/v3' }
+      'JP': { accounts: 'https://accounts.zoho.jp', api: 'https://www.zohoapis.jp/books/v3' },
+      'CA': { accounts: 'https://accounts.zohocloud.ca', api: 'https://www.zohoapis.ca/books/v3' },
+      'CN': { accounts: 'https://accounts.zoho.com.cn', api: 'https://www.zohoapis.com.cn/books/v3' },
+      'SA': { accounts: 'https://accounts.zoho.sa', api: 'https://www.zohoapis.sa/books/v3' }
     };
     return dcs[dc.toUpperCase()] || dcs['US'];
   }
@@ -76,11 +75,17 @@ class ZohoBooksService {
 
   /**
    * Resolves authentication headers.
-   * Priority: Tenant OAuth token (user-authorized) → Catalyst Connection → DB fallback
+   * Priority: Tenant OAuth token (user-authorized) â†’ Catalyst Connection â†’ DB fallback
    * The tenant token is tried first because it carries the user's full ZohoBooks.fullaccess.all scope.
    * The Catalyst Connection may only have limited server-level scope.
    */
   async getHeaders() {
+    if (this.tenantConfig?.serverManaged) {
+      const c = this.tenantConfig;
+      if (!c.refreshToken || !c.clientId || !c.clientSecret || !c.orgId) throw new Error('Books credentials are incomplete. Reconnect in Settings.');
+      const token = await this.refreshAccessToken(c.clientId, c.clientSecret, c.refreshToken, c.dc, false, c.posOrgId);
+      return { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' };
+    }
     // 1. Try to resolve tenant-specific OAuth token based on posOrgId or orgId (highest priority)
     if (this.tenantConfig && (this.tenantConfig.posOrgId || this.tenantConfig.orgId)) {
       const posOrgId = this.tenantConfig.posOrgId;
@@ -144,7 +149,7 @@ class ZohoBooksService {
       const resolvedClientSecret = clientSecret || FALLBACK_MASTER_CREDENTIALS.client_secret;
 
       if (resolvedClientId && resolvedClientSecret) {
-        console.log(`Using header-provided tenant OAuth token (DC: ${dc}) — no orgId available`);
+        console.log(`Using header-provided tenant OAuth token (DC: ${dc}) â€” no orgId available`);
         const accessToken = await this.refreshAccessToken(resolvedClientId, resolvedClientSecret, refreshToken, dc, true);
         return {
           'Authorization': `Zoho-oauthtoken ${accessToken}`,
@@ -180,7 +185,7 @@ class ZohoBooksService {
 
     // Fallback to hardcoded SaaS master credentials if DB is unavailable
     if (!clientId || !clientSecret) {
-      console.warn('Configurations table unavailable — using hardcoded master credentials as fallback.');
+      console.warn('Configurations table unavailable â€” using hardcoded master credentials as fallback.');
       clientId = clientId || FALLBACK_MASTER_CREDENTIALS.client_id;
       clientSecret = clientSecret || FALLBACK_MASTER_CREDENTIALS.client_secret;
     }
@@ -295,6 +300,10 @@ class ZohoBooksService {
    * Helper to format active endpoint urls based on DC
    */
   async getBooksUrl(endpoint) {
+    if (this.tenantConfig?.serverManaged) {
+      const c = this.tenantConfig;
+      return `${this.getDomainUrls(c.dc).api}${endpoint}${endpoint.includes('?') ? '&' : '?'}organization_id=${encodeURIComponent(c.orgId)}`;
+    }
     let dc = 'US';
     let orgId = '';
 
@@ -308,7 +317,7 @@ class ZohoBooksService {
       orgId = await this.getConfig('zoho_org_id') || '';
     }
 
-    console.log(`getBooksUrl: endpoint=${endpoint}, dc=${dc}, orgId=${orgId}, tenantConfig=${JSON.stringify(this.tenantConfig)}`);
+    console.log(`Books endpoint=${endpoint}, region=${dc}`);
 
     const domains = this.getDomainUrls(dc);
     let url = `${domains.api}${endpoint}`;
@@ -364,7 +373,7 @@ class ZohoBooksService {
         return response.data.items || [];
       }
       
-      // Zoho Books returned a non-zero code — include full details for debugging
+      // Zoho Books returned a non-zero code â€” include full details for debugging
       const errMsg = response.data.message || 'Unknown response structure from Zoho Books';
       const errCode = response.data.code || 'unknown';
       throw new Error(`Zoho Books API Error [${errCode}]: ${errMsg}`);
@@ -409,7 +418,7 @@ class ZohoBooksService {
       const payload = {
         contact_name: customerName,
         contact_type: 'customer',
-        emails: email
+        ...(email ? { contact_persons: [{ email, is_primary_contact: true }] } : {})
       };
 
       const createResponse = await axios.post(urlCreate, payload, { headers });
@@ -432,9 +441,10 @@ class ZohoBooksService {
       const url = await this.getBooksUrl('/invoices');
 
       const formattedLineItems = lineItems.map(item => ({
-        item_id: item.books_item_id || item.item_id,
+        ...(item.books_item_id ? { item_id: item.books_item_id } : { name: item.name || 'POS item' }),
         quantity: item.quantity,
         rate: item.rate,
+        ...(item.tax_id ? { tax_id: item.tax_id } : {}),
         description: item.name || 'POS item'
       }));
 
@@ -444,6 +454,7 @@ class ZohoBooksService {
         date: today,
         due_date: today,
         line_items: formattedLineItems,
+        is_inclusive_tax: false,
         payment_options: {
           payment_gateways: []
         },
@@ -458,7 +469,9 @@ class ZohoBooksService {
         
         // Approve/Send the invoice so it can be paid
         const approveUrl = await this.getBooksUrl(`/invoices/${invoice.invoice_id}/status/sent`);
-        await axios.post(approveUrl, {}, { headers });
+        // Keep the invoice identifier even if Books disallows changing its status;
+        // checkout must not lose a created invoice and create another on retry.
+        try { await axios.post(approveUrl, {}, { headers }); } catch { /* payment call reports any remaining restriction */ }
         
         return invoice;
       }

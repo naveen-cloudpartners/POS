@@ -30,6 +30,8 @@ Configure these backend environment variables with your trusted QZ certificate/k
 
 Literal `\n` or real newlines are supported. Never put the private key in Vite variables, public files, or frontend code. QZ must trust the certificate (a QZ-issued trusted certificate, or a locally provisioned trusted root for testing). See https://qz.io/docs/signing.
 
+Local `.env` loading uses the backend function directory, independent of the shell's working directory. In Catalyst, configure `QZ_KEY_ENCRYPTION_SECRET` explicitly and preserve it across deployments. The certificate setup displays signing errors separately from saved-file status. A missing secret must be restored; a changed secret requires restoring the original or re-saving the certificate pair as Admin. These are backend configuration failures, not Manager/Cashier permission failures. Diagnostic logs contain only QZ error codes, never keys or certificate contents.
+
 The authenticated backend signs only fresh discovery or inline HTML printing requests addressed to an enabled QZ printer belonging to the current company. It does not sign file access, raw device commands, or remote HTML URLs.
 
 The connector is bundled locally in `react-app/public/vendor/qz-tray` from the installed QZ Tray 2.3.0 distribution, with its license notice, so printing does not depend on a CDN.

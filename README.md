@@ -21,6 +21,14 @@ Catalyst is the hosting (like cPanel), `react-app/dist` is the
 | `scripts/deploy.sh` | Local deploy mirroring CI: build → syntax check → `catalyst deploy` (`all`/`functions`/`client`). |
 | `docs/CI_CD_Guide.md` | Pipeline architecture, secrets setup, dev/production workflows, roadmap. |
 
+## Zoho Books integration
+
+Admin **Settings → Integrations** provides OAuth credential setup, a copyable callback URL, authorization, Books organization selection, connection testing, product import and disconnect. No extra Catalyst Connection is needed; the backend starts without Books credentials. Deploy both backend and client before using the new flow.
+
+Catalyst retains POS users, roles, settings and operational records. New seller checkouts attempt Books customer/invoice/payment posting using their company's server-side connection. Books product changes appear only after manual import. Purchasing, local stock adjustments, voids/returns and historical sales are not automatically synchronized.
+
+See [Books setup and Catalyst requirements](docs/zoho-books-integration.md). The implementation passed local build/type checks and mocked integration tests; live authorization remains pending.
+
 ## Shared workspace styling
 
 `react-app/src/styles/workspace-theme.css` is imported after the base styles in `src/main.tsx` and aligns the authenticated workspace with the Purchasing UI. It covers shared cards, summary widgets, filters, tables, empty states, and responsive spacing. Page-owned layouts, including the compact POS terminal, remain in their page stylesheets.
@@ -40,7 +48,7 @@ The 30 Sep 2026 styling update passed TypeScript and the Vite production build. 
 
 - Health check: `GET /api/health`
 - Setup: `GET /api/setup/status` (requires `Products` table)
-- Auth: save/seed master credentials, login session (`/api/auth/me`, `/api/auth/url`, `/api/auth/callback`), disconnect
+- Auth: Catalyst login session (`/api/auth/me`); company-scoped Books OAuth (`/api/auth/url`, `/api/auth/callback`) and Admin-only disconnect. Legacy global master credential save/seed routes are retired.
 - Users: roster list, invite (creates Catalyst user best-effort + roster entry), update, activate/deactivate (last-admin + self guards), delete (Admin-only, last-admin + self guards), password re-invite, change role (Manager cannot touch Admins; Storekeeper now assignable), plus legacy `/api/users/*` (hardened: delete Admin-only, Storekeeper role fixed)
 - Audit: auto-logged trail (`GET /api/admin/audit` with date/actor/action/entity/search filters + metrics), filtered CSV/PDF exports, retention sweep, Administration settings (`admin_audit_retention_days`, `admin_audit_export`, `admin_allow_invitations`)
 - Shop data: products list/add/edit/delete, stock adjust, contacts list/add (legacy `/api/contacts` untouched)
@@ -60,7 +68,7 @@ The 30 Sep 2026 styling update passed TypeScript and the Vite production build. 
 - Company profile (`GET|PUT /api/settings/company`, logo upload/stream/remove in FileStore `CompanyAssets`, 5 MB PNG/JPG/WebP; emailed receipts embed the logo + address block)
 - Tax engine (`GET|PUT /api/settings/tax`: enable, name, default rate, exclusive/inclusive mode, per-line rounding, ≤20 profiles). Checkout, POS display, receipts and order detail all share one formula set (verified identical); exclusive default preserves legacy totals; unset line rates inherit the default, 0 stays exempt
 - Notifications (`GET|PUT /api/settings/notifications`: 11 types × email/in-app/system channels, low-stock threshold/recipients/immediate-vs-daily, alert email). Wired: immediate low-stock emails on deductions, void emails to customers, Books-sync failure alerts — all best-effort via SMTP
-- Integration health (`GET /api/settings/integrations`: Books connection/org/DC, token expiry from the 50-min cache stamp, last sync time + result, SMTP status)
+- Integration health (`GET /api/settings/integrations`): company Books connection, organization, region and latest product import result.
 - Zoho Books sync (`POST /api/sync/books`, diagnose) — see `zohoBooksService.js`
 
 ## Table-page layout standard
