@@ -68,6 +68,8 @@ export default function Pos() {
   const [printJobs, setPrintJobs] = useState<Array<PrintJob>>([]);
   const [emailBusy, setEmailBusy] = useState(false);
   const [emailMsg, setEmailMsg] = useState('');
+  const [printMessage, setPrintMessage] = useState('');
+  const [receiptPrinting, setReceiptPrinting] = useState(false);
   const [voidConfirm, setVoidConfirm] = useState(false);
   const [voidBusy, setVoidBusy] = useState(false);
   // SET-02: live tax mode (exclusive default preserves legacy math).
@@ -258,6 +260,7 @@ export default function Pos() {
     }
     setBusy(true);
     setMessage(null);
+    setPrintMessage('');
     const mailTo = (receiptEmail.trim() === '' ? customerEmail.trim() : receiptEmail.trim());
     checkout({
       customer_name: customerName.trim() === '' ? 'Walk-in Guest' : customerName.trim(),
@@ -292,6 +295,16 @@ export default function Pos() {
           setShowReceipt(true);
           setEmailMsg(res.email_sent === true ? 'Receipt emailed.' : '');
           setPrintJobs(Array.isArray(res.print_jobs) ? res.print_jobs.filter((j) => j.template !== 'bill') : []);
+          const printer = terminalPrinters.find((p) => p.station === 'counter' && p.enabled);
+          if (printer?.transport === 'qz') {
+            const bill: PrintJob = { jobId: `bill-${r.orderId}`, template: 'bill', station: 'counter', printerId: printer.id, printerName: printer.name, copies: 1, payload: { receipt: r } };
+            setReceiptPrinting(true);
+            setPrintMessage('Sending receipt to printer…');
+            void sendPrintJob(bill, printer).then((result) => {
+              setPrintMessage(result.ok ? 'Receipt sent to printer.' : `Sale completed. Receipt was not printed: ${result.error} Use Print to retry.`);
+            }).catch(() => setPrintMessage('Sale completed. Receipt was not printed. Use Print to retry.'))
+              .finally(() => setReceiptPrinting(false));
+          }
         }
         setMessage({ kind: 'ok', text: res.message ?? 'Sale completed.' });
         setCart([]);
@@ -385,8 +398,13 @@ export default function Pos() {
   };
 
   const printReceipt = () => {
-    if (receipt === null) return;
-    void dispatchPrintJob({ jobId: `bill-${receipt.orderId}`, template: 'bill', station: 'counter', printerId: null, printerName: 'Counter (default)', copies: 1, payload: { receipt } });
+    if (receipt === null || receiptPrinting) return;
+    const printer = terminalPrinters.find((p) => p.station === 'counter' && p.enabled) ?? null;
+    setReceiptPrinting(true);
+    void sendPrintJob({ jobId: `bill-${receipt.orderId}`, template: 'bill', station: 'counter', printerId: printer?.id ?? null, printerName: printer?.name ?? 'Counter (default)', copies: 1, payload: { receipt } }, printer)
+      .then((result) => setPrintMessage(result.ok ? 'Receipt sent to printer.' : result.error ?? 'Print failed.'))
+      .catch(() => setPrintMessage('Print failed. Please retry.'))
+      .finally(() => setReceiptPrinting(false));
   };
 
   const printKot = (job: PrintJob) => {
@@ -702,7 +720,7 @@ export default function Pos() {
         onClose={() => { setShowReceipt(false); }}
         footer={
           <>
-            <button type="button" className="ch-btn ch-btn-secondary" onClick={printReceipt}><Printer size={15} /> Print</button>
+            <button type="button" className="ch-btn ch-btn-secondary" onClick={printReceipt} disabled={receiptPrinting}><Printer size={15} /> {receiptPrinting ? 'Printing…' : 'Print'}</button>
             {printJobs.filter((j) => j.template !== 'bill').map((j) => (
               <button key={j.jobId} type="button" className="ch-btn ch-btn-secondary" onClick={() => printKot(j)}>
                 <Printer size={15} /> {(j.payload as Partial<KotJobPayload>).kotNumber ?? j.station}
@@ -718,6 +736,7 @@ export default function Pos() {
       >
         {receipt !== null && (
           <div className="pos-receipt-doc">
+            {printMessage && <p role="status" className="ch-hint">{printMessage}</p>}
             <h3 className="pos-rc-store">{receipt.store.store_name || 'CloudHub POS'}</h3>
             {receipt.store.company !== '' && <p className="ch-cell-sub">{receipt.store.company}</p>}
             <dl className="pos-rc-meta">

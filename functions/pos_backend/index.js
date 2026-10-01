@@ -9299,6 +9299,7 @@ function apiPermission(method, path) {
   if (!path.startsWith('/api/')) return null;
   if (['/api/health', '/api/auth/me', '/api/setup/status', '/api/auth/status', '/api/auth/callback', '/api/organizations/register', '/api/admin/approve-org', '/api/admin/reject-org'].includes(path)) return null;
   if (path === '/api/profile/me' || path === '/api/profile/me/photo') return 'manage_profile';
+  if (path === '/api/printing/qz/certificate' || path === '/api/printing/qz/sign') return 'sell';
   if (/^\/api\/(admin\/users|users)(\/|$)/.test(path)) return 'manage_users';
   if (path.startsWith('/api/admin/audit')) return 'manage_users';
   if (path.startsWith('/api/reports/') || path === '/api/dashboard/summary') return 'view_reports';
@@ -11123,6 +11124,136 @@ async function getIntegrationHealth(catalystApp, orgUserContext) {
 }
 
 /* ---------------- Personal staff profiles (self-service only) ---------------- */
+
+function qzEncryptionKey() {
+  const value = String(process.env.QZ_KEY_ENCRYPTION_SECRET || '').trim();
+  return /^[a-f0-9]{64}$/i.test(value) ? Buffer.from(value, 'hex') : null;
+}
+
+function validateQzCertificatePair(certificate, privateKey) {
+  const crypto = require('crypto');
+  if (typeof certificate !== 'string' || typeof privateKey !== 'string' || certificate.length > 32000 || privateKey.length > 32000) throw new Error('Select a certificate and private key file (maximum 32 KB each).');
+  if (!certificate.trim() || !privateKey.trim()) throw new Error('Both files must contain data. Regenerate the QZ files if either file is empty.');
+  let cert, key;
+  try { cert = new crypto.X509Certificate(certificate); key = crypto.createPrivateKey(privateKey); }
+  catch (_) { throw new Error('The certificate or private key is not a valid PEM file.'); }
+  if (key.asymmetricKeyType !== 'rsa' || (key.asymmetricKeyDetails?.modulusLength || 0) < 2048) throw new Error('Use a QZ RSA private key with at least 2048 bits.');
+  if (!cert.checkPrivateKey(key)) throw new Error('The private key does not match this certificate. Select the two files from the same QZ certificate folder.');
+  if (Date.now() < Date.parse(cert.validFrom) || Date.now() > Date.parse(cert.validTo)) throw new Error('The certificate is not currently valid.');
+  return { certificate: certificate.trim(), privateKey: key.export({ type: 'pkcs8', format: 'pem' }), subject: cert.subject, expires: cert.validTo };
+}
+
+function encryptQzPrivateKey(privateKey, key, orgId) {
+  const crypto = require('crypto');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(Buffer.from(String(orgId)));
+  const encrypted = Buffer.concat([cipher.update(privateKey, 'utf8'), cipher.final()]);
+  return { iv: iv.toString('base64'), tag: cipher.getAuthTag().toString('base64'), data: encrypted.toString('base64') };
+}
+
+function decryptQzPrivateKey(encrypted, key, orgId) {
+  const decipher = require('crypto').createDecipheriv('aes-256-gcm', key, Buffer.from(encrypted.iv, 'base64'));
+  decipher.setAAD(Buffer.from(String(orgId)));
+  decipher.setAuthTag(Buffer.from(encrypted.tag, 'base64'));
+  return Buffer.concat([decipher.update(Buffer.from(encrypted.data, 'base64')), decipher.final()]).toString('utf8');
+}
+
+async function readQzSigningMaterial(app, orgId) {
+  const rows = await safeZcql(app, `SELECT config_value FROM Configurations WHERE config_key = 'org_${orgId}_qz_signing' LIMIT 1`);
+  if (rows?.length) {
+    const saved = JSON.parse(rows[0].Configurations.config_value);
+    const key = qzEncryptionKey();
+    if (!key) throw new Error('QZ encryption secret is not configured on the server.');
+    return { ...saved, privateKey: decryptQzPrivateKey(saved.encryptedKey, key, orgId) };
+  }
+  return { certificate: process.env.QZ_CERTIFICATE?.replace(/\\n/g, '\n') || '', privateKey: process.env.QZ_PRIVATE_KEY?.replace(/\\n/g, '\n') || '' };
+}
+
+app.get('/api/settings/printers/qz-certificate', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req);
+    const context = await requireAuth(req, app);
+    if (!context) return res.status(401).json({ error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'manage_settings')) return;
+    const material = await readQzSigningMaterial(app, String(context.orgUser.org_id));
+    res.set('Cache-Control', 'no-store');
+    res.json({ configured: !!(material.certificate && material.privateKey), uploadReady: !!qzEncryptionKey(), subject: material.subject || '', expires: material.expires || '' });
+  } catch (_) { res.status(500).json({ error: 'Could not read certificate settings. Check the server encryption secret.' }); }
+});
+
+app.put('/api/settings/printers/qz-certificate', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req);
+    const context = await requireAuth(req, app);
+    if (!context) return res.status(401).json({ error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'manage_settings')) return;
+    const key = qzEncryptionKey();
+    if (!key) return res.status(503).json({ error: 'Configure QZ_KEY_ENCRYPTION_SECRET on the backend before uploading certificate files.' });
+    let material;
+    try { material = validateQzCertificatePair(req.body?.certificate, req.body?.privateKey); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+    const orgId = String(context.orgUser.org_id);
+    const { privateKey, ...publicFields } = material;
+    const saved = { ...publicFields, encryptedKey: encryptQzPrivateKey(privateKey, key, orgId) };
+    await safeUpsertConfig(app, `org_${orgId}_qz_signing`, JSON.stringify(saved));
+    res.set('Cache-Control', 'no-store');
+    res.json({ configured: true, uploadReady: true, subject: saved.subject, expires: saved.expires });
+  } catch (_) { res.status(500).json({ error: 'Could not save certificate settings.' }); }
+});
+
+function qzSigningRequestAllowed(message, printers, now = Date.now()) {
+  if (typeof message !== 'string' || message.length > 512000) return false;
+  let request;
+  try { request = JSON.parse(message); } catch (_) { return false; }
+  if (!request || !Number.isFinite(request.timestamp) || Math.abs(now - request.timestamp) > 120000) return false;
+  if (request.call === 'printers.find') return !request.params?.query || typeof request.params.query === 'string';
+  if (request.call !== 'print') return false;
+  const params = request.params;
+  const selected = params?.printer?.name;
+  if (!printers.some((p) => p.enabled !== false && p.active !== false && p.transport === 'qz' && p.osPrinter === selected)) return false;
+  const copies = params.options?.copies ?? 1;
+  if (!Number.isInteger(copies) || copies < 1 || copies > 5) return false;
+  // Sign only our inline receipt documents, never raw commands, files, or device operations.
+  return Array.isArray(params.data) && params.data.length === 1 && params.data.every((part) =>
+    part.type === 'pixel' && part.format === 'html' && part.flavor === 'plain' &&
+    typeof part.data === 'string' && !/<\s*(script|iframe|object|embed|img|link|base)\b|\b(?:src|href)\s*=|url\s*\(/i.test(part.data));
+}
+
+app.get('/api/printing/qz/certificate', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req);
+    const context = await requireAuth(req, app);
+    if (!context) return res.status(401).json({ error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'sell')) return;
+    res.set('Cache-Control', 'no-store');
+    const material = await readQzSigningMaterial(app, String(context.orgUser.org_id));
+    res.json({ certificate: material.privateKey ? material.certificate : '' });
+  } catch (_) { res.status(500).json({ error: 'Could not load QZ configuration.' }); }
+});
+
+function createQzRequestSignature(message, privateKey) {
+  const crypto = require('crypto');
+  const digest = crypto.createHash('sha256').update(message, 'utf8').digest('hex');
+  return crypto.sign('RSA-SHA512', Buffer.from(digest, 'utf8'), privateKey).toString('base64');
+}
+
+app.post('/api/printing/qz/sign', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req);
+    const context = await requireAuth(req, app);
+    if (!context) return res.status(401).json({ error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'sell')) return;
+    const material = await readQzSigningMaterial(app, String(context.orgUser.org_id));
+    if (!material.certificate || !material.privateKey) return res.status(503).json({ error: 'QZ signing certificate is not configured.' });
+    const message = req.body?.message;
+    const printers = await getPrinters(app, String(context.orgUser.org_id));
+    if (!qzSigningRequestAllowed(message, printers)) return res.status(400).json({ error: 'Unsupported QZ printing request.' });
+    const signature = createQzRequestSignature(message, material.privateKey);
+    res.set('Cache-Control', 'no-store');
+    res.json({ signature });
+  } catch (_) { res.status(500).json({ error: 'Could not sign the print request.' }); }
+});
 
 function personalProfileKey(context) {
   const identity = JSON.stringify([String(context.orgUser.org_id), String(context.user.email).trim().toLowerCase()]);

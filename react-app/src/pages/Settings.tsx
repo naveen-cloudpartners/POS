@@ -1,4 +1,5 @@
 import PageIcon from '../components/ui/PageIcon';
+import QzCertificateSetup from '../components/settings/QzCertificateSetup';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Store, Mail, Link2, Unlink, Save, Percent, Boxes, HeartHandshake, ReceiptText, ShieldCheck, Bell, ImageOff, Banknote, Printer as PrinterIcon } from 'lucide-react';
@@ -38,6 +39,7 @@ import {
   savePrinters,
   savePrintRouting,
   discoverQzPrinters,
+  getQzCertificateStatus,
   sendPrintJob,
   type Printer,
   type PrintJob,
@@ -164,14 +166,23 @@ export default function Settings() {
 
   useEffect(load, []);
 
-  useEffect(() => {
-    if (!printers.some((printer) => printer.transport === 'qz')) return;
+  const refreshQzPrinters = () => {
+    setQzMessage('Connecting to QZ Tray…');
     discoverQzPrinters().then((result) => {
       setQzConnected(result.connected);
       setQzPrinters(result.printers);
       setQzMessage(result.error ?? '');
     });
-  }, [printers]);
+  };
+
+  useEffect(() => {
+    if (activeSection !== 'printers') return;
+    let live = true;
+    getQzCertificateStatus().then((status) => {
+      if (live && status.configured) refreshQzPrinters();
+    }).catch(() => undefined);
+    return () => { live = false; };
+  }, [activeSection]);
 
   // Keep the preview on the loaded/saved default until an operator chooses a
   // different profile. If a selected profile is removed, fall back to the
@@ -282,6 +293,10 @@ export default function Settings() {
   };
 
   const savePrintersForm = () => {
+    if (printers.some((p) => p.enabled && p.transport === 'qz' && !p.osPrinter?.trim())) {
+      setError('Select a detected printer for each enabled QZ printer before saving.');
+      return;
+    }
     setSaving(true);
     setSavingKey('printers');
     setNotice('');
@@ -302,7 +317,7 @@ export default function Settings() {
       return;
     }
     const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'printer'}-${Date.now().toString(36)}`;
-    const printer: Printer = { id, name: name.slice(0, 80), station: 'kitchen', width: 80, transport: 'browser', address: '', enabled: true };
+    const printer: Printer = { id, name: name.slice(0, 80), station: printers.some((p) => p.station === 'counter') ? 'kitchen' : 'counter', width: 80, transport: 'qz', address: '', enabled: true };
     setPrinters((prev) => [...prev, printer]);
     setNewPrinterName('');
     setError('');
@@ -386,7 +401,7 @@ export default function Settings() {
       }};
     sendPrintJob(job, p).then((result) => {
       if (!result.ok) setError(result.error ?? 'Test print failed.');
-      else setNotice(result.transport === 'qz' ? `Test chit sent silently to "${p.osPrinter}".` : `Test chit sent for "${p.name}" — pick the physical printer in the OS dialog.`);
+      else setNotice(result.transport === 'qz' ? `Test receipt sent to "${p.osPrinter}".` : `Test chit sent for "${p.name}" — pick the physical printer in the OS dialog.`);
     });
   };
 
@@ -1223,8 +1238,11 @@ export default function Settings() {
           action={<PrinterIcon size={18} aria-hidden="true" />}
           footer={saveBtn('printers', savePrintersForm)}
         >
+          {isAdmin && <QzCertificateSetup onSaved={() => { setQzConnected(false); setQzMessage('Certificate saved. Refresh printers to reconnect with signing.'); }} />}
+          <button type="button" className="ch-btn ch-btn-secondary ch-btn-sm" onClick={refreshQzPrinters}>Refresh detected printers</button>
+          <p className="ch-hint" role="status">{qzMessage || (qzConnected ? `QZ connected — ${qzPrinters.length} printers detected.` : 'Start QZ Tray, then refresh printers.')}</p>
           {printers.length === 0 ? (
-            <p className="ch-hint">No printers yet — add the counter printer first, then kitchen and bar. Unclaimed stations fall back to browser print.</p>
+            <p className="ch-hint">Add a counter printer, choose QZ Tray and select your receipt printer. Saved counter QZ printers print automatically after payment.</p>
           ) : (
             printers.map((p) => (
               <div className="ch-form-grid" key={p.id} style={{ marginBottom: 12 }}>
@@ -1281,9 +1299,9 @@ export default function Settings() {
                   </select>
                 </div>
                 <div className="ch-field">
-                  {p.transport === 'qz' && qzConnected ? (
+                  {p.transport === 'qz' ? (
                     <>
-                      <label className="ch-label" htmlFor={`pr-os-${p.id}`}>Windows printer</label>
+                      <label className="ch-label" htmlFor={`pr-os-${p.id}`}>Receipt / system printer</label>
                       <select
                         id={`pr-os-${p.id}`}
                         className="ch-select"
@@ -1292,6 +1310,7 @@ export default function Settings() {
                         disabled={!isAdmin}
                       >
                         <option value="">Select a detected printer…</option>
+                        {p.osPrinter && !qzPrinters.includes(p.osPrinter) && <option value={p.osPrinter}>{p.osPrinter} (saved)</option>}
                         {qzPrinters.map((name) => <option key={name} value={name}>{name}</option>)}
                       </select>
                     </>
@@ -1311,7 +1330,7 @@ export default function Settings() {
                   {p.transport === 'qz' && (
                     <p className="ch-hint" style={{ margin: '5px 0 0' }}>
                       {qzConnected
-                        ? `QZ connected — ${qzPrinters.length} Windows printer${qzPrinters.length === 1 ? '' : 's'} detected.`
+                        ? `QZ connected — ${qzPrinters.length} printer${qzPrinters.length === 1 ? '' : 's'} detected.`
                         : <><a href="https://qz.io/download/" target="_blank" rel="noreferrer">Install QZ Tray on this terminal</a>{qzMessage ? ` — ${qzMessage}` : ''}</>}
                     </p>
                   )}
@@ -1351,14 +1370,10 @@ export default function Settings() {
               ))
             )}
             <p className="ch-hint" style={{ marginTop: 8 }}>
-              Real printers work through this terminal: Browser print opens the OS dialog — pick the physical
-              printer there (or set it as default). The IP/queue address is only used by QZ Tray, print-bridge
-              or Cloud transports; the cloud backend can never reach LAN addresses like 192.168.x.x directly.
+              Select an enabled Counter printer with QZ Tray, then Save. Successful POS payments automatically send a bill to that printer. Configure the selected paper width in the printer driver too.
             </p>
             <p className="ch-hint">
-              QZ Tray connects locally over <code>wss://localhost</code>. Its standard unsigned mode prompts
-              this browser/terminal for approval; production terminals should install QZ Tray with the shop's
-              own certificate and allowlist this POS origin. No certificate or private key is stored by CloudHub POS.
+              QZ Tray must be running on this terminal. Fully silent printing requires a trusted QZ certificate configured on the server; otherwise QZ may ask for permission. Printer names must match on every terminal using these shared settings.
             </p>
           {isAdmin && (
             <div className="ch-form-grid" style={{ marginTop: 8 }}>

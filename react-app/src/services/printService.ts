@@ -62,7 +62,13 @@ export interface Printer {
 }
 
 type QzTray = {
-  websocket: { isActive: () => boolean; connect: () => Promise<void> };
+  api: { setSha256Type: (hasher: (message: string) => Promise<string>) => void };
+  security: {
+    setCertificatePromise: (handler: (resolve: (certificate: string) => void, reject: (error: unknown) => void) => void) => void;
+    setSignatureAlgorithm: (algorithm: string) => void;
+    setSignaturePromise: (handler: (message: string) => (resolve: (signature: string) => void, reject: (error: unknown) => void) => void) => void;
+  };
+  websocket: { isActive: () => boolean; connect: () => Promise<void>; disconnect: () => Promise<void> };
   printers: { find: () => Promise<string[]> };
   configs: { create: (printer: string, options?: Record<string, unknown>) => unknown };
   print: (config: unknown, data: Array<Record<string, unknown>>) => Promise<void>;
@@ -73,7 +79,16 @@ declare global { interface Window { qz?: QzTray; } }
 export type PrintDispatchResult = { ok: boolean; transport: 'qz' | 'browser'; error?: string };
 
 /** Load on demand so an offline CDN or absent QZ Tray never breaks browser printing. */
+let qzLoad: Promise<QzTray | null> | null = null;
+let qzConnect: Promise<void> | null = null;
+let signingSetup: Promise<void> | null = null;
+
 async function loadQzTray(): Promise<QzTray | null> {
+  if (!qzLoad) qzLoad = loadQzScript().then((qz) => { if (!qz) qzLoad = null; return qz; });
+  return qzLoad;
+}
+
+async function loadQzScript(): Promise<QzTray | null> {
   if (window.qz) return window.qz;
   const id = 'cloudhub-qz-tray-client';
   const existing = document.getElementById(id) as HTMLScriptElement | null;
@@ -86,7 +101,7 @@ async function loadQzTray(): Promise<QzTray | null> {
     }
     const script = document.createElement('script');
     script.id = id;
-    script.src = 'https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.js';
+    script.src = `${import.meta.env.BASE_URL}vendor/qz-tray/qz-tray.js`;
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => resolve();
@@ -95,15 +110,60 @@ async function loadQzTray(): Promise<QzTray | null> {
   return window.qz ?? null;
 }
 
+async function connectQz(qz: QzTray): Promise<void> {
+  if (!signingSetup) {
+    signingSetup = apiFetch<{ certificate: string }>('/printing/qz/certificate').then(({ certificate }) => {
+      qz.security.setCertificatePromise((resolve) => resolve(certificate));
+      if (certificate) {
+        const requests = new Map<string, string>();
+        // QZ passes a SHA-256 digest to its signature callback, not the JSON request.
+        // Keep the original so the backend can validate the action before signing.
+        qz.api.setSha256Type(async (message) => {
+          const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message));
+          const digest = Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
+          requests.set(digest, message);
+          if (requests.size > 32) requests.delete(requests.keys().next().value!);
+          return digest;
+        });
+        qz.security.setSignatureAlgorithm('SHA512');
+        qz.security.setSignaturePromise((digest) => (resolve, reject) => {
+          const message = requests.get(digest);
+          if (!message) { reject(new Error('QZ signing request was not captured. Reload the page and retry.')); return; }
+          apiFetch<{ signature: string }>('/printing/qz/sign', { method: 'POST', body: { message } })
+            .then(({ signature }) => resolve(signature)).catch(reject);
+        });
+      }
+    }).catch((error) => { signingSetup = null; throw error; });
+  }
+  await signingSetup;
+  if (qz.websocket.isActive()) return;
+  if (!qzConnect) qzConnect = qz.websocket.connect().finally(() => { qzConnect = null; });
+  await qzConnect;
+}
+
 export async function discoverQzPrinters(): Promise<{ connected: boolean; printers: string[]; error?: string }> {
   const qz = await loadQzTray();
   if (!qz) return { connected: false, printers: [], error: 'QZ Tray was not detected on this terminal.' };
   try {
-    if (!qz.websocket.isActive()) await qz.websocket.connect();
+    await connectQz(qz);
     return { connected: true, printers: await qz.printers.find() };
   } catch (error) {
     return { connected: false, printers: [], error: error instanceof Error ? error.message : 'Could not connect to QZ Tray.' };
   }
+}
+
+export interface QzCertificateStatus { configured: boolean; uploadReady: boolean; subject: string; expires: string }
+export const getQzCertificateStatus = () => apiFetch<QzCertificateStatus>('/settings/printers/qz-certificate');
+export async function saveQzCertificateFiles(certificate: File, privateKey: File) {
+  if (!certificate.size || !privateKey.size) throw new Error('One of the files is empty. Regenerate the QZ certificate files.');
+  if (certificate.size > 32000 || privateKey.size > 32000) throw new Error('Each file must be 32 KB or smaller.');
+  const result = await apiFetch<QzCertificateStatus>('/settings/printers/qz-certificate', {
+    method: 'PUT', body: { certificate: await certificate.text(), privateKey: await privateKey.text() },
+  });
+  signingSetup = null;
+  // The next discovery reconnects using the newly saved certificate.
+  if (window.qz?.websocket.isActive()) await window.qz.websocket.disconnect().catch(() => undefined);
+  return result;
 }
 
 function printHtmlForJob(job: PrintJob): string | null {
@@ -127,10 +187,14 @@ export async function sendPrintJob(job: PrintJob, printer: Printer | null): Prom
   if (printer?.transport === 'qz') {
     const qz = await loadQzTray();
     const osPrinter = String(printer.osPrinter || '').trim();
+    if (!qz) return { ok: false, transport: 'qz', error: 'Start QZ Tray on this terminal, then retry printing.' };
+    if (!osPrinter) return { ok: false, transport: 'qz', error: 'Select a detected receipt printer in Admin Settings → Printers.' };
     if (qz && osPrinter !== '') {
       try {
-        if (!qz.websocket.isActive()) await qz.websocket.connect();
-        await qz.print(qz.configs.create(osPrinter, { rasterize: true }), [{ type: 'html', format: 'plain', data: html }]);
+        await connectQz(qz);
+        const width = printer.width === 58 ? 58 : 80;
+        const document = `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:2mm;width:${width - 8}mm;box-sizing:border-box}table{table-layout:fixed}td{overflow-wrap:break-word}p{margin:8px 0}</style></head><body>${html}</body></html>`;
+        await qz.print(qz.configs.create(osPrinter, { rasterize: true, copies: Math.max(1, Math.min(5, job.copies || 1)), jobName: job.jobId, margins: 0 }), [{ type: 'pixel', format: 'html', flavor: 'plain', data: document, options: { pageWidth: width / 25.4 } }]);
         return { ok: true, transport: 'qz' };
       } catch (error) {
         return { ok: false, transport: 'qz', error: error instanceof Error ? error.message : 'QZ Tray print failed.' };
