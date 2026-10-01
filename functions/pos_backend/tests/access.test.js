@@ -64,8 +64,9 @@ describe('private transaction history and customer lookup', () => {
 });
 
 describe('live roster authority', () => {
-  const resolveFactory = new Function('findRosterUser', 'safeZcql', 'sanitizeZcql', 'normWhRole',
+  const rawResolveFactory = new Function('findRosterUser', 'safeZcql', 'sanitizeZcql', 'normWhRole', 'catalyst',
     `async ${extractSource('function resolveCurrentOrgUser(')}; return resolveCurrentOrgUser;`);
+  const resolveFactory = (...args) => rawResolveFactory(...args, { initialize: () => app });
   const normalize = (role) => role === 'master_admin' ? 'Admin' : String(role || '');
   const app = { userManagement: () => ({ getCurrentUser: async () => ({ email_id: 'staff@example.com', user_id: '123' }) }) };
   it('applies role changes immediately even when OrgUsers sync is stale', async () => {

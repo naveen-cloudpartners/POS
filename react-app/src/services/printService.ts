@@ -83,6 +83,11 @@ let qzLoad: Promise<QzTray | null> | null = null;
 let qzConnect: Promise<void> | null = null;
 let signingSetup: Promise<void> | null = null;
 
+export async function resetPrinterSession() {
+  signingSetup = null;
+  if (window.qz?.websocket.isActive()) await window.qz.websocket.disconnect().catch(() => undefined);
+}
+
 async function loadQzTray(): Promise<QzTray | null> {
   if (!qzLoad) qzLoad = loadQzScript().then((qz) => { if (!qz) qzLoad = null; return qz; });
   return qzLoad;
@@ -225,6 +230,20 @@ export interface KotEntry {
 export async function getPrinters(): Promise<Array<Printer>> {
   const res = await apiFetch<{ success: boolean; printers?: Array<Printer> }>('/settings/printers');
   return res.printers ?? [];
+}
+
+/** Always resolve the current company's saved printer, including after a login switch. */
+export async function sendCompanyPrintJob(job: PrintJob, automatic = false): Promise<PrintDispatchResult> {
+  try {
+    const printers = await getPrinters();
+    const printer = printers.find((p) => p.enabled && p.id === job.printerId)
+      ?? printers.find((p) => p.enabled && p.station === job.station);
+    if (!printer) return { ok: false, transport: 'qz', error: `No enabled ${job.station} printer is configured. Ask Admin to save a printer.` };
+    if (automatic && printer.transport !== 'qz') return { ok: true, transport: 'browser' };
+    return await sendPrintJob(job, printer);
+  } catch (error) {
+    return { ok: false, transport: 'qz', error: error instanceof Error ? error.message : 'Could not load the company printer.' };
+  }
 }
 
 export async function savePrinters(printers: Array<Printer>): Promise<Array<Printer>> {

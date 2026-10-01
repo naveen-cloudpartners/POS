@@ -635,6 +635,9 @@ async function resolveCurrentOrgUser(req, catalystApp) {
   user.email = userEmail;
   user.user_id = userId;
 
+  // Authenticate with user credentials first; resolve only this identity's server-owned membership records.
+  catalystApp = catalyst.initialize(req, { scope: 'admin' });
+
   // The roster is authoritative on every request, including role demotions.
   const roster = await findRosterUser(catalystApp, userEmail.toLowerCase());
   if (roster && ['inactive', 'deleted'].includes(String(roster.data.status || '').toLowerCase())) return null;
@@ -730,7 +733,7 @@ async function resolveCurrentOrgUser(req, catalystApp) {
   // Fallback mode if tables don't exist or user is not mapped yet.
   // We check Configurations to see if they are already considered onboarded.
   // This maintains absolute compatibility during table migration.
-  const fallbackOrgId = 'org_default';
+  const fallbackOrgId = String(roster?.data?.org_id || 'org_default');
   const virtualOrgUser = {
     org_id: fallbackOrgId,
     user_id: user.user_id,
@@ -9299,7 +9302,7 @@ function apiPermission(method, path) {
   if (!path.startsWith('/api/')) return null;
   if (['/api/health', '/api/auth/me', '/api/setup/status', '/api/auth/status', '/api/auth/callback', '/api/organizations/register', '/api/admin/approve-org', '/api/admin/reject-org'].includes(path)) return null;
   if (path === '/api/profile/me' || path === '/api/profile/me/photo') return 'manage_profile';
-  if (path === '/api/printing/qz/certificate' || path === '/api/printing/qz/sign') return 'sell';
+  if (path === '/api/printing/qz/certificate' || path === '/api/printing/qz/sign') return 'signed_in';
   if (/^\/api\/(admin\/users|users)(\/|$)/.test(path)) return 'manage_users';
   if (path.startsWith('/api/admin/audit')) return 'manage_users';
   if (path.startsWith('/api/reports/') || path === '/api/dashboard/summary') return 'view_reports';
@@ -10099,6 +10102,7 @@ async function handleInviteUser(req, res) {
     const actorEmail = String(orgUserContext.user.email || orgUserContext.user.email_id || '');
     const record = {
       email: cleanEmail,
+      org_id: callerOrgId,
       name: String(name || '').trim() || cleanEmail.split('@')[0],
       role: wantRole,
       permissions: getRolePermissions(wantRole),
@@ -11125,6 +11129,11 @@ async function getIntegrationHealth(catalystApp, orgUserContext) {
 
 /* ---------------- Personal staff profiles (self-service only) ---------------- */
 
+function printerSettingsApp(req, context) {
+  if (!context?.user || !context?.orgUser?.org_id || !roleCan(callerRole(context), 'signed_in')) throw new Error('Printer access requires an active company member.');
+  return catalyst.initialize(req, { scope: 'admin' });
+}
+
 function qzEncryptionKey() {
   const value = String(process.env.QZ_KEY_ENCRYPTION_SECRET || '').trim();
   return /^[a-f0-9]{64}$/i.test(value) ? Buffer.from(value, 'hex') : null;
@@ -11176,7 +11185,7 @@ app.get('/api/settings/printers/qz-certificate', async (req, res) => {
     const context = await requireAuth(req, app);
     if (!context) return res.status(401).json({ error: 'Not authenticated' });
     if (!requirePermission(context, res, 'manage_settings')) return;
-    const material = await readQzSigningMaterial(app, String(context.orgUser.org_id));
+    const material = await readQzSigningMaterial(printerSettingsApp(req, context), String(context.orgUser.org_id));
     res.set('Cache-Control', 'no-store');
     res.json({ configured: !!(material.certificate && material.privateKey), uploadReady: !!qzEncryptionKey(), subject: material.subject || '', expires: material.expires || '' });
   } catch (_) { res.status(500).json({ error: 'Could not read certificate settings. Check the server encryption secret.' }); }
@@ -11196,7 +11205,7 @@ app.put('/api/settings/printers/qz-certificate', async (req, res) => {
     const orgId = String(context.orgUser.org_id);
     const { privateKey, ...publicFields } = material;
     const saved = { ...publicFields, encryptedKey: encryptQzPrivateKey(privateKey, key, orgId) };
-    await safeUpsertConfig(app, `org_${orgId}_qz_signing`, JSON.stringify(saved));
+    await safeUpsertConfig(printerSettingsApp(req, context), `org_${orgId}_qz_signing`, JSON.stringify(saved));
     res.set('Cache-Control', 'no-store');
     res.json({ configured: true, uploadReady: true, subject: saved.subject, expires: saved.expires });
   } catch (_) { res.status(500).json({ error: 'Could not save certificate settings.' }); }
@@ -11225,9 +11234,9 @@ app.get('/api/printing/qz/certificate', async (req, res) => {
     const app = catalyst.initialize(req);
     const context = await requireAuth(req, app);
     if (!context) return res.status(401).json({ error: 'Not authenticated' });
-    if (!requirePermission(context, res, 'sell')) return;
+    if (!requirePermission(context, res, 'signed_in')) return;
     res.set('Cache-Control', 'no-store');
-    const material = await readQzSigningMaterial(app, String(context.orgUser.org_id));
+    const material = await readQzSigningMaterial(printerSettingsApp(req, context), String(context.orgUser.org_id));
     res.json({ certificate: material.privateKey ? material.certificate : '' });
   } catch (_) { res.status(500).json({ error: 'Could not load QZ configuration.' }); }
 });
@@ -11243,11 +11252,11 @@ app.post('/api/printing/qz/sign', async (req, res) => {
     const app = catalyst.initialize(req);
     const context = await requireAuth(req, app);
     if (!context) return res.status(401).json({ error: 'Not authenticated' });
-    if (!requirePermission(context, res, 'sell')) return;
-    const material = await readQzSigningMaterial(app, String(context.orgUser.org_id));
+    if (!requirePermission(context, res, 'signed_in')) return;
+    const material = await readQzSigningMaterial(printerSettingsApp(req, context), String(context.orgUser.org_id));
     if (!material.certificate || !material.privateKey) return res.status(503).json({ error: 'QZ signing certificate is not configured.' });
     const message = req.body?.message;
-    const printers = await getPrinters(app, String(context.orgUser.org_id));
+    const printers = await getPrinters(printerSettingsApp(req, context), String(context.orgUser.org_id));
     if (!qzSigningRequestAllowed(message, printers)) return res.status(400).json({ error: 'Unsupported QZ printing request.' });
     const signature = createQzRequestSignature(message, material.privateKey);
     res.set('Cache-Control', 'no-store');
@@ -12233,7 +12242,9 @@ function normPrintStation(v, dflt) {
 
 async function getPrinters(catalystApp, orgId) {
   try {
-    const raw = await new ZohoBooksService(catalystApp, null).getConfig(`org_${orgId}_setting_printers`);
+    const key = sanitizeZcql(`org_${orgId}_setting_printers`);
+    const rows = await safeZcql(catalystApp, `SELECT config_value FROM Configurations WHERE config_key = '${key}' LIMIT 1`);
+    const raw = rows?.[0]?.Configurations?.config_value;
     if (raw === undefined || raw === null || String(raw) === '') return [];
     const parsed = JSON.parse(String(raw));
     if (!Array.isArray(parsed)) return [];
@@ -12254,7 +12265,7 @@ async function getPrinters(catalystApp, orgId) {
       enabled: p.active !== false && p.enabled !== false,
     })).slice(0, 20);
   } catch (e) {
-    return [];
+    throw new Error(`Could not read company printers: ${extractSdkMessage(e)}`);
   }
 }
 
@@ -12541,7 +12552,7 @@ app.get('/api/settings/printers', async (req, res) => {
     const orgUserContext = await getCurrentOrgUser(req, catalystApp);
     if (!orgUserContext) return res.status(401).json({ success: false, error: 'Not authenticated' });
     const orgId = String(orgUserContext.orgUser.org_id || '');
-    res.status(200).json({ success: true, printers: await getPrinters(catalystApp, orgId) });
+    res.status(200).json({ success: true, printers: await getPrinters(printerSettingsApp(req, orgUserContext), orgId) });
   } catch (error) {
     console.error('Error reading printers:', error.message);
     res.status(500).json({ success: false, error: error.message });
@@ -12555,7 +12566,7 @@ app.put('/api/settings/printers', async (req, res) => {
     if (!orgUserContext) return res.status(401).json({ success: false, error: 'Not authenticated' });
     if (!requirePermission(orgUserContext, res, 'manage_settings', 'Printers require Admin.')) return;
     const orgId = String(orgUserContext.orgUser.org_id || '');
-    const result = await savePrinters(catalystApp, orgId, (req.body || {}).printers);
+    const result = await savePrinters(printerSettingsApp(req, orgUserContext), orgId, (req.body || {}).printers);
     if (result.error) return res.status(400).json({ success: false, error: result.error });
     try {
       await logAuditLog(catalystApp, kotAuditPayload(orgUserContext, 'SETTINGS_CHANGED', '', `printers (${result.printers.length})`));

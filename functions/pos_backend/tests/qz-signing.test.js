@@ -21,9 +21,14 @@ describe('QZ request signing scope', () => {
       assert.equal(allowed({ ...request, params: { ...request.params, data: [part] } }), false);
     }
   });
-  it('limits signing to POS roles', () => {
-    for (const role of ['Admin', 'Manager', 'Cashier']) assert.equal(roleCan(role, apiPermission('POST', '/api/printing/qz/sign')), true);
-    assert.equal(roleCan('Storekeeper', apiPermission('POST', '/api/printing/qz/sign')), false);
+  it('allows all active staff to use shared printers but only Admin to configure them', () => {
+    for (const role of ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef']) {
+      assert.equal(roleCan(role, apiPermission('POST', '/api/printing/qz/sign')), true);
+      assert.equal(roleCan(role, apiPermission('GET', '/api/printing/qz/certificate')), true);
+      assert.equal(roleCan(role, apiPermission('GET', '/api/settings/printers')), true);
+      assert.equal(roleCan(role, apiPermission('PUT', '/api/settings/printers')), role === 'Admin');
+    }
+    assert.equal(roleCan('', apiPermission('POST', '/api/printing/qz/sign')), false);
     for (const role of ['Manager', 'Cashier', 'Storekeeper']) assert.equal(roleCan(role, apiPermission('PUT', '/api/settings/printers/qz-certificate')), false);
     assert.equal(roleCan('Admin', apiPermission('PUT', '/api/settings/printers/qz-certificate')), true);
   });

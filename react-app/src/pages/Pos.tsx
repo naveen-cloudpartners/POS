@@ -11,7 +11,7 @@ import { getProducts } from '../services/productService';
 import { checkout, sendReceiptEmail, voidOrder, type PosReceipt } from '../services/orderService';
 import { getCustomers } from '../services/customerService';
 import { getPaymentMethods, getSettings, getSmtpStatus, getTaxSettings, type TaxSettings } from '../services/settingsService';
-import { getPrinters, sendPrintJob, type KotJobPayload, type Printer as PrinterConfig, type PrintJob } from '../services/printService';
+import { sendCompanyPrintJob, type KotJobPayload, type PrintJob } from '../services/printService';
 import { useAuth } from '../context/AuthContext';
 import { currency, number, isLowStock, isOutOfStock } from '../utils/format';
 import { calcTotals, type TaxOpts } from '../utils/tax';
@@ -82,10 +82,6 @@ export default function Pos() {
     : taxSettings.profiles[Number(taxSelection)]?.rate ?? taxSettings.default_rate;
   // SET-05: tender methods offered follow Settings → Payment methods.
   const [tenderModes, setTenderModes] = useState<Array<PayMode>>(['Cash', 'Card', 'Bank']);
-  // Preloaded once: print dispatch below must resolve the printer
-  // synchronously from the click handler so the browser-popup path keeps the
-  // user gesture (an await before window.open gets popup-blocked).
-  const [terminalPrinters, setTerminalPrinters] = useState<Array<PrinterConfig>>([]);
 
   const load = () => {
     setLoading(true);
@@ -118,7 +114,6 @@ export default function Pos() {
       })
       .catch(() => undefined);
     getSmtpStatus().then((s) => setSmtpReady(s.configured)).catch(() => undefined);
-    getPrinters().then(setTerminalPrinters).catch(() => undefined);
   };
 
   useEffect(load, []);
@@ -295,16 +290,12 @@ export default function Pos() {
           setShowReceipt(true);
           setEmailMsg(res.email_sent === true ? 'Receipt emailed.' : '');
           setPrintJobs(Array.isArray(res.print_jobs) ? res.print_jobs.filter((j) => j.template !== 'bill') : []);
-          const printer = terminalPrinters.find((p) => p.station === 'counter' && p.enabled);
-          if (printer?.transport === 'qz') {
-            const bill: PrintJob = { jobId: `bill-${r.orderId}`, template: 'bill', station: 'counter', printerId: printer.id, printerName: printer.name, copies: 1, payload: { receipt: r } };
-            setReceiptPrinting(true);
-            setPrintMessage('Sending receipt to printer…');
-            void sendPrintJob(bill, printer).then((result) => {
-              setPrintMessage(result.ok ? 'Receipt sent to printer.' : `Sale completed. Receipt was not printed: ${result.error} Use Print to retry.`);
-            }).catch(() => setPrintMessage('Sale completed. Receipt was not printed. Use Print to retry.'))
-              .finally(() => setReceiptPrinting(false));
-          }
+          const bill: PrintJob = { jobId: `bill-${r.orderId}`, template: 'bill', station: 'counter', printerId: null, printerName: 'Counter', copies: 1, payload: { receipt: r } };
+          setReceiptPrinting(true);
+          setPrintMessage('Sending receipt to printer…');
+          void sendCompanyPrintJob(bill, true).then((result) => {
+            setPrintMessage(result.ok ? (result.transport === 'qz' ? 'Receipt sent to printer.' : 'Use Print to print this receipt.') : `Sale completed. Receipt was not printed: ${result.error} Use Print to retry.`);
+          }).finally(() => setReceiptPrinting(false));
         }
         setMessage({ kind: 'ok', text: res.message ?? 'Sale completed.' });
         setCart([]);
@@ -387,21 +378,15 @@ export default function Pos() {
   };
 
   const dispatchPrintJob = (job: PrintJob) => {
-    const printer = terminalPrinters.find((p) => p.id === job.printerId)
-      ?? terminalPrinters.find((p) => p.station === job.station && p.enabled)
-      ?? null;
-    // No await before sendPrintJob's browser path: window.open still runs in
-    // this click task. QZ jobs go async silently (no popup involved).
-    sendPrintJob(job, printer)
+    void sendCompanyPrintJob(job)
       .then((result) => { if (!result.ok) setError(result.error ?? 'Print failed.'); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Print failed.'));
   };
 
   const printReceipt = () => {
     if (receipt === null || receiptPrinting) return;
-    const printer = terminalPrinters.find((p) => p.station === 'counter' && p.enabled) ?? null;
     setReceiptPrinting(true);
-    void sendPrintJob({ jobId: `bill-${receipt.orderId}`, template: 'bill', station: 'counter', printerId: printer?.id ?? null, printerName: printer?.name ?? 'Counter (default)', copies: 1, payload: { receipt } }, printer)
+    void sendCompanyPrintJob({ jobId: `bill-${receipt.orderId}`, template: 'bill', station: 'counter', printerId: null, printerName: 'Counter', copies: 1, payload: { receipt } })
       .then((result) => setPrintMessage(result.ok ? 'Receipt sent to printer.' : result.error ?? 'Print failed.'))
       .catch(() => setPrintMessage('Print failed. Please retry.'))
       .finally(() => setReceiptPrinting(false));

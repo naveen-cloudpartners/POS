@@ -11,7 +11,7 @@ In Admin Settings → Printers:
 
 Successful POS checkout automatically submits one bill to the first enabled counter QZ printer. Browser printers continue to use manual Print. A QZ failure never opens browser printing or reverses a completed sale. The receipt shows the failure and offers Print to retry. A successful submission means the spooler accepted the job; it does not prove paper was physically printed.
 
-Printer settings are shared within the company. Use matching OS queue names across terminals. QZ must be installed and running on every terminal. Changing terminal/printer settings requires reloading an already open POS page.
+Printer settings are shared within the company. Cashiers and other active staff use the Admin-saved printer and certificate; they cannot edit the setup. Server reads authenticate the user and resolve the company before reading shared configuration with server credentials. POS bills and Orders reprints fetch the current registry at print time, so changes do not require a page reload. Use matching OS queue names across terminals. QZ must be installed and running on every terminal.
 
 ## Removing QZ permission prompts
 

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function fixture(fail = false, signed = false) {
+function fixture(fail = false, signed = false, printers = []) {
   const calls = [];
   let hasher, signatureHandler;
   const signRequest = async (call, params) => {
@@ -28,6 +28,7 @@ function fixture(fail = false, signed = false) {
   vm.runInNewContext(compiled, {
     exports, window: { qz }, crypto: require('node:crypto').webcrypto, TextEncoder,
     require: (name) => name === './api' ? { apiFetch: async (path, options) => {
+      if (path === '/settings/printers') return { printers };
       if (path.endsWith('/sign')) {
         const request = JSON.parse(options.body.message);
         calls.push({ signing: request });
@@ -42,7 +43,7 @@ function fixture(fail = false, signed = false) {
   return { service: exports, calls };
 }
 const printer = { id: 'counter', enabled: true, station: 'counter', width: 58, transport: 'qz', osPrinter: 'Receipt' };
-const job = { jobId: 'bill-123', template: 'bill', copies: 1, payload: { receipt: {} } };
+const job = { jobId: 'bill-123', template: 'bill', station: 'counter', copies: 1, payload: { receipt: {} } };
 
 test('QZ receipts use pixel HTML, chosen printer, width and copies without browser popup', async () => {
   const { service, calls } = fixture();
@@ -76,4 +77,19 @@ test('signed discovery and receipt printing send validated JSON rather than the 
   assert.equal((await service.discoverQzPrinters()).connected, true);
   assert.equal((await service.sendPrintJob(job, printer)).ok, true);
   assert.deepEqual(calls.filter((call) => call.signing).map((call) => call.signing.call), ['printers.find', 'print']);
+});
+test('staff printing resolves the latest shared printer rather than a stale page snapshot', async () => {
+  const registry = [{ ...printer }];
+  const { service, calls } = fixture(false, true, registry);
+  assert.equal((await service.sendCompanyPrintJob(job, true)).ok, true);
+  registry[0] = { ...printer, osPrinter: 'Updated receipt printer' };
+  assert.equal((await service.sendCompanyPrintJob(job, true)).ok, true);
+  assert.equal(calls.filter((call) => call.config).at(-1).config.name, 'Updated receipt printer');
+});
+test('missing company printers produce an actionable error without a browser popup', async () => {
+  const { service, calls } = fixture();
+  const result = await service.sendCompanyPrintJob(job);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /Admin/);
+  assert.equal(calls.includes('browser'), false);
 });

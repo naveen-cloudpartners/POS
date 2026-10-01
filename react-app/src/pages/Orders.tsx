@@ -13,7 +13,7 @@ import ErrorState from '../components/ui/ErrorState';
 import EmptyState from '../components/ui/EmptyState';
 import { useAuth } from '../context/AuthContext';
 import { exportOrdersCsv, getOrderDetail, getOrders, voidOrder } from '../services/orderService';
-import { fetchPrintJob, getPrinters, sendPrintJob, type Printer as PrinterConfig, type PrintJob, type PrintTemplate } from '../services/printService';
+import { fetchPrintJob, sendCompanyPrintJob, type PrintJob, type PrintTemplate } from '../services/printService';
 import { getCustomers } from '../services/customerService';
 import { getUsers } from '../services/userService';
 import { currency, formatDate, number } from '../utils/format';
@@ -128,7 +128,6 @@ export default function Orders() {
   useEffect(() => {
     getCustomers().catch(() => [] as Array<Customer>).then(setCustomers).catch(() => undefined);
     getUsers().then(setUsers).catch(() => setUsers([]));
-    getPrinters().then(setTerminalPrinters).catch(() => undefined);
   }, []);
 
   // Stay in sync with workspace deep links (e.g. pipeline → ?status=synced).
@@ -191,7 +190,6 @@ export default function Orders() {
   // Preloaded printer list: reprint payloads arrive async (fetchPrintJob),
   // so resolving the printer from state keeps the browser-popup path as
   // close to the click as possible instead of adding another await.
-  const [terminalPrinters, setTerminalPrinters] = useState<Array<PrinterConfig>>([]);
 
   const reprint = (orderId: string, template: PrintTemplate) => {
     setPrintBusy(true);
@@ -204,8 +202,7 @@ export default function Orders() {
           jobId: res.jobId, template, station, printerId: null, printerName: `${station} (default)`, copies: 1,
           payload: template === 'bill' ? { receipt: p.receipt } : p as PrintJob['payload'],
         };
-        getPrinters().then(setTerminalPrinters).catch(() => undefined);
-        sendPrintJob(job, terminalPrinters.find((printer) => printer.station === station && printer.enabled) ?? null)
+        return sendCompanyPrintJob(job)
           .then((result) => { if (!result.ok) setError(result.error ?? 'Reprint failed.'); })
           .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Reprint failed'));
       })

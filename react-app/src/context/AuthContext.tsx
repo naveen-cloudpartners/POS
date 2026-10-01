@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { fetchBackendSession, type SessionUser } from '../services/catalystAuth';
 import { normalizeRole, type AppRole } from '../services/authService';
+import { resetPrinterSession } from '../services/printService';
 
 interface AuthState {
   user: SessionUser | null;
@@ -18,6 +19,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole>('');
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
+
+  useEffect(() => { void resetPrinterSession(); }, [email]);
 
   useEffect(() => {
     let live = true;
