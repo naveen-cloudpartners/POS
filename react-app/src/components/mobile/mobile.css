@@ -1,4 +1,4 @@
-/* CloudHub POS — Mobile Access Screen (dashboard design language) */
+/* Muster POS — Mobile Access Screen (dashboard design language) */
 
 .mob-page {
   position: relative;
@@ -8,10 +8,10 @@
   justify-content: center;
   padding: 24px 16px;
   background:
-    radial-gradient(700px 380px at 12% -8%, rgba(93, 142, 249, 0.16), transparent 60%),
-    radial-gradient(640px 360px at 88% 6%, rgba(58, 118, 248, 0.12), transparent 60%),
+    radial-gradient(700px 380px at 12% -8%, rgba(55, 65, 81, 0.16), transparent 60%),
+    radial-gradient(640px 360px at 88% 6%, rgba(55, 65, 81, 0.12), transparent 60%),
     radial-gradient(600px 420px at 50% 110%, rgba(34, 179, 120, 0.08), transparent 60%),
-    #f5f7fc;
+    #f8fafb;
   overflow: clip;
   animation: mobIn 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -23,8 +23,8 @@
 
 .mob-blobs { position: absolute; inset: 0; pointer-events: none; }
 .mob-blobs span { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.55; }
-.mob-blobs .b1 { width: 420px; height: 420px; left: -140px; top: -120px; background: radial-gradient(circle, rgba(93,142,249,0.35), transparent 70%); }
-.mob-blobs .b2 { width: 380px; height: 380px; right: -120px; top: 10%; background: radial-gradient(circle, rgba(58,118,248,0.28), transparent 70%); }
+.mob-blobs .b1 { width: 420px; height: 420px; left: -140px; top: -120px; background: radial-gradient(circle, rgba(55, 65, 81,0.35), transparent 70%); }
+.mob-blobs .b2 { width: 380px; height: 380px; right: -120px; top: 10%; background: radial-gradient(circle, rgba(55, 65, 81,0.28), transparent 70%); }
 .mob-blobs .b3 { width: 480px; height: 320px; left: 30%; bottom: -160px; background: radial-gradient(circle, rgba(34,179,120,0.16), transparent 70%); }
 
 .mob-card {
@@ -33,7 +33,7 @@
   max-width: 460px;
   text-align: center;
   background: #fff;
-  border: 1px solid #e6eaf3;
+  border: 1px solid #e5e7eb;
   border-radius: 16px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
   padding: clamp(1.75rem, 5vw, 2.5rem) clamp(1.25rem, 5vw, 2rem);
@@ -45,11 +45,11 @@
 .mob-logo {
   width: 56px; height: 56px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #5d8ef9, #3a76f8);
+  background: linear-gradient(135deg, #374151, #374151);
   color: #fff;
   display: inline-flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 26px;
-  box-shadow: 0 10px 26px rgba(58, 118, 248, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 26px rgba(55, 65, 81, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   margin-bottom: 1rem;
 }
 
@@ -57,20 +57,20 @@
   margin: 0 0 0.35rem;
   font-size: 0.7rem; font-weight: 700;
   letter-spacing: 0.14em; text-transform: uppercase;
-  color: #3a76f8;
+  color: #374151;
 }
 
 .mob-title {
   margin: 0 0 0.6rem;
   font-size: clamp(1.4rem, 5.5vw, 1.75rem);
   font-weight: 700; letter-spacing: -0.025em;
-  color: #0f1b33;
+  color: #20252b;
 }
 
 .mob-sub {
   margin: 0 0 1.5rem;
   font-size: 0.9rem; line-height: 1.6;
-  color: #5b6b87; font-weight: 500;
+  color: #7b8185; font-weight: 500;
   max-width: 36ch;
 }
 
@@ -87,21 +87,21 @@
 
 .mob-btn-primary {
   color: #fff;
-  background: linear-gradient(135deg, #5d8ef9, #3a76f8);
+  background: linear-gradient(135deg, #374151, #374151);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 6px 18px rgba(58, 118, 248, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 18px rgba(55, 65, 81, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.mob-btn-primary:hover { transform: translateY(-1px); filter: brightness(1.04); box-shadow: 0 10px 26px rgba(58, 118, 248, 0.42); }
+.mob-btn-primary:hover { transform: translateY(-1px); filter: brightness(1.04); box-shadow: 0 10px 26px rgba(55, 65, 81, 0.42); }
 
 .mob-btn-secondary {
-  color: #0f1b33;
+  color: #20252b;
   background: #fff;
-  border: 1px solid #e6eaf3;
+  border: 1px solid #e5e7eb;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
 }
 
-.mob-btn-secondary:hover { transform: translateY(-1px); border-color: #5d8ef9; color: #3a76f8; }
+.mob-btn-secondary:hover { transform: translateY(-1px); border-color: #374151; color: #374151; }
 
 .mob-features {
   list-style: none;
@@ -113,19 +113,19 @@
 
 .mob-features li {
   display: flex; align-items: center; gap: 0.6rem;
-  font-size: 0.83rem; font-weight: 700; color: #243354;
-  background: #f5f7fc;
+  font-size: 0.83rem; font-weight: 700; color: #20252b;
+  background: #f8fafb;
   border: 1px solid rgba(230, 234, 243, 0.9);
   border-radius: 11px;
   padding: 0.55rem 0.8rem;
   text-align: left;
 }
 
-.mob-features svg { color: #3a76f8; flex-shrink: 0; }
+.mob-features svg { color: #374151; flex-shrink: 0; }
 
 .mob-page a:focus-visible,
 .mob-page button:focus-visible {
-  outline: 2px solid #3a76f8;
+  outline: 2px solid #374151;
   outline-offset: 3px;
 }
 

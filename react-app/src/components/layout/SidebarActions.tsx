@@ -5,7 +5,6 @@ import { Bell } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { logout } from '../../services/catalystAuth';
 import { profilePhotoUrl } from '../../services/profileService';
-import { companyLogoUrl, getCompanyProfile } from '../../services/settingsService';
 
 export default function SidebarActions({ settingsControl }: { settingsControl?: ReactNode }) {
   const { user, role } = useAuth();
@@ -19,15 +18,7 @@ export default function SidebarActions({ settingsControl }: { settingsControl?: 
   const initial = (user?.name ?? user?.email ?? 'U').trim().charAt(0).toUpperCase() || 'U';
 
   useEffect(() => {
-    let live = true;
-    if (role !== 'Admin') {
-      setLogoSrc(user?.avatarVersion ? profilePhotoUrl(user.avatarVersion) : '');
-      return;
-    }
-    getCompanyProfile().then((company) => {
-      if (live) setLogoSrc(company.logo_file_id ? companyLogoUrl() : company.logo_url || '');
-    }).catch(() => { if (live) setLogoSrc(''); });
-    return () => { live = false; };
+    setLogoSrc(user?.avatarVersion ? profilePhotoUrl(user.avatarVersion) : '');
   }, [location.pathname, location.hash, role, user?.avatarVersion]);
 
   useEffect(() => {
@@ -65,14 +56,11 @@ export default function SidebarActions({ settingsControl }: { settingsControl?: 
             onClick={() => { setNotifOpen((v) => !v);  setUserOpen(false); }}
           >
             <Bell size={17} />
-            <span className="ch-dot" aria-hidden="true" />
           </button>
           {notifOpen && (
             <div className="ch-notif-pop" role="menu" aria-label="Notifications">
-              <div className="ch-notif-head">Notifications <span className="ch-badge ch-badge-info">3 new</span></div>
-              <div className="ch-notif-item"><span className="ch-thumb" style={{ width: 36, height: 36 }}>◈</span><span><b>Sales sync complete</b><span>Orders and inventory are up to date.</span></span></div>
-              <div className="ch-notif-item"><span className="ch-thumb" style={{ width: 36, height: 36, background: 'var(--ch-warning-bg)', color: 'var(--ch-warning-ink)' }}>!</span><span><b>Low-stock review</b><span>Check Inventory for items under 10 units.</span></span></div>
-              <div className="ch-notif-item"><span className="ch-thumb" style={{ width: 36, height: 36, background: 'var(--ch-success-bg)', color: 'var(--ch-success-ink)' }}>✓</span><span><b>Store is live</b><span>POS is ready to take sales.</span></span></div>
+              <div className="ch-notif-head">Notifications</div>
+              <div className="ch-notif-item"><span><b>No notifications</b><span>You have no new notifications to review.</span></span></div>
             </div>
           )}
         </div>

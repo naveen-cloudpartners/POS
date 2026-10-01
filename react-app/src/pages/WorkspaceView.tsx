@@ -62,7 +62,7 @@ import Returns from './Returns';
 import './WorkspaceView.css';
 
 /* ==========================================================================
-   CloudHub POS — Enterprise sub-module workspace views.
+   Muster POS — Enterprise sub-module workspace views.
    Every view derives from LIVE service data (products / orders / customers /
    users). No fabricated metrics: empty domains render honest empty states.
    ========================================================================== */
@@ -564,9 +564,9 @@ function KitchenView() {
       {notice !== '' && <div className="ch-alert ch-alert-success">{notice}</div>}
       {error !== '' && <div className="ch-alert ch-alert-error">{error}</div>}
       <div className="ch-grid-stats">
-        <StatCard label="Fired" value={number(counts.fired)} icon={<ChefHat size={20} />} iconBg="#fef1e1" iconColor="#b25a09" delay={40} />
-        <StatCard label="In progress" value={number(counts.acked)} icon={<ClipboardCheck size={20} />} iconBg="#e9f0fe" iconColor="#2b5fe3" delay={100} />
-        <StatCard label="Done" value={number(counts.done)} icon={<CheckCircle2 size={20} />} iconBg="#e3f6ec" iconColor="#147a50" delay={160} />
+        <StatCard label="Fired" value={number(counts.fired)} icon={<ChefHat size={20} />} iconBg="#fef1e1" iconColor="#b45309" delay={40} />
+        <StatCard label="In progress" value={number(counts.acked)} icon={<ClipboardCheck size={20} />} iconBg="#f3f4f6" iconColor="#1f2937" delay={100} />
+        <StatCard label="Done" value={number(counts.done)} icon={<CheckCircle2 size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={160} />
       </div>
       <Card delay={200}>
         <div className="ch-toolbar">
@@ -721,7 +721,7 @@ function InvoicesView() {
       <ViewHead title="Invoices" sub={`${number(invoiced.length)} invoiced · ${number(pending)} awaiting invoice.`} />
       <div className="ch-grid-stats">
         <StatCard label="Invoiced" value={number(invoiced.length)} delta={`${currency(invoiced.reduce((s, o) => s + (Number(o.total) || 0), 0))} billed`} deltaTone="up" icon={<FileText size={20} />} delay={40} />
-        <StatCard label="Awaiting invoice" value={number(pending)} delta={pending > 0 ? 'Follow up from Orders' : 'All clear'} deltaTone={pending > 0 ? 'down' : 'up'} icon={<ClipboardCheck size={20} />} iconBg="#fef1e1" iconColor="#b25a09" delay={100} />
+        <StatCard label="Awaiting invoice" value={number(pending)} delta={pending > 0 ? 'Follow up from Orders' : 'All clear'} deltaTone={pending > 0 ? 'down' : 'up'} icon={<ClipboardCheck size={20} />} iconBg="#fef1e1" iconColor="#b45309" delay={100} />
       </div>
       <Card delay={140}>
         {invoiced.length === 0 ? (
@@ -833,9 +833,9 @@ function LoyaltyView() {
       <ViewHead title="Loyalty" sub="Live points balances, tier distribution and member ranking." actions={<Link to="/customers" className="ch-btn ch-btn-secondary ch-btn-sm">All customers</Link>} />
       <div className="ch-grid-stats">
         <StatCard label="Total members" value={number(stats.members)} icon={<HeartHandshake size={20} />} delay={40} />
-        <StatCard label="Active points" value={number(stats.active)} delta={`${number(stats.issued)} issued`} deltaTone="flat" icon={<Gift size={20} />} iconBg="#e3f6ec" iconColor="#147a50" delay={100} />
-        <StatCard label="Points redeemed" value={number(stats.redeemed)} icon={<Gift size={20} />} iconBg="#fef1e1" iconColor="#b25a09" delay={160} />
-        <StatCard label="VIP customers" value={number(stats.vips)} icon={<HeartHandshake size={20} />} iconBg="#e9f0fe" iconColor="#2b5fe3" delay={220} />
+        <StatCard label="Active points" value={number(stats.active)} delta={`${number(stats.issued)} issued`} deltaTone="flat" icon={<Gift size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={100} />
+        <StatCard label="Points redeemed" value={number(stats.redeemed)} icon={<Gift size={20} />} iconBg="#fef1e1" iconColor="#b45309" delay={160} />
+        <StatCard label="VIP customers" value={number(stats.vips)} icon={<HeartHandshake size={20} />} iconBg="#f3f4f6" iconColor="#1f2937" delay={220} />
       </div>
       <div className="ws-tier-grid">
         {tiers.map((t, i) => (
@@ -977,7 +977,7 @@ function RewardsView() {
       {campError !== '' && <div className="ch-alert ch-alert-error">{campError}</div>}
       <div className="ch-grid-stats">
         <StatCard label="Active campaigns" value={number(activeCampaigns.length)} delta={`${number(campaigns.length)} total`} deltaTone="flat" icon={<Gift size={20} />} delay={40} />
-        <StatCard label="Redeemable points" value={number(activePoints)} delta="Across all members" deltaTone="flat" icon={<HeartHandshake size={20} />} iconBg="#e3f6ec" iconColor="#147a50" delay={100} />
+        <StatCard label="Redeemable points" value={number(activePoints)} delta="Across all members" deltaTone="flat" icon={<HeartHandshake size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={100} />
       </div>
       <Card title="Reward programs" subtitle="Points cost → POS discount voucher" delay={140}>
         {campaigns.length === 0 ? (
@@ -1319,8 +1319,8 @@ function ActivityView() {
       />
       <div className="ch-grid-stats">
         <StatCard label="Recent orders" value={number(Math.min(orders.length, 12))} icon={<ScrollText size={20} />} delay={40} />
-        <StatCard label="Transfers" value={number(transferCount)} icon={<SlidersHorizontal size={20} />} iconBg="#e9f0fe" iconColor="#2b5fe3" delay={100} />
-        <StatCard label="Customers" value={number(customers.length)} icon={<HeartHandshake size={20} />} iconBg="#e3f6ec" iconColor="#147a50" delay={160} />
+        <StatCard label="Transfers" value={number(transferCount)} icon={<SlidersHorizontal size={20} />} iconBg="#f3f4f6" iconColor="#1f2937" delay={100} />
+        <StatCard label="Customers" value={number(customers.length)} icon={<HeartHandshake size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={160} />
       </div>
       <Card delay={80}>
         {feed.length === 0 ? (
@@ -1445,9 +1445,9 @@ function AuditView() {
 
       <div className="ch-grid-stats">
         <StatCard label="Total events" value={number(metrics?.total_events ?? rows.length)} icon={<ClipboardCheck size={20} />} delay={40} />
-        <StatCard label="Users created" value={number(metrics?.users_created ?? 0)} icon={<ClipboardCheck size={20} />} iconBg="#e3f6ec" iconColor="#147a50" delay={100} />
-        <StatCard label="Role changes" value={number(metrics?.role_changes ?? 0)} icon={<ClipboardCheck size={20} />} iconBg="#e9f0fe" iconColor="#2b5fe3" delay={160} />
-        <StatCard label="Users disabled" value={number(metrics?.users_deactivated ?? 0)} delta={`${number(metrics?.report_exports ?? 0)} exports`} deltaTone="flat" icon={<ClipboardCheck size={20} />} iconBg="#fef1e1" iconColor="#b25a09" delay={220} />
+        <StatCard label="Users created" value={number(metrics?.users_created ?? 0)} icon={<ClipboardCheck size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={100} />
+        <StatCard label="Role changes" value={number(metrics?.role_changes ?? 0)} icon={<ClipboardCheck size={20} />} iconBg="#f3f4f6" iconColor="#1f2937" delay={160} />
+        <StatCard label="Users disabled" value={number(metrics?.users_deactivated ?? 0)} delta={`${number(metrics?.report_exports ?? 0)} exports`} deltaTone="flat" icon={<ClipboardCheck size={20} />} iconBg="#fef1e1" iconColor="#b45309" delay={220} />
       </div>
 
       <Card delay={80}>
@@ -1654,8 +1654,8 @@ function BusinessView() {
       {error !== '' && <div className="ch-alert ch-alert-error">{error}</div>}
       <div className="ch-grid-stats">
         <StatCard label="Catalog" value={number(products.length)} delta={`${number(products.reduce((s, p) => s + Number(p.stock || 0), 0))} units on hand`} icon={<Package size={20} />} delay={40} />
-        <StatCard label="Customers" value={number(customers.length)} icon={<HeartHandshake size={20} />} iconBg="#e3f6ec" iconColor="#147a50" delay={100} />
-        <StatCard label="Lifetime revenue" value={currency(revenue)} delta={`${number(orders.length)} orders`} deltaTone="up" icon={<Building2 size={20} />} iconBg="#e9f0fe" iconColor="#2b5fe3" delay={160} />
+        <StatCard label="Customers" value={number(customers.length)} icon={<HeartHandshake size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={100} />
+        <StatCard label="Lifetime revenue" value={currency(revenue)} delta={`${number(orders.length)} orders`} deltaTone="up" icon={<Building2 size={20} />} iconBg="#f3f4f6" iconColor="#1f2937" delay={160} />
       </div>
       <Card
         title="Company profile"
@@ -1837,8 +1837,8 @@ function AutomationView() {
       />
       <div className="ch-grid-stats">
         <StatCard label="Books connection" value={connected ? 'Active' : 'Off'} delta={zoho?.org_id ? `Org ${zoho.org_id}` : 'Not connected'} deltaTone={connected ? 'up' : 'down'} icon={<Workflow size={20} />} delay={40} />
-        <StatCard label="Synced orders" value={number(synced)} icon={<ClipboardCheck size={20} />} iconBg="#e3f6ec" iconColor="#147a50" delay={100} />
-        <StatCard label="Local orders" value={number(completedLocal)} delta="Completed in POS" deltaTone="up" icon={<RefreshCw size={20} />} iconBg="#fef1e1" iconColor="#b25a09" delay={160} />
+        <StatCard label="Synced orders" value={number(synced)} icon={<ClipboardCheck size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={100} />
+        <StatCard label="Local orders" value={number(completedLocal)} delta="Completed in POS" deltaTone="up" icon={<RefreshCw size={20} />} iconBg="#fef1e1" iconColor="#b45309" delay={160} />
       </div>
       <Card title="Flows" subtitle="Status derived from live integration state" delay={200}>
         <ul className="ws-feed">

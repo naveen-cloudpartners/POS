@@ -153,7 +153,7 @@ export default function Returns() {
           value={number(orders.filter((o) => !['voided', 'cancelled', 'refunded'].includes(String(o.status ?? '').toLowerCase())).length)}
           icon={<Undo2 size={20} />}
           iconBg="#e3f6ec"
-          iconColor="#147a50"
+          iconColor="#287c52"
           delay={100}
         />
       </div>

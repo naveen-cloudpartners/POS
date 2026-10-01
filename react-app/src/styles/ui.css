@@ -1,4 +1,4 @@
-/* CloudHub POS — premium UI primitives, no-glass edition (Card, Table,
+/* Muster POS — premium UI primitives, no-glass edition (Card, Table,
    Modal, Search, Badge, Stat...). Same feel, solid surfaces + light tints. */
 
 .ch-card {
@@ -18,7 +18,7 @@
   background: linear-gradient(90deg, transparent, rgba(230,234,243,0.9), transparent);
   pointer-events: none;
 }
-.ch-card.hoverable:hover { transform: translateY(-3px); box-shadow: var(--ch-shadow-lg); border-color: rgba(93,142,249,0.35); }
+.ch-card.hoverable:hover { transform: translateY(-3px); box-shadow: var(--ch-shadow-lg); border-color: rgba(55, 65, 81,0.35); }
 /* Standard table-page rhythm (matches Products reference):
    Header → Stats → Toolbar Card → Table → Pagination.
    The 20px column gap owns ALL vertical separation inside card bodies,
@@ -63,21 +63,21 @@
   width: 120px; height: 120px;
   right: -40px; top: -40px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(93,142,249,0.14), transparent 70%);
+  background: radial-gradient(circle, rgba(55, 65, 81,0.14), transparent 70%);
   pointer-events: none;
 }
 .ch-stat:hover { transform: translateY(-3px); box-shadow: var(--ch-shadow-lg); }
 .ch-stat-icon {
   width: 46px; height: 46px; border-radius: 14px;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 14px rgba(15,27,51,0.1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 14px rgba(24, 24, 27,0.1);
 }
 .ch-stat-label { font-size: 11px; font-weight: 700; color: var(--ch-muted); text-transform: uppercase; letter-spacing: 0.07em; }
 .ch-stat-value { font-size: 25px; font-weight: 700; letter-spacing: -0.03em; margin: 3px 0 2px; font-variant-numeric: tabular-nums; }
 .ch-stat-delta { font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 99px; }
 .ch-stat-delta.up { color: var(--ch-success-ink); background: var(--ch-success-bg); }
 .ch-stat-delta.down { color: var(--ch-danger-ink); background: var(--ch-danger-bg); }
-.ch-stat-delta.flat { color: var(--ch-muted); background: rgba(91,107,135,0.1); }
+.ch-stat-delta.flat { color: var(--ch-muted); background: rgba(113, 113, 122,0.1); }
 .ch-stat-spark { margin-top: 8px; display: flex; align-items: flex-end; gap: 3px; height: 28px; }
 .ch-stat-spark i { flex: 1; border-radius: 3px; background: linear-gradient(180deg, var(--ch-primary), var(--ch-primary-dark)); opacity: 0.85; min-height: 4px; }
 
@@ -93,7 +93,7 @@
   position: sticky; top: 0; z-index: 2;
   text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
   color: var(--ch-muted);
-  background: #f5f7fc;
+  background: #f8fafb;
   padding: 9px 12px;
   border-bottom: 1px solid var(--ch-border);
   white-space: nowrap;
@@ -101,16 +101,16 @@
 .ch-table tbody td { padding: 9px 12px; border-bottom: 1px solid var(--ch-border-soft); vertical-align: middle; }
 .ch-table tbody tr { transition: background 0.15s ease, transform 0.15s ease; }
 .ch-table tbody tr:last-child td { border-bottom: none; }
-.ch-table tbody tr:hover { background: rgba(93, 142, 249, 0.06); }
+.ch-table tbody tr:hover { background: rgba(55, 65, 81, 0.06); }
 .ch-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .ch-cell-main { font-weight: 700; color: var(--ch-ink); letter-spacing: -0.005em; }
 .ch-cell-sub { font-size: 12px; color: var(--ch-muted); font-weight: 500; }
 .ch-thumb {
   width: 40px; height: 40px; border-radius: 12px; object-fit: cover;
-  background: linear-gradient(135deg, var(--ch-primary-soft), #d7e4fd);
+  background: linear-gradient(135deg, var(--ch-primary-soft), #f8fafb);
   color: var(--ch-primary-dark);
   display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;
-  border: 1px solid rgba(93,142,249,0.2);
+  border: 1px solid rgba(55, 65, 81,0.2);
 }
 .ch-checkbox { width: 17px; height: 17px; accent-color: var(--ch-primary-dark); cursor: pointer; }
 
@@ -162,13 +162,13 @@
 .ch-badge-success { background: var(--ch-success-bg); color: var(--ch-success-ink); border-color: rgba(34,179,120,0.25); }
 .ch-badge-warning { background: var(--ch-warning-bg); color: var(--ch-warning-ink); border-color: rgba(253,145,52,0.3); }
 .ch-badge-danger { background: var(--ch-danger-bg); color: var(--ch-danger-ink); border-color: rgba(232,70,70,0.25); }
-.ch-badge-info { background: var(--ch-info-bg); color: var(--ch-primary-deep); border-color: rgba(58,118,248,0.25); }
-.ch-badge-neutral { background: rgba(91,107,135,0.09); color: var(--ch-muted); border-color: var(--ch-border); }
+.ch-badge-info { background: var(--ch-info-bg); color: var(--ch-primary-deep); border-color: rgba(55, 65, 81,0.25); }
+.ch-badge-neutral { background: rgba(113, 113, 122,0.09); color: var(--ch-muted); border-color: var(--ch-border); }
 
 /* Modal — solid + scale entrance */
 .ch-modal-backdrop {
   position: fixed; inset: 0; z-index: 60;
-  background: rgba(11, 18, 38, 0.48);
+  background: rgba(24, 24, 27, 0.48);
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
   animation: ch-fade 0.2s ease both;
@@ -180,7 +180,7 @@
   border-radius: 16px;
   width: 100%; max-width: 560px; max-height: 88svh;
   display: flex; flex-direction: column;
-  box-shadow: 0 32px 80px rgba(11,18,38,0.3);
+  box-shadow: 0 32px 80px rgba(24, 24, 27,0.3);
   animation: ch-pop 0.25s var(--ch-ease) both;
   overflow: hidden;
 }
@@ -196,7 +196,7 @@
 /* Drawer — solid slide-in panel for details */
 .ch-drawer-backdrop {
   position: fixed; inset: 0; z-index: 60;
-  background: rgba(11,18,38,0.4);
+  background: rgba(24, 24, 27,0.4);
   animation: ch-fade 0.2s ease both;
 }
 .ch-drawer {
@@ -222,7 +222,7 @@
 
 .ch-skeleton {
   border-radius: 10px;
-  background: linear-gradient(90deg, #eef1f7 25%, #e0e7f3 37%, #eef1f7 63%);
+  background: linear-gradient(90deg, #ececee 25%, #f8fafb 37%, #ececee 63%);
   background-size: 400px 100%;
   animation: ch-shimmer 1.4s ease infinite;
   min-height: 14px;
@@ -242,11 +242,11 @@
 .ch-state { text-align: center; padding: 52px 24px; color: var(--ch-muted); }
 .ch-state-icon {
   width: 64px; height: 64px; border-radius: 16px;
-  background: linear-gradient(135deg, var(--ch-primary-soft), #d7e4fd);
-  border: 1px solid rgba(93,142,249,0.25);
+  background: linear-gradient(135deg, var(--ch-primary-soft), #f8fafb);
+  border: 1px solid rgba(55, 65, 81,0.25);
   display: inline-flex; align-items: center; justify-content: center;
   margin-bottom: 14px; color: var(--ch-primary-dark);
-  box-shadow: 0 10px 24px rgba(93,142,249,0.2);
+  box-shadow: 0 10px 24px rgba(55, 65, 81,0.2);
 }
 .ch-state-title { margin: 0 0 6px; font-size: 16px; font-weight: 700; color: var(--ch-ink); letter-spacing: -0.01em; }
 .ch-state-text { margin: 0 auto 18px; font-size: 13.5px; max-width: 420px; font-weight: 500; }
@@ -254,7 +254,7 @@
 .ch-alert { border-radius: 13px; padding: 13px 15px; font-size: 13px; margin-bottom: 16px; border: 1px solid; font-weight: 600; display: flex; align-items: center; gap: 8px; animation: ch-fade-up 0.25s var(--ch-ease) both; }
 .ch-alert-error { background: var(--ch-danger-bg); border-color: rgba(232,70,70,0.3); color: #991b1b; }
 .ch-alert-success { background: var(--ch-success-bg); border-color: rgba(34,179,120,0.3); color: #0c5c38; }
-.ch-alert-info { background: var(--ch-info-bg); border-color: rgba(58,118,248,0.3); color: #1e40af; }
+.ch-alert-info { background: var(--ch-info-bg); border-color: rgba(55, 65, 81,0.3); color: #ec942b; }
 
 .ch-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 13px 4px 0; font-size: 12.5px; color: var(--ch-muted); font-weight: 600; }
 
@@ -277,7 +277,7 @@
 .ch-segmented button:not(.active):hover { color: var(--ch-ink); }
 
 /* Progress / meter */
-.ch-meter { height: 8px; border-radius: 99px; background: rgba(91,107,135,0.12); overflow: hidden; }
+.ch-meter { height: 8px; border-radius: 99px; background: rgba(113, 113, 122,0.12); overflow: hidden; }
 .ch-meter i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--ch-primary), var(--ch-primary-dark)); transition: width 0.4s var(--ch-ease); }
 
 /* Insight icon + trend pill (shared by dashboard, reports, workspace views) */

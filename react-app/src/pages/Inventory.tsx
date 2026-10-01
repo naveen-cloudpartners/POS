@@ -416,9 +416,9 @@ export default function Inventory() {
                 aria-label="Matching warehouses"
                 style={{
                   position: 'absolute', zIndex: 30, left: 0, right: 0, top: '100%',
-                  background: 'var(--ch-card-bg, #fff)', border: '1px solid var(--ch-border-soft, #e2e8f0)',
+                  background: 'var(--ch-card-bg, #fff)', border: '1px solid var(--ch-border-soft, #ececee)',
                   borderRadius: 10, marginTop: 0, maxHeight: 180, overflowY: 'auto',
-                  boxShadow: '0 12px 32px rgba(15,27,51,.14)',
+                  boxShadow: '0 12px 32px rgba(24, 24, 27,.14)',
                 }}
               >
                 {adjustWarehouseOptions.map((w) => (
@@ -429,7 +429,7 @@ export default function Inventory() {
                     onMouseDown={(e) => { e.preventDefault(); pickAdjustWarehouse(String(w.ROWID), w.name); }}
                     style={{
                       padding: '9px 12px', cursor: 'pointer', fontSize: 13,
-                      background: String(w.ROWID) === adjustWarehouseId ? 'var(--ch-primary-bg, #eef4ff)' : 'transparent',
+                      background: String(w.ROWID) === adjustWarehouseId ? 'var(--ch-primary-bg, #f8fafb)' : 'transparent',
                     }}
                   >
                     <strong>{w.name}</strong>

@@ -23,7 +23,7 @@ const SecuritySection: React.FC = () => {
       <figure className="security-shot anim-fade-up" aria-label="Cloud infrastructure">
         <img
           src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1600&q=70"
-          alt="Cloud datacenter infrastructure hosting CloudHub POS"
+          alt="Cloud datacenter infrastructure hosting Muster POS"
           width="1600" height="700"
           loading="lazy"
         />

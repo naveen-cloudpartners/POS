@@ -37,12 +37,12 @@ const Navbar: React.FC = () => {
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            boxShadow: '0 4px 12px rgba(0, 97, 255, 0.2)'
+            boxShadow: '0 4px 12px rgba(55, 65, 81, 0.2)'
           }}>
             <Cloud size={20} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
-            <span style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>CloudHub</span>
+            <span style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>Muster</span>
             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary)', letterSpacing: '0.05em' }}>ENTERPRISE POS</span>
           </div>
         </div>

@@ -228,8 +228,8 @@ export default function Transfers() {
       <div className="ch-grid-stats cols-4">
         <StatCard label="Total transfers" value={number(stats.total)} icon={<ArrowLeftRight size={20} />} />
         <StatCard label="Awaiting approval" value={number(stats.pending)} delta={stats.pending > 0 ? 'Action needed' : 'Queue clear'} deltaTone={stats.pending > 0 ? 'down' : 'up'} icon={<ArrowLeftRight size={20} />} iconBg="#fef3e2" iconColor="#d97706" />
-        <StatCard label="Approved" value={number(stats.approved)} delta="Ready to complete" icon={<ArrowRight size={20} />} iconBg="#e9f0fe" iconColor="#2b5fe3" />
-        <StatCard label="Completed" value={number(stats.completed)} icon={<ArrowLeftRight size={20} />} iconBg="#e3f6ec" iconColor="#147a50" />
+        <StatCard label="Approved" value={number(stats.approved)} delta="Ready to complete" icon={<ArrowRight size={20} />} iconBg="#f3f4f6" iconColor="#1f2937" />
+        <StatCard label="Completed" value={number(stats.completed)} icon={<ArrowLeftRight size={20} />} iconBg="#e3f6ec" iconColor="#287c52" />
       </div>
 
       <Card title="Stock transfers">

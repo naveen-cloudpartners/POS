@@ -23,7 +23,7 @@ const HeroSection: React.FC = () => {
           </div>
 
           <h1 className="hero-title">
-            CloudHub POS
+            Muster POS
             <span className="el-hero-accent">Next-Generation Retail Management</span>
           </h1>
 
@@ -57,11 +57,11 @@ const HeroSection: React.FC = () => {
         </div>
 
         {/* Right: floating glass product mockup (pure CSS, no imagery) */}
-        <div className="el-visual" role="img" aria-label="Preview of the CloudHub POS dashboard, register, inventory and reports">
+        <div className="el-visual" role="img" aria-label="Preview of the Muster POS dashboard, register, inventory and reports">
           <div className="el-mock-window anim-fade-up">
             <div className="browser-bar" aria-hidden="true">
               <span className="browser-dots"><i></i><i></i><i></i></span>
-              <span className="browser-url">app.cloudhubpos.com/dashboard</span>
+              <span className="browser-url">Muster POS / Dashboard</span>
               <span className="browser-live">Live</span>
             </div>
             <div className="el-mock-app">

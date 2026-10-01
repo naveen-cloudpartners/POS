@@ -2,7 +2,7 @@
 .pos-mobile-cart-link { display: none; }
 @media (max-width: 1024px) {
   .ch-app.no-panel .ch-main, .ch-app.panel-collapsed .ch-main, .ch-app .ch-main { margin-left: 0; }
-  .ch-app { background: #f5f7fc; }
+  .ch-app { background: #f8fafb; }
   .ch-app .ch-bg-decor { display: none; }
   .ch-app .ch-content { padding: 20px 20px 40px; }
   .ch-app .ch-header { top: 0; margin: 0; border-radius: 0; padding: 12px 20px; box-shadow: var(--ch-shadow-sm); }

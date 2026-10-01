@@ -34,7 +34,7 @@ export default function Header({ title, module, subtitle, onMenu }: HeaderProps)
   const qaRef = useRef<HTMLDivElement | null>(null);
   const userRef = useRef<HTMLDivElement | null>(null);
 
-  const sub = subtitle ?? MODULE_SUB[module] ?? 'CloudHub POS · Enterprise';
+  const sub = subtitle ?? MODULE_SUB[module] ?? 'Muster POS · Enterprise';
   const initial = (user?.name ?? user?.email ?? 'U').trim().charAt(0).toUpperCase() || 'U';
 
   useEffect(() => {

@@ -1,47 +1,47 @@
 /* ==========================================================================
-   CloudHub POS — Premium 2026 Design System (no-glass edition)
+   Muster POS — Premium 2026 Design System (no-glass edition)
    Same palette, shadows, motion and feel — frosted translucency replaced
    with solid white + light tints so every shape stays visible.
-   Palette: #5D8EF9 #3A76F8 #22B378 #FD9134 #E84646 #F5F7FC
+   Palette: #374151 #374151 #287c52 #b45309 #9f454b #f8fafb
    ========================================================================== */
 
 :root {
-  --ch-primary: #5d8ef9;
-  --ch-primary-dark: #3a76f8;
-  --ch-primary-deep: #2b5fe3;
-  --ch-primary-soft: #e9f0fe;
-  --ch-primary-ring: rgba(93, 142, 249, 0.22);
-  --ch-primary-glow: rgba(93, 142, 249, 0.35);
+  --ch-primary: #374151;
+  --ch-primary-dark: #1f2937;
+  --ch-primary-deep: #1f2937;
+  --ch-primary-soft: #f3f4f6;
+  --ch-primary-ring: rgba(55, 65, 81, 0.22);
+  --ch-primary-glow: rgba(55, 65, 81, 0.35);
 
-  --ch-success: #22b378;
+  --ch-success: #287c52;
   --ch-success-bg: #e3f6ec;
-  --ch-success-ink: #147a50;
-  --ch-warning: #fd9134;
+  --ch-success-ink: #287c52;
+  --ch-warning: #b45309;
   --ch-warning-bg: #fef1e1;
-  --ch-warning-ink: #b25a09;
-  --ch-danger: #e84646;
+  --ch-warning-ink: #b45309;
+  --ch-danger: #9f454b;
   --ch-danger-bg: #fdecec;
-  --ch-danger-ink: #b42323;
-  --ch-info: #3a76f8;
-  --ch-info-bg: #e9f0fe;
+  --ch-danger-ink: #9f454b;
+  --ch-info: #374151;
+  --ch-info-bg: #f3f4f6;
 
-  --ch-bg: #f5f7fc;
+  --ch-bg: #f8fafb;
   --ch-white: #ffffff;
   --ch-glass: rgba(255, 255, 255, 0.65);
   --ch-glass-strong: rgba(255, 255, 255, 0.82);
   --ch-glass-border: rgba(255, 255, 255, 0.35);
-  --ch-border: #e6eaf3;
-  --ch-border-soft: #eef1f7;
+  --ch-border: #e5e7eb;
+  --ch-border-soft: #ececee;
 
-  --ch-ink: #0f1b33;
-  --ch-ink-2: #243354;
-  --ch-muted: #5b6b87;
-  --ch-muted-soft: #8b98b3;
+  --ch-ink: #20252b;
+  --ch-ink-2: #20252b;
+  --ch-muted: #7b8185;
+  --ch-muted-soft: #7b8185;
 
-  --ch-sidebar-bg: #0b1226;
-  --ch-sidebar-bg-2: #131d3a;
-  --ch-sidebar-ink: #dbe4ff;
-  --ch-sidebar-muted: #8b98bd;
+  --ch-sidebar-bg: #111827;
+  --ch-sidebar-bg-2: #111827;
+  --ch-sidebar-ink: #f8fafb;
+  --ch-sidebar-muted: #a1a1aa;
 
   --ch-radius: 14px;
   --ch-radius-sm: 10px;
@@ -58,10 +58,10 @@
   --ch-side-gap: 12px;
   --ch-header-h: 68px;
 
-  --ch-shadow-sm: 0 1px 2px rgba(15, 27, 51, 0.05);
-  --ch-shadow-md: 0 8px 30px rgba(15, 27, 51, 0.08);
-  --ch-shadow-lg: 0 18px 50px rgba(15, 27, 51, 0.12);
-  --ch-shadow-glow: 0 8px 24px rgba(93, 142, 249, 0.35);
+  --ch-shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.05);
+  --ch-shadow-md: 0 8px 30px rgba(24, 24, 27, 0.08);
+  --ch-shadow-lg: 0 18px 50px rgba(24, 24, 27, 0.12);
+  --ch-shadow-glow: 0 8px 24px rgba(55, 65, 81, 0.35);
   --ch-font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   --ch-ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -91,15 +91,15 @@ body {
 a { color: var(--ch-primary-dark); text-decoration: none; }
 a:hover { text-decoration: none; }
 button { font-family: inherit; }
-::selection { background: rgba(93, 142, 249, 0.25); }
+::selection { background: rgba(55, 65, 81, 0.25); }
 
 /* ---------- App shell + ambient background ---------- */
 .ch-app {
   display: flex;
   min-height: 100svh;
   background:
-    radial-gradient(900px 480px at 12% -8%, rgba(93, 142, 249, 0.14), transparent 60%),
-    radial-gradient(760px 420px at 88% 4%, rgba(58, 118, 248, 0.1), transparent 60%),
+    radial-gradient(900px 480px at 12% -8%, rgba(55, 65, 81, 0.14), transparent 60%),
+    radial-gradient(760px 420px at 88% 4%, rgba(55, 65, 81, 0.1), transparent 60%),
     radial-gradient(700px 500px at 50% 110%, rgba(34, 179, 120, 0.07), transparent 60%),
     var(--ch-bg);
   position: relative;
@@ -119,15 +119,15 @@ button { font-family: inherit; }
   opacity: 0.55;
   animation: ch-float 14s ease-in-out infinite alternate;
 }
-.ch-bg-decor .b1 { width: 480px; height: 480px; left: -140px; top: -120px; background: radial-gradient(circle, rgba(93,142,249,0.35), transparent 70%); }
-.ch-bg-decor .b2 { width: 420px; height: 420px; right: -120px; top: 8%; background: radial-gradient(circle, rgba(58,118,248,0.28), transparent 70%); animation-delay: -4s; }
+.ch-bg-decor .b1 { width: 480px; height: 480px; left: -140px; top: -120px; background: radial-gradient(circle, rgba(55, 65, 81,0.35), transparent 70%); }
+.ch-bg-decor .b2 { width: 420px; height: 420px; right: -120px; top: 8%; background: radial-gradient(circle, rgba(55, 65, 81,0.28), transparent 70%); animation-delay: -4s; }
 .ch-bg-decor .b3 { width: 560px; height: 380px; left: 30%; bottom: -180px; background: radial-gradient(circle, rgba(34,179,120,0.16), transparent 70%); animation-delay: -8s; }
 .ch-bg-decor .b4 { width: 300px; height: 300px; right: 22%; bottom: 12%; background: radial-gradient(circle, rgba(253,145,52,0.12), transparent 70%); animation-delay: -2s; }
 .ch-bg-decor::after {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgba(15, 27, 51, 0.07) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(24, 24, 27, 0.07) 1px, transparent 1px);
   background-size: 26px 26px;
   mask-image: radial-gradient(800px 420px at 50% 0%, black, transparent 75%);
 }
@@ -233,11 +233,11 @@ button { font-family: inherit; }
   background: linear-gradient(135deg, var(--ch-primary) 0%, var(--ch-primary-dark) 100%);
   border-color: rgba(255,255,255,0.2);
   color: #fff;
-  box-shadow: 0 6px 18px rgba(58, 118, 248, 0.32), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow: 0 6px 18px rgba(55, 65, 81, 0.32), inset 0 1px 0 rgba(255,255,255,0.25);
 }
 .ch-btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 10px 26px rgba(58, 118, 248, 0.42), inset 0 1px 0 rgba(255,255,255,0.3);
+  box-shadow: 0 10px 26px rgba(55, 65, 81, 0.42), inset 0 1px 0 rgba(255,255,255,0.3);
   filter: brightness(1.04);
 }
 .ch-btn-secondary {
@@ -270,7 +270,7 @@ button { font-family: inherit; }
   color: var(--ch-ink);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
-.ch-input:hover, .ch-select:hover { border-color: #c9d4ea; }
+.ch-input:hover, .ch-select:hover { border-color: #f8fafb; }
 .ch-input:focus, .ch-select:focus, .ch-textarea:focus {
   outline: none;
   border-color: var(--ch-primary);
@@ -291,7 +291,7 @@ button { font-family: inherit; }
   color: #fff;
   display: flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 13px; flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(93,142,249,0.4);
+  box-shadow: 0 4px 12px rgba(55, 65, 81,0.4);
 }
 
 /* ---------- Header (solid white) ---------- */
@@ -401,7 +401,7 @@ button { font-family: inherit; }
 /* ---------- Sidebar overlay (tablet/mobile) ---------- */
 .ch-scrim {
   position: fixed; inset: 0;
-  background: rgba(11, 18, 38, 0.5);
+  background: rgba(24, 24, 27, 0.5);
   z-index: 35;
   border: none; padding: 0; cursor: pointer;
 }

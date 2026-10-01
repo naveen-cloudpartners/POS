@@ -58,6 +58,7 @@ export default function Pos() {
   const [discountPct, setDiscountPct] = useState('0');
   const [payMode, setPayMode] = useState<PayMode>('Cash');
   const [split, setSplit] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [splits, setSplits] = useState<Array<SplitLeg>>([{ mode: 'Cash', amount: '' }]);
   const [mailReceipt, setMailReceipt] = useState(false);
   const [receiptEmail, setReceiptEmail] = useState('');
@@ -345,7 +346,7 @@ export default function Pos() {
   const receiptText = (r: PosReceipt): string => {
     const money = (n: number): string => currency(n);
     const out: Array<string> = [
-      r.store.store_name || 'CloudHub POS',
+      r.store.store_name || 'Muster POS',
       `Invoice: ${r.invoiceNumber || r.orderId}`,
       `Date: ${r.date}`,
       `Customer: ${r.customerName}`,
@@ -551,6 +552,7 @@ export default function Pos() {
                         <span className="ch-cell-sub">{currency(l.product.rate)} each</span>
                       </span>
                       <span className="pos-line-disc">
+                        <span className="pos-line-disc-label">Discount</span>
                         <input
                           className="ch-input"
                           aria-label={`Discount for ${l.product.name}`}
@@ -608,6 +610,46 @@ export default function Pos() {
                 <input id="pos-disc" className="ch-input" type="number" min="0" max="100" value={discountPct} onChange={(e) => setDiscountPct(e.target.value)} />
               </div>
             </div>
+            {smtpReady && (
+              <div className="pos-email-row">
+                <label className="ch-row" style={{ gap: 8, fontSize: 13 }}>
+                  <input type="checkbox" className="ch-checkbox" checked={mailReceipt} onChange={(e) => setMailReceipt(e.target.checked)} aria-label="Email receipt on checkout" />
+                  Email receipt
+                </label>
+                {mailReceipt && (
+                  <input
+                    className="ch-input"
+                    aria-label="Receipt email"
+                    type="email"
+                    value={receiptEmail}
+                    onChange={(e) => setReceiptEmail(e.target.value)}
+                    placeholder={customerEmail.trim() === '' ? 'Email for receipt…' : customerEmail}
+                  />
+                )}
+              </div>
+            )}
+
+            <div className="pos-sticky-checkout">
+              <dl className="pos-totals">
+                <div><dt>Sub total</dt><dd>{currency(totals.sub)}</dd></div>
+                <div>
+                  <dt>{taxName}{totals.taxMode === 'inclusive' ? ' (incl.)' : ''}</dt>
+                  <dd>{currency(totals.tax)}</dd>
+                </div>
+                {totals.itemDisc > 0 && <div><dt>Item discounts</dt><dd>−{currency(totals.itemDisc)}</dd></div>}
+                {totals.orderDisc > 0 && <div><dt>Discount</dt><dd>−{currency(totals.orderDisc)}</dd></div>}
+                <div className="pos-grand"><dt>Total</dt><dd>{currency(totals.total)}</dd></div>
+              </dl>
+              <button type="button" className="ch-btn ch-btn-primary pos-checkout" onClick={() => setPaymentOpen(true)} disabled={cart.length === 0 || busy}>
+                {busy ? 'Processing…' : `Collect payment · ${currency(totals.total)}`}
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <Modal open={paymentOpen} title="Collect payment" subtitle="Review the total and choose how your customer will pay." onClose={() => { if (!busy) setPaymentOpen(false); }} footer={<><button className="ch-btn ch-btn-secondary" onClick={() => setPaymentOpen(false)} disabled={busy}>Cancel</button><button className="ch-btn ch-btn-primary" disabled={busy || cart.length === 0 || (split && !tenderOk)} onClick={() => { setPaymentOpen(false); void submit(); }}>{busy ? 'Processing…' : 'Complete payment'}</button></>}>
+        <div className="muster-payment-summary"><span>Amount due</span><strong>{currency(totals.total)}</strong><small>{itemCount} item{itemCount === 1 ? '' : 's'} · {customerName || 'Walk-in customer'}</small></div>
             <div className="pos-meta-row pos-payment-row">
               <div className="ch-field">
                 <span className="ch-label">Payment</span>
@@ -659,43 +701,7 @@ export default function Pos() {
               </div>
             )}
 
-            {smtpReady && (
-              <div className="pos-email-row">
-                <label className="ch-row" style={{ gap: 8, fontSize: 13 }}>
-                  <input type="checkbox" className="ch-checkbox" checked={mailReceipt} onChange={(e) => setMailReceipt(e.target.checked)} aria-label="Email receipt on checkout" />
-                  Email receipt
-                </label>
-                {mailReceipt && (
-                  <input
-                    className="ch-input"
-                    aria-label="Receipt email"
-                    type="email"
-                    value={receiptEmail}
-                    onChange={(e) => setReceiptEmail(e.target.value)}
-                    placeholder={customerEmail.trim() === '' ? 'Email for receipt…' : customerEmail}
-                  />
-                )}
-              </div>
-            )}
-
-            <div className="pos-sticky-checkout">
-              <dl className="pos-totals">
-                <div><dt>Sub total</dt><dd>{currency(totals.sub)}</dd></div>
-                <div>
-                  <dt>{taxName}{totals.taxMode === 'inclusive' ? ' (incl.)' : ''}</dt>
-                  <dd>{currency(totals.tax)}</dd>
-                </div>
-                {totals.itemDisc > 0 && <div><dt>Item discounts</dt><dd>−{currency(totals.itemDisc)}</dd></div>}
-                {totals.orderDisc > 0 && <div><dt>Discount</dt><dd>−{currency(totals.orderDisc)}</dd></div>}
-                <div className="pos-grand"><dt>Total</dt><dd>{currency(totals.total)}</dd></div>
-              </dl>
-              <button type="button" className="ch-btn ch-btn-primary pos-checkout" onClick={submit} disabled={cart.length === 0 || busy || (split && !tenderOk)}>
-                {busy ? 'Processing…' : `Charge ${currency(totals.total)} · ${split ? 'Split' : payMode}`}
-              </button>
-            </div>
-          </div>
-        </aside>
-      </div>
+      </Modal>
 
       {/* Receipt (POS-09) */}
       <Modal
@@ -722,7 +728,7 @@ export default function Pos() {
         {receipt !== null && (
           <div className="pos-receipt-doc">
             {printMessage && <p role="status" className="ch-hint">{printMessage}</p>}
-            <h3 className="pos-rc-store">{receipt.store.store_name || 'CloudHub POS'}</h3>
+            <h3 className="pos-rc-store">{receipt.store.store_name || 'Muster POS'}</h3>
             {receipt.store.company !== '' && <p className="ch-cell-sub">{receipt.store.company}</p>}
             <dl className="pos-rc-meta">
               <div><dt>Invoice</dt><dd>{receipt.invoiceNumber || `#${receipt.orderId}`}</dd></div>

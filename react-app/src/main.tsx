@@ -10,6 +10,8 @@ import './styles/responsive.css'
 import './styles/product-media.css'
 import './styles/cards.css'
 import './styles/workspace-theme.css'
+import './styles/muster-brand.css'
+import './styles/premium.css'
 import MobileAccessGate from './components/mobile/MobileAccessGate.tsx'
 
 createRoot(document.getElementById('root')!).render(

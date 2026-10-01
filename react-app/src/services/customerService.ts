@@ -106,7 +106,8 @@ export async function saveCustomer(input: SaveCustomerInput): Promise<Customer |
   if (input.id !== undefined && String(input.id).trim() !== '' && !String(input.id).startsWith('local-')) {
     return updateCustomer(input.id, input);
   }
-  const { id: _ignored, ...payload } = input;
+  const payload = { ...input };
+  delete payload.id;
   try {
     const res = await apiFetch<{ success: boolean; customer?: Customer }>('/customers', {
       method: 'POST',

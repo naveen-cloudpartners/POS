@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import PrimaryRail from './PrimaryRail';
 import ContextPanel from './ContextPanel';
 import { hasPanel, type Workspace } from './navigation';
@@ -36,15 +36,29 @@ export default function Sidebar({
   // Single-section modules hide the secondary panel (see navigation.hasPanel).
   const showPanel = hasPanel(activeWorkspace, role) && !panelCollapsed;
 
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onCloseDrawer);
+  closeRef.current = onCloseDrawer;
+
   // Escape closes the drawer; inert keeps hidden drawer links out of tab order.
   useEffect(() => {
     if (!drawerOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const controls = () => Array.from(drawerRef.current?.querySelectorAll<HTMLElement>('button, a[href]') ?? []).filter((element) => element.getClientRects().length > 0);
+    const frame = requestAnimationFrame(() => controls()[0]?.focus());
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseDrawer();
+      if (e.key === 'Escape') closeRef.current();
+      if (e.key === 'Tab') {
+        const items = controls(); const first = items[0]; const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [drawerOpen, onCloseDrawer]);
+    return () => { window.removeEventListener('keydown', onKey); cancelAnimationFrame(frame); document.body.style.overflow = previousOverflow; previousFocus?.focus(); };
+  }, [drawerOpen]);
   return (
     <>
       <div className={panelCollapsed ? 'ch-side collapsed' : 'ch-side'}>
@@ -74,7 +88,7 @@ export default function Sidebar({
       {drawerOpen && (
         <button type="button" className="ch-scrim" aria-label="Close navigation" onClick={onCloseDrawer} />
       )}
-      <div className={drawerOpen ? 'ch-drawer-nav open' : 'ch-drawer-nav'} aria-hidden={!drawerOpen} inert={!drawerOpen}>
+      <div ref={drawerRef} role="dialog" aria-modal={drawerOpen || undefined} aria-label="Navigation" className={drawerOpen ? 'ch-drawer-nav open' : 'ch-drawer-nav'} aria-hidden={!drawerOpen} inert={!drawerOpen}>
         <ContextPanel
           key={`drawer-${activeWorkspace.id}`}
           workspace={activeWorkspace}

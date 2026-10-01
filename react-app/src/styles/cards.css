@@ -2,7 +2,7 @@
    and the existing form/checkout behavior are intentionally independent. */
 @media screen and (min-width: 1025px) and (hover: hover) and (pointer: fine) {
   .ch-app .ch-card {
-    border-color: #dfe6f1;
+    border-color: #f8fafb;
     border-radius: 12px;
     box-shadow: none;
   }
@@ -11,7 +11,7 @@
     padding: 14px 18px;
     gap: 12px;
     background: #fff;
-    border-bottom-color: #e1e8f3;
+    border-bottom-color: #f8fafb;
   }
   .ch-app .ch-card-title { font-size: 14px; font-weight: 600; line-height: 1.4; }
   .ch-app .ch-card-sub { font-size: 12px; font-weight: 400; line-height: 1.5; margin-top: 3px; }

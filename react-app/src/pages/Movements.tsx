@@ -125,8 +125,8 @@ export default function Movements() {
 
       <div className="ch-grid-stats cols-3">
         <StatCard label="Movements" value={number(summary.movements)} icon={<ArrowLeftRight size={20} />} />
-        <StatCard label="Units in" value={number(summary.units_in)} icon={<ArrowLeftRight size={20} />} iconBg="#e3f6ec" iconColor="#147a50" />
-        <StatCard label="Units out" value={number(summary.units_out)} icon={<ArrowLeftRight size={20} />} iconBg="#fef1e1" iconColor="#b25a09" />
+        <StatCard label="Units in" value={number(summary.units_in)} icon={<ArrowLeftRight size={20} />} iconBg="#e3f6ec" iconColor="#287c52" />
+        <StatCard label="Units out" value={number(summary.units_out)} icon={<ArrowLeftRight size={20} />} iconBg="#fef1e1" iconColor="#b45309" />
       </div>
 
       <Card title="Stock movements">

@@ -17,7 +17,7 @@ import '../styles/login.css';
 import { login, fetchBackendSession, CATALYST_LOGIN_URL } from '../services/catalystAuth';
 
 /* ==========================================================================
-   CloudHub POS — Modern SaaS Login Page
+   Muster POS — Modern SaaS Login Page
    Authentication & Session logic kept 100% unchanged.
    ========================================================================== */
 
@@ -126,15 +126,15 @@ const Login: React.FC = () => {
       <div className="login-bg-grid" aria-hidden="true" />
 
       {/* ---------- Left: Brand & Product Showcase Panel ---------- */}
-      <aside className="login-brand" aria-label="CloudHub POS overview">
+      <aside className="login-brand" aria-label="Muster POS overview">
         <div className="login-brand-inner">
           {/* Brand Header */}
           <div className="brand-header">
-            <Link to="/" className="login-logo" aria-label="CloudHub POS home">
+            <Link to="/" className="login-logo" aria-label="Muster POS home">
               <span className="login-logo-mark" aria-hidden="true">
                 <Cloud />
               </span>
-              <span className="login-logo-text">CloudHub POS</span>
+              <span className="login-logo-text">Muster POS</span>
             </Link>
             <span className="login-version-badge">
               <Sparkles className="badge-sparkle-icon" aria-hidden="true" />
@@ -149,7 +149,7 @@ const Login: React.FC = () => {
               <span className="headline-gradient">From Anywhere</span>
             </h1>
             <p className="login-sub">
-              CloudHub POS combines billing, sales, inventory, reporting and Zoho Books integration in one cloud platform.
+              Muster POS combines billing, sales, inventory, reporting and Zoho Books integration in one cloud platform.
             </p>
           </div>
 
@@ -203,7 +203,7 @@ const Login: React.FC = () => {
               <Zap className="badge-zap-icon" aria-hidden="true" />
               <span>Secure Single Sign-On</span>
             </div>
-            <h2 id="login-title">Sign in to CloudHub</h2>
+            <h2 id="login-title">Sign in to Muster</h2>
             <p className="login-card-desc">
               Access your point-of-sale, inventory controls &amp; sales reports.
             </p>

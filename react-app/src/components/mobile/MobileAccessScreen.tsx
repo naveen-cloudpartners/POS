@@ -33,7 +33,7 @@ export default function MobileAccessScreen({ onContinue }: MobileAccessScreenPro
 
       <main className="mob-card" role="main" aria-labelledby="mob-title">
         <span className="mob-logo" aria-hidden="true">C</span>
-        <p className="mob-eyebrow">CloudHub POS</p>
+        <p className="mob-eyebrow">Muster POS</p>
         <h1 id="mob-title" className="mob-title">Mobile Device Detected</h1>
         <p className="mob-sub">
           This application is optimized for desktop environments.

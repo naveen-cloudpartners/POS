@@ -7,15 +7,15 @@
   .ch-app .ch-profile-logo { display: block; width: 34px; height: 34px; object-fit: contain; padding: 2px; border-radius: 50%; background: #fff; }
 
   .ch-app .prod-grid { gap: 20px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-  .ch-app .prod-card { border-radius: 16px; border-color: #dce4f2; gap: 10px; box-shadow: var(--ch-shadow-sm); }
-  .ch-app .prod-card:hover { transform: none; box-shadow: 0 6px 20px rgba(15, 27, 51, .08); }
+  .ch-app .prod-card { border-radius: 16px; border-color: #f8fafb; gap: 10px; box-shadow: var(--ch-shadow-sm); }
+  .ch-app .prod-card:hover { transform: none; box-shadow: 0 6px 20px rgba(24, 24, 27, .08); }
   .ch-app .prod-card-top { position: relative; margin: -16px -16px 4px; width: calc(100% + 32px); min-height: 180px; }
   .ch-app .prod-card-top .prod-grid-img, .ch-app .prod-card-top .prod-big {
-    width: 100%; height: 180px; border: 0; border-bottom: 1px solid #dce4f2; border-radius: 0;
-    background: linear-gradient(135deg, #e9f0fe, #f4f7fc); font-size: 44px; color: var(--ch-primary);
+    width: 100%; height: 180px; border: 0; border-bottom: 1px solid #f8fafb; border-radius: 0;
+    background: linear-gradient(135deg, #f3f4f6, #f8fafb); font-size: 44px; color: var(--ch-primary);
     object-fit: contain;
   }
-  .ch-app .prod-card-top .ch-badge { position: absolute; left: 12px; bottom: 12px; margin: 0; box-shadow: 0 1px 5px rgba(15, 27, 51, .08); }
+  .ch-app .prod-card-top .ch-badge { position: absolute; left: 12px; bottom: 12px; margin: 0; box-shadow: 0 1px 5px rgba(24, 24, 27, .08); }
   .ch-app .prod-check { opacity: 1; top: 12px; right: 12px; z-index: 1; border: 1px solid var(--ch-border); }
   .ch-app .prod-card-name { font-size: 15px; line-height: 1.4; margin-top: 0; }
   .ch-app .prod-card-sub { font-weight: 400; }
@@ -25,14 +25,14 @@
 
   .ch-app .pos-mobile-thumb { display: none; }
   .ch-app .desktop-product-media { display: block; width: calc(100% + 26px); margin: -13px -13px 6px; }
-  .ch-app .desktop-product-media .pos-thumb { width: 100%; height: 148px; margin: 0; border-radius: 0; border: 0; background: #edf3ff; object-fit: contain; font-size: 36px; color: var(--ch-primary); }
+  .ch-app .desktop-product-media .pos-thumb { width: 100%; height: 148px; margin: 0; border-radius: 0; border: 0; background: #f8fafb; object-fit: contain; font-size: 36px; color: var(--ch-primary); }
   .ch-app .pos-card { overflow: hidden; border-radius: 14px; gap: 8px; }
   .ch-app .pos-card-name { line-height: 1.4; min-height: 36px; }
 
-  .ch-app #integrations { border-radius: 16px; border-color: #dce4f2; box-shadow: 0 3px 12px rgba(15, 27, 51, .04); }
-  .ch-app #integrations .ch-card-head { background: #edf3ff; padding: 20px 24px; border-bottom-color: #dce4f2; }
+  .ch-app #integrations { border-radius: 16px; border-color: #f8fafb; box-shadow: 0 3px 12px rgba(24, 24, 27, .04); }
+  .ch-app #integrations .ch-card-head { background: #f8fafb; padding: 20px 24px; border-bottom-color: #f8fafb; }
   .ch-app #integrations .ch-card-body { padding: 24px; gap: 24px; }
-  .ch-app #integrations .settings-zoho { background: #f7f9fd; border: 1px solid #dce4f2; border-radius: 12px; padding: 4px 20px; }
+  .ch-app #integrations .settings-zoho { background: #f8fafb; border: 1px solid #f8fafb; border-radius: 12px; padding: 4px 20px; }
   .ch-app #integrations .settings-zoho div { padding: 16px 0; align-items: baseline; }
   .ch-app #integrations .settings-zoho dd { text-align: right; overflow-wrap: anywhere; min-width: 0; }
   .ch-app #integrations .settings-zoho dt { flex-shrink: 0; }

@@ -306,7 +306,7 @@ export default function Dashboard() {
 
       <div className="ch-grid-stats">
         <StatCard label="Revenue" value={currency(stats.revenueTotal)} delta={`${currency(stats.revenueToday)} today`} deltaTone={stats.revenueToday > 0 ? 'up' : 'flat'} icon={<DollarSign size={20} />} spark={spark} delay={40} />
-        <StatCard label="Orders" value={number(stats.orderTotal)} delta={stats.todayOrderCount > 0 ? `${stats.todayOrderCount} today` : 'No sales today yet'} deltaTone={stats.todayOrderCount > 0 ? 'up' : 'flat'} icon={<ClipboardList size={20} />} iconBg="#e3f6ec" iconColor="#147a50" delay={100} />
+        <StatCard label="Orders" value={number(stats.orderTotal)} delta={stats.todayOrderCount > 0 ? `${stats.todayOrderCount} today` : 'No sales today yet'} deltaTone={stats.todayOrderCount > 0 ? 'up' : 'flat'} icon={<ClipboardList size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={100} />
         <StatCard
           label="Customers"
           value={number(stats.customers.total)}
@@ -314,7 +314,7 @@ export default function Dashboard() {
           deltaTone="flat"
           icon={<Users size={20} />}
           iconBg="#fef1e1"
-          iconColor="#b25a09"
+          iconColor="#b45309"
           delay={160}
         />
         <StatCard
@@ -325,8 +325,8 @@ export default function Dashboard() {
             : `${stats.profit.marginPct.toFixed(1)}% margin · ${stats.profitCoverage}% lines costed`}
           deltaTone={stats.profit !== null && stats.profit.total > 0 ? 'up' : 'flat'}
           icon={<Wallet size={20} />}
-          iconBg="#e9f0fe"
-          iconColor="#2b5fe3"
+          iconBg="#f3f4f6"
+          iconColor="#1f2937"
           delay={220}
         />
       </div>
@@ -542,8 +542,8 @@ export default function Dashboard() {
             delta={`${number(data.transfers.filter((t) => String(t.status) === 'Approved').length)} approved · ${number(data.transfers.filter((t) => String(t.status) === 'Completed').length)} completed`}
             deltaTone="flat"
             icon={<ClipboardList size={20} />}
-            iconBg="#e9f0fe"
-            iconColor="#2b5fe3"
+            iconBg="#f3f4f6"
+            iconColor="#1f2937"
             delay={400}
           />
         </div>
@@ -572,7 +572,7 @@ export default function Dashboard() {
               deltaTone={pending > 0 ? 'down' : 'up'}
               icon={<ClipboardList size={20} />}
               iconBg="#fef1e1"
-              iconColor="#b25a09"
+              iconColor="#b45309"
               delay={400}
             />
             {top && (

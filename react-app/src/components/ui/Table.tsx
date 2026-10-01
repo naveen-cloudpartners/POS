@@ -20,7 +20,7 @@ interface TableProps<T> {
 
 export default function Table<T>({ columns, rows, rowKey, minWidth = 640, rowClassName }: TableProps<T>) {
   return (
-    <div className="ch-table-wrap">
+    <div className="ch-table-wrap" role="region" aria-label="Records table" tabIndex={0}>
       <table className="ch-table" style={{ minWidth }}>
         <thead>
           <tr>

@@ -17,7 +17,7 @@ const Footer: React.FC = () => {
               }}>
                 <Cloud size={18} color="white" />
               </div>
-              <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'white' }}>CloudHub POS</span>
+              <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'white' }}>Muster POS</span>
             </div>
             <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', marginBottom: '2rem' }}>
               The next-generation cloud point of sale system for multi-tenant enterprise operations.
@@ -66,7 +66,7 @@ const Footer: React.FC = () => {
           fontSize: '0.85rem',
           color: 'var(--muted-foreground)'
         }}>
-          <span>© 2026 CloudHub POS Suite. All rights reserved.</span>
+          <span>© 2026 Muster POS Suite. All rights reserved.</span>
           <span style={{ display: 'flex', gap: '1.5rem' }}>
             <span>Status: 99.99% Uptime</span>
             <span>Region: Global (US/EU/IN)</span>

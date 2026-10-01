@@ -14,7 +14,7 @@ import '../styles/design-system.css';
 import '../styles/landing.css';
 
 /**
- * CloudHub POS — Landing (pure marketing page).
+ * Muster POS — Landing (pure marketing page).
  * No session checking, no redirects, no auth logic.
  * RootEntry handles all authenticated routing at /app/
  */

@@ -349,7 +349,7 @@ export default function Settings() {
     const job: PrintJob = p.station === 'counter'
       ? (() => {
         const sample: PosReceipt = {
-          store: { store_name: company.company_name || 'CloudHub POS', company: company.legal_name || '', currency: 'LKR' },
+          store: { store_name: company.company_name || 'Muster POS', company: company.legal_name || '', currency: 'LKR' },
           orderId: 'TEST-001',
           invoiceNumber: 'TEST-001',
           booksInvoiceId: '',
@@ -873,7 +873,7 @@ export default function Settings() {
           footer={saveBtn('tax', saveTax)}
         >
           {tax === null ? (
-            <p className="ch-hint">Tax settings unavailable on this backend.</p>
+            <p className="ch-hint">Tax settings are currently unavailable.</p>
           ) : (
             <>
               <div className="ch-form-grid">
@@ -1052,7 +1052,7 @@ export default function Settings() {
           }
         >
           {notif === null ? (
-            <p className="ch-hint">Notification settings unavailable on this backend.</p>
+            <p className="ch-hint">Notification settings are currently unavailable.</p>
           ) : (
             <>
               <div className="settings-3col">

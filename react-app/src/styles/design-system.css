@@ -1,31 +1,31 @@
 :root {
   /* CloudHub enterprise palette — shared with the app workspace */
-  --primary: #3a76f8;
-  --primary-hover: #2b5fe3;
-  --secondary: #64748b;
-  --background: #f5f7fc;
-  --foreground: #0f1b33;
+  --primary: #374151;
+  --primary-hover: #1f2937;
+  --secondary: #7b8185;
+  --background: #f8fafb;
+  --foreground: #20252b;
 
-  --muted: #f8fafc;
-  --muted-foreground: #475569;
+  --muted: #f8fafb;
+  --muted-foreground: #4b5563;
 
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
+  --accent: #ececee;
+  --accent-foreground: #1f2937;
 
-  --border: #e6eaf3;
-  --input: #eef1f7;
-  --ring: rgba(93, 142, 249, 0.22);
+  --border: #e5e7eb;
+  --input: #ececee;
+  --ring: rgba(55, 65, 81, 0.22);
 
-  --success: #22b378;
-  --warning: #f59e0b;
-  --destructive: #ef4444;
+  --success: #287c52;
+  --warning: #b45309;
+  --destructive: #9f454b;
 
   /* Elevation - Layered Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
   --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-  --shadow-premium: 0 0 0 1px rgba(15,27,51,0.04), 0 8px 30px rgba(15,27,51,0.08);
+  --shadow-premium: 0 0 0 1px rgba(24, 24, 27,0.04), 0 8px 30px rgba(24, 24, 27,0.08);
 
   /* Modern Radii */
   --radius-sm: 0.625rem;
@@ -53,12 +53,12 @@
 }
 
 .dark {
-  --background: #020617;
-  --foreground: #f8fafc;
-  --muted: #0f172a;
-  --muted-foreground: #94a3b8;
-  --accent: #1e293b;
-  --border: #1e293b;
+  --background: #1f2937;
+  --foreground: #f8fafb;
+  --muted: #1f2937;
+  --muted-foreground: #a1a1aa;
+  --accent: #20252b;
+  --border: #20252b;
   --shadow-premium: 0 0 0 1px rgba(255,255,255,0.1), 0 12px 24px rgba(0,0,0,0.3);
 }
 
@@ -117,7 +117,7 @@ a {
 .surface:hover {
   transform: translateY(-3px);
   border-color: var(--primary);
-  box-shadow: 0 8px 30px rgba(15, 27, 51, 0.1);
+  box-shadow: 0 8px 30px rgba(24, 24, 27, 0.1);
 }
 
 /* Buttons System */
@@ -135,15 +135,15 @@ a {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #5d8ef9, var(--primary-hover));
+  background: linear-gradient(135deg, #374151, var(--primary-hover));
   color: white;
-  box-shadow: 0 6px 18px rgba(58, 118, 248, 0.32), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow: 0 6px 18px rgba(55, 65, 81, 0.32), inset 0 1px 0 rgba(255,255,255,0.25);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #6d9bfa, var(--primary-hover));
+  background: linear-gradient(135deg, #ec942b, var(--primary-hover));
   transform: translateY(-1px);
-  box-shadow: 0 10px 26px rgba(58, 118, 248, 0.42), 0 0 0 4px var(--ring);
+  box-shadow: 0 10px 26px rgba(55, 65, 81, 0.42), 0 0 0 4px var(--ring);
 }
 
 .btn-secondary {

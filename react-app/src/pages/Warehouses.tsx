@@ -249,9 +249,9 @@ export default function Warehouses() {
           deltaTone={stats.total - stats.active > 0 ? 'down' : 'up'}
           icon={<Building2 size={20} />}
           iconBg="#e3f6ec"
-          iconColor="#147a50"
+          iconColor="#287c52"
         />
-        <StatCard label="Total inventory value" value={currency(stats.value)} icon={<span aria-hidden="true">₨</span>} iconBg="#e9f0fe" iconColor="#2b5fe3" />
+        <StatCard label="Total inventory value" value={currency(stats.value)} icon={<span aria-hidden="true">₨</span>} iconBg="#f3f4f6" iconColor="#1f2937" />
         <StatCard
           label="Low stock lines"
           value={number(stats.low)}

@@ -1,0 +1,523 @@
+{
+  "desktop": [
+    {
+      "route": "/dashboard",
+      "empty": false,
+      "heading": "Business overview",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/products",
+      "empty": false,
+      "heading": "Products",
+      "overflow": false
+    },
+    {
+      "route": "/inventory",
+      "empty": false,
+      "heading": "Inventory",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/categories",
+      "empty": false,
+      "heading": "Categories",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/warehouses",
+      "empty": false,
+      "heading": "Warehouses",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/transfers",
+      "empty": false,
+      "heading": "Transfers",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/movements",
+      "empty": false,
+      "heading": "Stock Movements",
+      "overflow": false
+    },
+    {
+      "route": "/customers",
+      "empty": false,
+      "heading": "Customers",
+      "overflow": false
+    },
+    {
+      "route": "/customers/loyalty",
+      "empty": false,
+      "heading": "Loyalty",
+      "overflow": false
+    },
+    {
+      "route": "/customers/rewards",
+      "empty": false,
+      "heading": "Rewards",
+      "overflow": false
+    },
+    {
+      "route": "/sales/orders",
+      "empty": false,
+      "heading": "Orders",
+      "overflow": false
+    },
+    {
+      "route": "/sales/payments",
+      "empty": false,
+      "heading": "Payments",
+      "overflow": false
+    },
+    {
+      "route": "/sales/invoices",
+      "empty": false,
+      "heading": "Invoices",
+      "overflow": false
+    },
+    {
+      "route": "/sales/returns",
+      "empty": false,
+      "heading": "Returns",
+      "overflow": false
+    },
+    {
+      "route": "/sales/kitchen",
+      "empty": false,
+      "heading": "Kitchen",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/orders",
+      "empty": false,
+      "heading": "Purchase orders",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/vendors",
+      "empty": false,
+      "heading": "Vendors",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/receiving",
+      "empty": false,
+      "heading": "Receive stock",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/bills",
+      "empty": false,
+      "heading": "Vendor bills",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/payments",
+      "empty": false,
+      "heading": "Payments & credits",
+      "overflow": false
+    },
+    {
+      "route": "/admin/users",
+      "empty": false,
+      "heading": "Users",
+      "overflow": false
+    },
+    {
+      "route": "/admin/roles",
+      "empty": false,
+      "heading": "Roles",
+      "overflow": false
+    },
+    {
+      "route": "/admin/activity",
+      "empty": false,
+      "heading": "Activity Logs",
+      "overflow": false
+    },
+    {
+      "route": "/admin/audit",
+      "empty": false,
+      "heading": "Audit",
+      "overflow": false
+    },
+    {
+      "route": "/settings#general",
+      "empty": false,
+      "heading": "My profile",
+      "overflow": false
+    },
+    {
+      "route": "/settings#taxes",
+      "empty": false,
+      "heading": "My profile",
+      "overflow": false
+    },
+    {
+      "route": "/settings#inventory",
+      "empty": false,
+      "heading": "My profile",
+      "overflow": false
+    },
+    {
+      "route": "/settings#loyalty",
+      "empty": false,
+      "heading": "My profile",
+      "overflow": false
+    },
+    {
+      "route": "/settings#reporting",
+      "empty": false,
+      "heading": "My profile",
+      "overflow": false
+    },
+    {
+      "route": "/settings#administration",
+      "empty": false,
+      "heading": "My profile",
+      "overflow": false
+    },
+    {
+      "route": "/settings#notifications",
+      "empty": false,
+      "heading": "My profile",
+      "overflow": false
+    },
+    {
+      "route": "/settings#integrations",
+      "empty": false,
+      "heading": "My profile",
+      "overflow": false
+    },
+    {
+      "route": "/settings#payments",
+      "empty": false,
+      "heading": "My profile",
+      "overflow": false
+    },
+    {
+      "route": "/settings#printers",
+      "empty": false,
+      "heading": "My profile",
+      "overflow": false
+    },
+    {
+      "route": "/settings/automation",
+      "empty": false,
+      "heading": "Business overview",
+      "overflow": false
+    },
+    {
+      "route": "/reports#revenue",
+      "empty": false,
+      "heading": "Reports",
+      "overflow": false
+    },
+    {
+      "route": "/reports#profit",
+      "empty": false,
+      "heading": "Reports",
+      "overflow": false
+    },
+    {
+      "route": "/reports#products",
+      "empty": false,
+      "heading": "Reports",
+      "overflow": false
+    },
+    {
+      "route": "/reports#customers",
+      "empty": false,
+      "heading": "Reports",
+      "overflow": false
+    },
+    {
+      "route": "/reports#register",
+      "empty": false,
+      "heading": "Reports",
+      "overflow": false
+    }
+  ],
+  "mobile": [
+    {
+      "route": "/dashboard",
+      "empty": false,
+      "heading": "Business overview",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/products",
+      "empty": false,
+      "heading": "Products",
+      "overflow": false
+    },
+    {
+      "route": "/inventory",
+      "empty": false,
+      "heading": "Inventory",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/categories",
+      "empty": false,
+      "heading": "Categories",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/warehouses",
+      "empty": false,
+      "heading": "Warehouses",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/transfers",
+      "empty": false,
+      "heading": "Transfers",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/movements",
+      "empty": false,
+      "heading": "Stock Movements",
+      "overflow": false
+    },
+    {
+      "route": "/customers",
+      "empty": false,
+      "heading": "Customers",
+      "overflow": false
+    },
+    {
+      "route": "/customers/loyalty",
+      "empty": false,
+      "heading": "Loyalty",
+      "overflow": false
+    },
+    {
+      "route": "/customers/rewards",
+      "empty": false,
+      "heading": "Rewards",
+      "overflow": false
+    },
+    {
+      "route": "/sales/orders",
+      "empty": false,
+      "heading": "Orders",
+      "overflow": false
+    },
+    {
+      "route": "/sales/payments",
+      "empty": false,
+      "heading": "Payments",
+      "overflow": false
+    },
+    {
+      "route": "/sales/invoices",
+      "empty": false,
+      "heading": "Invoices",
+      "overflow": false
+    },
+    {
+      "route": "/sales/returns",
+      "empty": false,
+      "heading": "Returns",
+      "overflow": false
+    },
+    {
+      "route": "/sales/kitchen",
+      "empty": false,
+      "heading": "Kitchen",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/orders",
+      "empty": false,
+      "heading": "Purchase orders",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/vendors",
+      "empty": false,
+      "heading": "Vendors",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/receiving",
+      "empty": false,
+      "heading": "Receive stock",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/bills",
+      "empty": false,
+      "heading": "Vendor bills",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/payments",
+      "empty": false,
+      "heading": "Payments & credits",
+      "overflow": false
+    },
+    {
+      "route": "/admin/users",
+      "empty": false,
+      "heading": "Users",
+      "overflow": false
+    },
+    {
+      "route": "/admin/roles",
+      "empty": false,
+      "heading": "Roles",
+      "overflow": false
+    },
+    {
+      "route": "/admin/activity",
+      "empty": false,
+      "heading": "Activity Logs",
+      "overflow": false
+    },
+    {
+      "route": "/admin/audit",
+      "empty": false,
+      "heading": "Audit",
+      "overflow": false
+    },
+    {
+      "route": "/settings#general",
+      "empty": false,
+      "heading": "Settings",
+      "overflow": false
+    },
+    {
+      "route": "/settings#taxes",
+      "empty": false,
+      "heading": "Settings",
+      "overflow": false
+    },
+    {
+      "route": "/settings#inventory",
+      "empty": false,
+      "heading": "Settings",
+      "overflow": false
+    },
+    {
+      "route": "/settings#loyalty",
+      "empty": false,
+      "heading": "Settings",
+      "overflow": false
+    },
+    {
+      "route": "/settings#reporting",
+      "empty": false,
+      "heading": "Settings",
+      "overflow": false
+    },
+    {
+      "route": "/settings#administration",
+      "empty": false,
+      "heading": "Settings",
+      "overflow": false
+    },
+    {
+      "route": "/settings#notifications",
+      "empty": false,
+      "heading": "Settings",
+      "overflow": false
+    },
+    {
+      "route": "/settings#integrations",
+      "empty": false,
+      "heading": "Settings",
+      "overflow": false
+    },
+    {
+      "route": "/settings#payments",
+      "empty": false,
+      "heading": "Settings",
+      "overflow": false
+    },
+    {
+      "route": "/settings#printers",
+      "empty": false,
+      "heading": "Settings",
+      "overflow": false
+    },
+    {
+      "route": "/settings/automation",
+      "empty": false,
+      "heading": "Automation",
+      "overflow": false
+    },
+    {
+      "route": "/reports#revenue",
+      "empty": false,
+      "heading": "Reports",
+      "overflow": false
+    },
+    {
+      "route": "/reports#profit",
+      "empty": false,
+      "heading": "Reports",
+      "overflow": false
+    },
+    {
+      "route": "/reports#products",
+      "empty": false,
+      "heading": "Reports",
+      "overflow": false
+    },
+    {
+      "route": "/reports#customers",
+      "empty": false,
+      "heading": "Reports",
+      "overflow": false
+    },
+    {
+      "route": "/reports#register",
+      "empty": false,
+      "heading": "Reports",
+      "overflow": false
+    }
+  ],
+  "tablet": [
+    {
+      "route": "/dashboard",
+      "heading": "Business overview",
+      "overflow": false
+    },
+    {
+      "route": "/inventory/products",
+      "heading": "Products",
+      "overflow": false
+    },
+    {
+      "route": "/customers",
+      "heading": "Customers",
+      "overflow": false
+    },
+    {
+      "route": "/purchases/orders",
+      "heading": "Purchase orders",
+      "overflow": false
+    },
+    {
+      "route": "/sales/pos",
+      "heading": "Point of Sale",
+      "overflow": false
+    },
+    {
+      "route": "/reports#revenue",
+      "heading": "Reports",
+      "overflow": false
+    },
+    {
+      "route": "/settings/profile",
+      "heading": "My profile",
+      "overflow": false
+    }
+  ]
+}

@@ -929,7 +929,7 @@ export default function Products() {
       <Modal
         open={formOpen}
         title={editing === null ? 'Add product' : `Edit ${editing.name}`}
-        subtitle="Catalog item stored in the CloudHub datastore"
+        subtitle="Set product details, pricing and stock."
         onClose={() => setFormOpen(false)}
         footer={
           <>

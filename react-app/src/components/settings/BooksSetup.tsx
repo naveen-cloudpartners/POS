@@ -64,7 +64,7 @@ export default function BooksSetup() {
   };
   const dirty = status !== null && (clientId.trim() !== status.client_id || dc !== status.dc || secret !== '');
   return <Card id="integrations" title="Zoho Books" subtitle="Set up your company connection, then import products and post new sales">
-    {error && <p role="alert" className="ch-hint" style={{ color: 'var(--danger, #b91c1c)' }}>{error}</p>}
+    {error && <p role="alert" className="ch-hint" style={{ color: 'var(--danger, #9f454b)' }}>{error}</p>}
     {notice && <p role="status" className="ch-hint">{notice}</p>}
     <p className="ch-hint">You can leave Books disconnected until your account is ready. Your POS continues storing sales in Catalyst.</p>
     <div className="ch-form-grid" style={{ marginTop: 16 }}>

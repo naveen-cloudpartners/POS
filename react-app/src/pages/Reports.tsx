@@ -490,9 +490,9 @@ export default function Reports() {
         <div className="reports-tab">
           <div className="ch-grid-stats reports-stats">
             <StatCard label="Total revenue" value={currency(dispRevenue)} delta={`${growth >= 0 ? '+' : ''}${growth.toFixed(1)}% ${growthBase}`} deltaTone={growth >= 0 ? 'up' : 'down'} icon={<Wallet size={20} />} spark={spark} delay={40} />
-            <StatCard label="Total orders" value={number(dispOrders)} delta={`Avg ${currency(dispAov)} per order`} deltaTone="flat" icon={<ReceiptText size={20} />} iconBg="#e3f6ec" iconColor="#147a50" delay={100} />
-            <StatCard label="Products" value={number(products.length)} delta={`${number(products.reduce((s, p) => s + Number(p.stock || 0), 0))} units on hand`} icon={<Package size={20} />} iconBg="#fef1e1" iconColor="#b25a09" delay={160} />
-            <StatCard label="Customers" value={number(customerCount)} icon={<Users size={20} />} iconBg="#e9f0fe" iconColor="#2b5fe3" delay={220} />
+            <StatCard label="Total orders" value={number(dispOrders)} delta={`Avg ${currency(dispAov)} per order`} deltaTone="flat" icon={<ReceiptText size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={100} />
+            <StatCard label="Products" value={number(products.length)} delta={`${number(products.reduce((s, p) => s + Number(p.stock || 0), 0))} units on hand`} icon={<Package size={20} />} iconBg="#fef1e1" iconColor="#b45309" delay={160} />
+            <StatCard label="Customers" value={number(customerCount)} icon={<Users size={20} />} iconBg="#f3f4f6" iconColor="#1f2937" delay={220} />
           </div>
 
           <div className="reports-grid">

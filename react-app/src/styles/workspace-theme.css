@@ -3,8 +3,8 @@
 .ch-app .ch-content {
   --ch-radius: 12px;
   --ch-radius-sm: 8px;
-  --ch-border: #e6eaf3;
-  --ch-border-soft: #eef1f7;
+  --ch-border: #e5e7eb;
+  --ch-border-soft: #ececee;
 }
 
 @media (min-width: 1025px) {
@@ -148,7 +148,7 @@
   min-height: 38px;
   font-size: 12px;
   border-radius: 10px;
-  background: #f9fbff;
+  background: #f8fafb;
 }
 .ch-content :is(.ch-input, .ch-select, .ch-textarea) {
   min-width: 0;
@@ -157,7 +157,7 @@
   font-weight: 400;
 }
 .ch-content :is(.ch-input, .ch-select, .ch-textarea, .ch-search input):focus {
-  box-shadow: 0 0 0 3px rgba(70, 126, 247, .13);
+  box-shadow: 0 0 0 3px rgba(55, 65, 81, .13);
 }
 .ch-content .ch-label { font-size: 11.5px; font-weight: 700; }
 .ch-content .ch-hint { font-size: 11.5px; line-height: 1.5; }
@@ -166,8 +166,8 @@
 .ch-content .ch-table-wrap { border-radius: 8px; border-color: var(--ch-border-soft); }
 .ch-content .ch-table thead th {
   padding: 11px 14px;
-  background: #f6f8fc;
-  color: #667694;
+  background: #f8fafb;
+  color: #4b5563;
   font-size: 10px;
   letter-spacing: 0;
 }
@@ -183,12 +183,12 @@
   border-radius: 16px;
   color: var(--ch-primary-dark);
   background: var(--ch-primary-soft);
-  border: 1px solid rgba(70, 126, 247, .17);
+  border: 1px solid rgba(55, 65, 81, .17);
   box-shadow: none;
 }
 .ch-content .ch-state-title { font-size: 18px; line-height: 1.4; }
 .ch-content .ch-state-text { font-size: 13px; line-height: 1.5; }
-.ch-content .ch-table tbody tr:hover { background: #f9fbff; }
+.ch-content .ch-table tbody tr:hover { background: #f8fafb; }
 .ch-content .ch-btn:focus-visible {
   outline: 2px solid var(--ch-primary);
   outline-offset: 3px;
@@ -202,22 +202,22 @@
   box-shadow: var(--ch-shadow-sm);
 }
 .ch-content .dash-hero {
-  background: #101a35;
-  color: #eef2ff;
-  border: 1px solid #22335f;
-  box-shadow: 0 18px 44px rgba(11,18,38,0.24);
+  background: #1f2937;
+  color: #f8fafb;
+  border: 1px solid #1f2937;
+  box-shadow: 0 18px 44px rgba(24, 24, 27,0.24);
 }
 .ch-content .dash-hero::after { display: none; }
 .ch-content .dash-hero-value { color: #fff; font-size: 30px; letter-spacing: 0; }
-.ch-content :is(.dash-hero-sub, .dash-hero-bar-day) { color: #aebce0; }
+.ch-content :is(.dash-hero-sub, .dash-hero-bar-day) { color: #f3f4f6; }
 .ch-content .cust-top .ch-cell-sub { color: var(--ch-muted); }
 .ch-content :is(.dash-hero-eyebrow, .dash-hero-btn.ghost) {
-  color: #dce7ff;
+  color: #f8fafb;
   background: rgba(255,255,255,0.1);
   border-color: rgba(255,255,255,0.18);
 }
 .ch-content .dash-hero-bar-track { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); }
-.ch-content .cust-top-row { background: #f9fbff; border-color: var(--ch-border-soft); }
+.ch-content .cust-top-row { background: #f8fafb; border-color: var(--ch-border-soft); }
 .ch-content .cust-top-row:hover { background: var(--ch-primary-soft); }
 
 /* POS retains its own fixed-height layout and compact quantity controls. */

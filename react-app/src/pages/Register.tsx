@@ -30,7 +30,7 @@ import '../styles/register.css';
 import API_BASE from '../services/api';
 
 /* ==========================================================================
-   CloudHub POS — Organization Registration (no passwords here).
+   Muster POS — Organization Registration (no passwords here).
    Collects org + owner + address only.
    POST /api/organizations/register -> Organizations row (status "pending")
    + admin approval email. On approval a Catalyst Authentication user is
@@ -364,14 +364,14 @@ const Register: React.FC = () => {
     <div className="org-page">
       {/* ---------- Hero ---------- */}
       <header className="org-hero">
-        <Link to="/" className="org-logo" aria-label="CloudHub POS home">
+        <Link to="/" className="org-logo" aria-label="Muster POS home">
           <span className="org-logo-mark" aria-hidden="true"><Cloud /></span>
-          <span className="org-logo-text">CloudHub POS</span>
+          <span className="org-logo-text">Muster POS</span>
         </Link>
         <h1 className="org-hero-title">Register Your Organization</h1>
         <p className="org-hero-sub">
           Create your organization account and start managing sales,
-          inventory, customers and reporting with CloudHub POS.
+          inventory, customers and reporting with Muster POS.
         </p>
         <ul className="org-badges" aria-label="Platform highlights">
           {TRUST_BADGES.map((b) => (
@@ -386,7 +386,7 @@ const Register: React.FC = () => {
       {/* ---------- Main two-column ---------- */}
       <div className="org-layout">
         {/* Left: benefits illustration panel */}
-        <aside className="org-side" aria-label="Why CloudHub POS">
+        <aside className="org-side" aria-label="Why Muster POS">
           <div className="org-side-card">
             <div className="org-graphic" aria-hidden="true">
               <div className="org-graphic-orb orb-a" />
@@ -596,7 +596,7 @@ const Register: React.FC = () => {
             <span className="org-modal-icon" aria-hidden="true"><Check /></span>
             <h2 id="org-modal-title" className="org-modal-title">Registration Submitted</h2>
             <p className="org-modal-body">
-              Thank you for choosing CloudHub POS.<br />
+              Thank you for choosing Muster POS.<br />
               Your registration request has been prepared successfully.
             </p>
             <p className="org-modal-body muted">
@@ -606,7 +606,7 @@ const Register: React.FC = () => {
             <p className="org-status">
               Status: <span className="org-status-pill">Pending Approval</span>
             </p>
-            <p className="org-modal-support">CloudHub POS Support</p>
+            <p className="org-modal-support">Muster POS Support</p>
             <button type="button" className="org-submit org-modal-btn" onClick={closeModal}>
               Close
             </button>

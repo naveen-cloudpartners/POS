@@ -340,15 +340,15 @@ export default function Customers() {
       {/* Analytics row (CUST-03/04/05): retention + loyalty at a glance */}
       <div className="cust-widgets reveal" style={{ animationDelay: '80ms', gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="cust-widget">
-          <span className="cust-widget-ic" style={{ background: '#e9f0fe', color: '#2b5fe3' }}><ReceiptText size={17} /></span>
+          <span className="cust-widget-ic" style={{ background: '#f3f4f6', color: '#1f2937' }}><ReceiptText size={17} /></span>
           <span><b>{currency(summary.avgOrder)}</b><span className="ch-cell-sub">Average order value</span></span>
         </div>
         <div className="cust-widget">
-          <span className="cust-widget-ic" style={{ background: '#e3f6ec', color: '#147a50' }}><Sparkles size={17} /></span>
+          <span className="cust-widget-ic" style={{ background: '#e3f6ec', color: '#287c52' }}><Sparkles size={17} /></span>
           <span><b>{number(Math.round(summary.avgPoints))}</b><span className="ch-cell-sub">Avg loyalty balance</span></span>
         </div>
         <div className="cust-widget">
-          <span className="cust-widget-ic" style={{ background: '#fef3e2', color: '#b25a09' }}><Users size={17} /></span>
+          <span className="cust-widget-ic" style={{ background: '#fef3e2', color: '#b45309' }}><Users size={17} /></span>
           <span><b>{number(summary.actives)}</b><span className="ch-cell-sub">Active (ordered)</span></span>
         </div>
         <div className="cust-widget">

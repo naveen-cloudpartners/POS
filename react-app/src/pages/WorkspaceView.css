@@ -1,4 +1,4 @@
-/* CloudHub POS — enterprise workspace sub-module views */
+/* Muster POS — enterprise workspace sub-module views */
 
 .ws-tabs {
   display: inline-flex; gap: 4px;
@@ -28,7 +28,7 @@
 
 .ws-feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ws-feed li { display: flex; gap: 12px; align-items: flex-start; padding: 10px; border-radius: 12px; transition: background 0.15s ease; }
-.ws-feed li:hover { background: rgba(93,142,249,0.05); }
+.ws-feed li:hover { background: rgba(55, 65, 81,0.05); }
 .ws-feed b { display: block; font-size: 13.5px; }
 
 .ws-steps { margin: 0; padding: 0 0 0 4px; list-style: none; display: flex; flex-direction: column; gap: 12px; counter-reset: step; }

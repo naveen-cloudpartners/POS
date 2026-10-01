@@ -24,7 +24,7 @@ export default function PrimaryRail({ workspaces, activeId, role, onSelect, onCo
       <button
         type="button"
         className="ch-rail-logo"
-        data-tip={panelCollapsed ? 'CloudHub POS · Expand panel' : 'CloudHub POS · Collapse panel'}
+        data-tip={panelCollapsed ? 'Muster POS · Expand panel' : 'Muster POS · Collapse panel'}
         aria-label={panelCollapsed ? 'Expand context panel' : 'Collapse context panel'}
         onClick={onCollapsePanel}
       >
