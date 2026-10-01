@@ -60,7 +60,7 @@ export default function Transfers() {
   const [formError, setFormError] = useState('');
   const [formBusy, setFormBusy] = useState(false);
 
-  const effectiveRole = role === '' ? 'Admin' : role;
+  const effectiveRole = role;
   const operable = ['Admin', 'Manager', 'Storekeeper'].includes(effectiveRole);
   const approver = ['Admin', 'Manager'].includes(effectiveRole);
 

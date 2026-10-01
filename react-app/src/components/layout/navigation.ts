@@ -65,10 +65,10 @@ export const WORKSPACES: Array<Workspace> = [
     label: 'POS',
     tagline: 'Counter terminal & payments',
     icon: ShoppingCart,
-    roles: SELLERS,
+    roles: [...SELLERS, 'Chef'],
     children: [
       { id: 'pos-terminal', label: 'POS Terminal', to: '/sales/pos', aliases: ['/pos'], roles: SELLERS },
-      { id: 'pos-kitchen', label: 'Kitchen', to: '/sales/kitchen', roles: [...SELLERS, 'Storekeeper', 'Chef'] },
+      { id: 'pos-kitchen', label: 'Kitchen', to: '/sales/kitchen', roles: ['Admin', 'Manager', 'Waiter', 'Chef'] },
       { id: 'pos-payments', label: 'Payments', to: '/sales/payments', roles: FRONT },
       { id: 'pos-invoices', label: 'Invoices', to: '/sales/invoices', roles: FRONT },
       { id: 'pos-returns', label: 'Returns', to: '/sales/returns', roles: FRONT },
@@ -115,8 +115,8 @@ export const WORKSPACES: Array<Workspace> = [
     roles: FRONT,
     children: [
       { id: 'cust-all', label: 'Customers', to: '/customers', roles: FRONT },
-      { id: 'cust-loyalty', label: 'Loyalty', to: '/customers/loyalty', roles: FRONT },
-      { id: 'cust-rewards', label: 'Rewards', to: '/customers/rewards', roles: FRONT },
+      { id: 'cust-loyalty', label: 'Loyalty', to: '/customers/loyalty', roles: MANAGERS },
+      { id: 'cust-rewards', label: 'Rewards', to: '/customers/rewards', roles: MANAGERS },
     ],
   },
   {
@@ -124,9 +124,9 @@ export const WORKSPACES: Array<Workspace> = [
     label: 'Orders',
     tagline: 'History & tracking',
     icon: ClipboardList,
-    roles: [...SELLERS, 'Storekeeper'],
+    roles: SELLERS,
     children: [
-      { id: 'ord-orders', label: 'Orders', to: '/sales/orders', aliases: ['/orders'], roles: [...SELLERS, 'Storekeeper'] },
+      { id: 'ord-orders', label: 'Orders', to: '/sales/orders', aliases: ['/orders'], roles: SELLERS },
     ],
   },
   {
@@ -159,10 +159,11 @@ export const WORKSPACES: Array<Workspace> = [
   {
     id: 'settings',
     label: 'Settings',
-    tagline: 'Store configuration',
+    tagline: 'Settings & personal profile',
     icon: Settings,
-    roles: ['Admin'],
+    roles: ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'],
     children: [
+      { id: 'set-profile', label: 'My profile', to: '/settings/profile', aliases: ['/settings'], roles: ['Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'] },
       { id: 'set-general', label: 'General', to: '/settings#general', aliases: ['/settings'], roles: ['Admin'] },
       { id: 'set-inventory', label: 'Inventory', to: '/settings#inventory', roles: ['Admin'] },
       { id: 'set-loyalty', label: 'Loyalty', to: '/settings#loyalty', roles: ['Admin'] },
@@ -176,6 +177,7 @@ export const WORKSPACES: Array<Workspace> = [
       { id: 'set-automation', label: 'Automation', to: '/settings/automation', roles: ['Admin'] },
     ],
     sections: [
+      { label: 'Personal Settings', childIds: ['set-profile'] },
       { label: 'Business Settings', childIds: ['set-general', 'set-taxes'] },
       { label: 'Store Operations', childIds: ['set-inventory', 'set-loyalty', 'set-reporting', 'set-admin'] },
       { label: 'Store Configuration', childIds: ['set-notify', 'set-integrations', 'set-payments', 'set-printers', 'set-automation'] },
@@ -207,7 +209,7 @@ export function resolveRoute(pathname: string, hash: string, role: string): Reso
     for (const ws of WORKSPACES) {
       for (const c of ws.children) {
         const s = splitHash(c.to);
-        if (s.path === pathname && s.hash === cleanHash && (role === '' || c.roles.includes(role))) {
+        if (s.path === pathname && s.hash === cleanHash && c.roles.includes(role)) {
           return { workspace: ws, child: c };
         }
       }
@@ -215,7 +217,7 @@ export function resolveRoute(pathname: string, hash: string, role: string): Reso
   }
   for (const ws of WORKSPACES) {
     for (const c of ws.children) {
-      if (pathMatches(c, pathname) && (role === '' || c.roles.includes(role))) {
+      if (pathMatches(c, pathname) && c.roles.includes(role)) {
         return { workspace: ws, child: c };
       }
     }
@@ -225,18 +227,18 @@ export function resolveRoute(pathname: string, hash: string, role: string): Reso
 
 export function visibleWorkspaces(role: string): Array<Workspace> {
   return WORKSPACES.filter((ws) => {
-    if (role !== '' && !ws.roles.includes(role)) return false;
-    return ws.children.some((c) => role === '' || c.roles.includes(role));
+    if (!ws.roles.includes(role)) return false;
+    return ws.children.some((c) => c.roles.includes(role));
   });
 }
 
 export function homeOf(ws: Workspace, role: string): string {
-  return ws.children.find((c) => role === '' || c.roles.includes(role))?.to ?? '/dashboard';
+  return ws.children.find((c) => c.roles.includes(role))?.to ?? '/dashboard';
 }
 
 /** Role-visible children of a workspace (the true level-2 module nav). */
 export function visibleChildren(ws: Workspace, role: string): Array<NavChild> {
-  return ws.children.filter((c) => role === '' || c.roles.includes(role));
+  return ws.children.filter((c) => c.roles.includes(role));
 }
 
 /**

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { fetchBackendSession, type SessionUser } from '../services/catalystAuth';
-import { getCurrentRole, type AppRole } from '../services/authService';
+import { normalizeRole, type AppRole } from '../services/authService';
 
 interface AuthState {
   user: SessionUser | null;
@@ -21,23 +21,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let live = true;
-    (async () => {
-      setLoading(true);
+    let busy = false;
+    const update = async () => {
+      if (busy) return;
+      busy = true;
       try {
         const session = await fetchBackendSession();
         if (!live) return;
         setUser(session.user);
         setEmail(session.email);
-        if (session.authenticated) {
-          const r = await getCurrentRole();
-          if (live) setRole(r === '' ? 'Admin' : r);
-        }
+        setRole(session.authenticated ? normalizeRole(session.role) : '');
       } finally {
+        busy = false;
         if (live) setLoading(false);
       }
-    })();
+    };
+    void update();
+    const timer = window.setInterval(() => { if (!document.hidden) void update(); }, 10000);
+    const onFocus = () => { void update(); };
+    const onVisibility = () => { if (!document.hidden) void update(); };
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('pos-access-refresh', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       live = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('pos-access-refresh', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [tick]);
 

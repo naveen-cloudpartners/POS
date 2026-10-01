@@ -63,7 +63,7 @@ export default function Warehouses() {
   const [deleteTarget, setDeleteTarget] = useState<Warehouse | null>(null);
   const [detail, setDetail] = useState<Warehouse | null>(null);
 
-  const effectiveRole = role === '' ? 'Admin' : role;
+  const effectiveRole = role;
   const manageable = can('manage_products', effectiveRole);
   const deletable = ['Admin', 'Manager'].includes(effectiveRole);
 

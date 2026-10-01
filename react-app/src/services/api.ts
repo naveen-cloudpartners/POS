@@ -40,6 +40,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
     data = { raw: text };
   }
   if (!resp.ok) {
+    if (resp.status === 401 || resp.status === 403) window.dispatchEvent(new Event('pos-access-refresh'));
     const msg =
       data !== null && typeof data === 'object' && 'error' in data && typeof (data as { error: unknown }).error === 'string'
         ? (data as { error: string }).error

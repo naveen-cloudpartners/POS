@@ -93,7 +93,7 @@ export default function Orders() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [voidBusy, setVoidBusy] = useState(false);
 
-  const effectiveRole = role === '' ? 'Admin' : role;
+  const effectiveRole = role;
   const canVoid = effectiveRole === 'Admin';
 
   // ORD-04: every filter runs on the server; the page only renders results.

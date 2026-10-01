@@ -128,7 +128,7 @@ export default function Settings() {
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfileRate, setNewProfileRate] = useState('');
 
-  const effectiveRole = role === '' ? 'Admin' : role;
+  const effectiveRole = role;
   const isAdmin = effectiveRole === 'Admin';
 
   const load = () => {

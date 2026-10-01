@@ -41,7 +41,7 @@ export default function Returns() {
   const [result, setResult] = useState<{ refund_total?: number; fully_refunded?: boolean; message?: string } | null>(null);
   const [refundModes, setRefundModes] = useState<Array<string>>(['Cash', 'Card', 'Bank']);
 
-  const effectiveRole = role === '' ? 'Admin' : role;
+  const effectiveRole = role;
   const canProcess = ['Admin', 'Manager'].includes(effectiveRole);
 
   const load = () => {

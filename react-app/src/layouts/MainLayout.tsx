@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
-import Header from '../components/layout/Header';
 import Breadcrumbs from '../components/layout/Breadcrumbs';
 import {
   getStoredPanelCollapsed,
@@ -32,7 +31,7 @@ function Shell() {
   const [panelCollapsed, setPanelCollapsed] = useState<boolean>(() => getStoredPanelCollapsed());
   const location = useLocation();
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const { role, user, loading } = useAuth();
 
   const workspaces = useMemo(() => visibleWorkspaces(role), [role]);
 
@@ -98,12 +97,16 @@ function Shell() {
     [location.pathname, location.hash, role],
   );
 
-  const childLabel = resolved?.child.label ?? 'Workspace';
   const panelVisible = hasPanel(activeWorkspace, role) && !panelCollapsed;
   const appClass = `ch-app${panelCollapsed ? ' panel-collapsed' : ''}${panelVisible ? '' : ' no-panel'}`;
 
+  if (loading) return <div className="ch-state">Checking access...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (workspaces.length === 0) return <div className="ch-state">Your account has no POS role. Ask an administrator to assign access.</div>;
+  if (!resolved) return <Navigate to={homeOf(workspaces[0], role)} replace />;
+
   return (
-    <div className={appClass}>
+    <div className={`${appClass} ch-headerless`}>
       <div className="ch-bg-decor" aria-hidden="true">
         <span className="b1" />
         <span className="b2" />
@@ -119,16 +122,11 @@ function Shell() {
         onTogglePanel={togglePanel}
         onSelectWorkspace={selectWorkspace}
         drawerOpen={drawerOpen}
+        onOpenDrawer={() => setDrawerOpen(true)}
         onCloseDrawer={() => setDrawerOpen(false)}
       />
       <div className="ch-main">
-        <Header
-          title={childLabel}
-          module={activeWorkspace.label}
-          subtitle={activeWorkspace.tagline}
-          onMenu={() => setDrawerOpen(true)}
-        />
-        <main className="ch-content workspace-design" style={{ '--workspace-label': `"${activeWorkspace.label.toUpperCase()}"` } as React.CSSProperties} key={location.pathname}>
+        <main className="ch-content workspace-design" style={{ '--workspace-label': `"${activeWorkspace.label.toUpperCase()}"` } as React.CSSProperties} key={`${location.pathname}:${role}`}>
           <Breadcrumbs items={crumbs} />
           <Outlet />
         </main>

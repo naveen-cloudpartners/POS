@@ -71,7 +71,7 @@ export default function Customers() {
   const [pointsError, setPointsError] = useState('');
   const [pointsBusy, setPointsBusy] = useState(false);
 
-  const effectiveRole = role === '' ? 'Admin' : role;
+  const effectiveRole = role;
   const canCreate = ['Admin', 'Manager', 'Cashier'].includes(effectiveRole);
   const canManage = ['Admin', 'Manager'].includes(effectiveRole);
   const canDelete = effectiveRole === 'Admin';

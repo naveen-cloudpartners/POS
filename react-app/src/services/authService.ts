@@ -1,5 +1,4 @@
 import { fetchBackendSession } from './catalystAuth';
-import { getUsers } from './userService';
 
 /* CloudHub POS — session + role helpers for the frontend shell.
    Catalyst session remains the single source of truth (no local auth). */
@@ -11,14 +10,15 @@ export async function getCurrentRole(): Promise<AppRole> {
   try {
     const session = await fetchBackendSession();
     if (!session.authenticated) return '';
-    const users = await getUsers();
-    const me = users.find((u) => u.email.toLowerCase() === session.email.toLowerCase());
-    const raw = (me?.role ?? 'Admin').trim();
-    if (raw === 'master_admin') return 'Admin';
-    return raw as AppRole;
+    return normalizeRole(session.role);
   } catch {
     return '';
   }
+}
+
+export function normalizeRole(raw: string): AppRole {
+  const role = raw === 'master_admin' ? 'Admin' : raw;
+  return ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'].includes(role) ? role as AppRole : '';
 }
 
 export function can(permission: 'manage_products' | 'adjust_stock' | 'view_reports' | 'manage_users' | 'manage_settings' | 'sell', role: string): boolean {
@@ -26,6 +26,7 @@ export function can(permission: 'manage_products' | 'adjust_stock' | 'view_repor
     case 'sell':
       return ['Admin', 'Manager', 'Cashier', 'Waiter'].includes(role);
     case 'manage_products':
+      return ['Admin', 'Manager'].includes(role);
     case 'adjust_stock':
       return ['Admin', 'Manager', 'Storekeeper'].includes(role);
     case 'view_reports':

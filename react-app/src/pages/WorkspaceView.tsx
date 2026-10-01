@@ -130,7 +130,7 @@ function CategoriesView() {
   const [repairInfo, setRepairInfo] = useState<RepairResult | null>(null);
   const [repairBusy, setRepairBusy] = useState(false);
 
-  const editable = can('manage_products', role === '' ? 'Admin' : role);
+  const editable = can('manage_products', role);
 
   const load = () => {
     setLoading(true);
@@ -892,7 +892,7 @@ function RewardsView() {
   const [redeemError, setRedeemError] = useState('');
   const [voucher, setVoucher] = useState<string | null>(null);
 
-  const effectiveRole = role === '' ? 'Admin' : role;
+  const effectiveRole = role;
   const canManage = ['Admin', 'Manager'].includes(effectiveRole);
   const canRedeem = ['Admin', 'Manager', 'Cashier'].includes(effectiveRole);
 
@@ -1181,7 +1181,7 @@ type PermissionKey = (typeof PERMISSIONS)[number]['key'];
 const ROLE_SCOPES: Record<string, string> = {
   Admin: 'Full access: users, settings, reports, exports, voids, audit trail.',
   Manager: 'Operations: products, inventory, customers, orders, reports. No settings, no user deletion.',
-  Cashier: 'Counter: POS sales, own orders, customer lookup and creation. No products, users or reports.',
+  Cashier: 'Counter: POS sales, own orders, customer lookup. No products, users or reports.',
   Storekeeper: 'Warehouse: stock, adjustments, transfers. Products read-only. No sales or customers.',
   Waiter: 'Floor sales like Cashier. No back-office access.',
   Chef: 'Kitchen visibility only. No sales, stock or admin access.',
@@ -1359,7 +1359,7 @@ function AuditView() {
   const [detail, setDetail] = useState<AuditRecord | null>(null);
   const [exportBusy, setExportBusy] = useState<string | null>(null);
 
-  const effectiveRole = role === '' ? 'Admin' : role;
+  const effectiveRole = role;
   const isAdmin = effectiveRole === 'Admin';
 
   const currentFilters = useMemo(() => ({
@@ -1551,7 +1551,7 @@ function BusinessView() {
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoTick, setLogoTick] = useState(0);
 
-  const isAdmin = (role === '' ? 'Admin' : role) === 'Admin';
+  const isAdmin = (role) === 'Admin';
 
   const load = () => {
     setLoading(true);

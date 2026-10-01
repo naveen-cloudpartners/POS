@@ -14,6 +14,7 @@ interface EnterpriseSidebarProps {
   onSelectWorkspace: (ws: Workspace) => void;
   drawerOpen: boolean;
   onCloseDrawer: () => void;
+  onOpenDrawer: () => void;
 }
 
 /**
@@ -30,6 +31,7 @@ export default function Sidebar({
   onSelectWorkspace,
   drawerOpen,
   onCloseDrawer,
+  onOpenDrawer,
 }: EnterpriseSidebarProps) {
   // Single-section modules hide the secondary panel (see navigation.hasPanel).
   const showPanel = hasPanel(activeWorkspace, role) && !panelCollapsed;
@@ -51,7 +53,10 @@ export default function Sidebar({
           activeId={activeWorkspace.id}
           role={role}
           onSelect={onSelectWorkspace}
-          onCollapsePanel={onTogglePanel}
+          onCollapsePanel={() => {
+            if (window.matchMedia('(max-width: 1024px)').matches) onOpenDrawer();
+            else onTogglePanel();
+          }}
           panelCollapsed={panelCollapsed}
         />
         {!showPanel ? null : (

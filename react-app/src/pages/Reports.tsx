@@ -124,7 +124,7 @@ export default function Reports() {
   const [profitRep, setProfitRep] = useState<ProfitReport | null>(null);
   const [registerRep, setRegisterRep] = useState<RegisterReport | null>(null);
 
-  const effectiveRole = role === '' ? 'Admin' : role;
+  const effectiveRole = role;
   const isFrontline = ['Cashier', 'Waiter', 'Chef'].includes(effectiveRole);
   const isStorekeeper = effectiveRole === 'Storekeeper';
   const canViewProfit = ['Admin', 'Manager'].includes(effectiveRole);

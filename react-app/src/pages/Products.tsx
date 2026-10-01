@@ -149,7 +149,7 @@ export default function Products() {
   const [importError, setImportError] = useState('');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
-  const editable = can('manage_products', role === '' ? 'Admin' : role);
+  const editable = can('manage_products', role);
 
   const load = () => {
     setLoading(true);

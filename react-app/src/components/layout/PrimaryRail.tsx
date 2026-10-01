@@ -1,5 +1,7 @@
-import { Link, NavLink } from 'react-router-dom';
-import { ChevronsLeft, Cloud } from 'lucide-react';
+import type { CSSProperties } from 'react';
+import { NavLink } from 'react-router-dom';
+import { Cloud } from 'lucide-react';
+import SidebarActions from './SidebarActions';
 import { homeOf, type Workspace } from './navigation';
 
 interface PrimaryRailProps {
@@ -18,11 +20,19 @@ interface PrimaryRailProps {
 export default function PrimaryRail({ workspaces, activeId, role, onSelect, onCollapsePanel, panelCollapsed }: PrimaryRailProps) {
   return (
     <div className="ch-rail" role="navigation" aria-label="Workspaces">
-      <Link to="/dashboard" className="ch-rail-logo" data-tip="CloudHub POS" aria-label="CloudHub POS home">
+      <div className="ch-rail-top">
+      <button
+        type="button"
+        className="ch-rail-logo"
+        data-tip={panelCollapsed ? 'CloudHub POS · Expand panel' : 'CloudHub POS · Collapse panel'}
+        aria-label={panelCollapsed ? 'Expand context panel' : 'Collapse context panel'}
+        onClick={onCollapsePanel}
+      >
         <Cloud size={26} strokeWidth={2} aria-hidden="true" />
-      </Link>
-      <div className="ch-rail-items">
-        {workspaces.map((ws) => {
+      </button>
+      </div>
+      <div className="ch-rail-items" style={{ '--rail-count': workspaces.filter((ws) => ws.id !== 'settings').length } as CSSProperties}>
+        {workspaces.filter((ws) => ws.id !== 'settings').map((ws) => {
           const Icon = ws.icon;
           const active = ws.id === activeId;
           return (
@@ -41,15 +51,19 @@ export default function PrimaryRail({ workspaces, activeId, role, onSelect, onCo
           );
         })}
       </div>
-      <button
-        type="button"
-        className="ch-rail-btn ch-rail-collapse"
-        data-tip={panelCollapsed ? 'Expand panel' : 'Collapse panel'}
-        aria-label={panelCollapsed ? 'Expand context panel' : 'Collapse context panel'}
-        onClick={onCollapsePanel}
-      >
-        <ChevronsLeft size={18} aria-hidden="true" className={panelCollapsed ? 'flipped' : undefined} />
-      </button>
+      <div className="ch-rail-footer">
+
+      <SidebarActions settingsControl={workspaces.filter((ws) => ws.id === 'settings').map((ws) => {
+        const Icon = ws.icon;
+        return (
+          <NavLink key={ws.id} to={homeOf(ws, role)} aria-label={ws.label}
+            data-tip={ws.label} className={activeId === ws.id ? 'ch-rail-btn active' : 'ch-rail-btn'}
+            onClick={() => onSelect(ws)}>
+            <Icon size={21} aria-hidden="true" />
+          </NavLink>
+        );
+      })} />
+      </div>
     </div>
   );
 }

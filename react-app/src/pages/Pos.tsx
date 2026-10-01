@@ -43,7 +43,7 @@ function round2(n: number): number {
 
 export default function Pos() {
   const { role } = useAuth();
-  const canVoid = role === '' || role === 'Admin' || role === 'Manager';
+  const canVoid = role === 'Admin' || role === 'Manager';
   const [products, setProducts] = useState<Array<Product>>([]);
   const [customers, setCustomers] = useState<Array<Customer>>([]);
   const [store, setStore] = useState({ store_name: '', company: '', currency: 'LKR' });

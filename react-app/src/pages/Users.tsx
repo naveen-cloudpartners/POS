@@ -42,7 +42,7 @@ function isActive(u: PosUser): boolean {
 }
 
 export default function Users() {
-  const { role, email: myEmail } = useAuth();
+  const { role, email: myEmail, refresh } = useAuth();
   const [users, setUsers] = useState<Array<PosUser>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -76,7 +76,7 @@ export default function Users() {
   const [resetTarget, setResetTarget] = useState<PosUser | null>(null);
   const [resetBusy, setResetBusy] = useState(false);
 
-  const effectiveRole = role === '' ? 'Admin' : role;
+  const effectiveRole = role;
   const isAdmin = effectiveRole === 'Admin';
   const isManager = effectiveRole === 'Manager';
   const canManage = isAdmin || isManager;
@@ -196,6 +196,7 @@ export default function Users() {
       })
       .then(() => {
         setNotice(`Role updated to ${roleValue}.`);
+        refresh();
         setRoleTarget(null);
         load();
       })

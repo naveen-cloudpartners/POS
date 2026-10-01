@@ -158,6 +158,7 @@ app.use((req, res, next) => {
 // defined alongside the admin block. Fail-open by design — logging never
 // blocks the request it observes.
 app.use(auditMiddleware);
+app.use(enforceApiPermissions);
 
 /**
  * Sanitize a value before interpolating into a ZCQL string.
@@ -279,7 +280,10 @@ async function sendSmtpMail(catalystApp, { to, subject, html, text }) {
         smtpFrom = await booksService.getConfig('email_smtp_from') || smtpUser;
       } catch (e) { /* Configurations table may not exist yet */ }
     }
-    if (!(smtpHost && smtpUser && smtpPass)) return false;
+    if (!(smtpHost && smtpUser && smtpPass)) {
+      console.error('[MAIL] SMTP configuration incomplete:', { host: !!smtpHost, user: !!smtpUser, password: !!smtpPass });
+      return false;
+    }
     const transporter = nodemailer.createTransport({
       host: smtpHost,
       port: parseInt(smtpPort, 10) || 587,
@@ -606,6 +610,12 @@ function getTenantConfig(req) {
  * Otherwise, falls back gracefully to a default organization 'org_default' (virtual single-tenant).
  */
 async function getCurrentOrgUser(req, catalystApp) {
+  // Reuse only within this HTTP request; the next request reads the roster again.
+  if (!req._posOrgUserPromise) req._posOrgUserPromise = resolveCurrentOrgUser(req, catalystApp);
+  return req._posOrgUserPromise;
+}
+
+async function resolveCurrentOrgUser(req, catalystApp) {
   let user = null;
   try {
     user = await catalystApp.userManagement().getCurrentUser();
@@ -625,17 +635,9 @@ async function getCurrentOrgUser(req, catalystApp) {
   user.email = userEmail;
   user.user_id = userId;
 
-  // USR-04: suspended roster accounts resolve to unauthenticated on every
-  // hardened endpoint. Fail-open (unknown state stays signed in).
-  try {
-    if (await isAccountDeactivated(catalystApp, userEmail)) {
-      console.log('[AUTH] Suspended roster account blocked:', userEmail);
-      return null;
-    }
-  } catch (e) { /* suspension check is best-effort */ }
-
-  // (Developer override removed — every account resolves through
-  // OrgUsers/roster like everyone else.)
+  // The roster is authoritative on every request, including role demotions.
+  const roster = await findRosterUser(catalystApp, userEmail.toLowerCase());
+  if (roster && ['inactive', 'deleted'].includes(String(roster.data.status || '').toLowerCase())) return null;
 
   const safeUserId = sanitizeZcql(userId);
   const safeUserEmail = sanitizeZcql(userEmail.toLowerCase());
@@ -668,7 +670,8 @@ async function getCurrentOrgUser(req, catalystApp) {
         const bo = String((b && b.OrgUsers && b.OrgUsers.org_id) || '');
         return (ao === 'org_default' ? 1 : 0) - (bo === 'org_default' ? 1 : 0);
       });
-      const orgUser = ranked[0].OrgUsers;
+      const orgUser = { ...ranked[0].OrgUsers };
+      if (roster) orgUser.role = normWhRole(roster.data.role);
       // Self-heal: converge numeric-id rows to email-keyed rows so the team
       // roster always shows real emails. Cosmetic migration only, best-effort.
       try {
@@ -731,7 +734,7 @@ async function getCurrentOrgUser(req, catalystApp) {
   const virtualOrgUser = {
     org_id: fallbackOrgId,
     user_id: user.user_id,
-    role: 'Admin', // First/sole user behaves as Admin
+    role: roster ? normWhRole(roster.data.role) : '', // Unassigned accounts have no privileges
     display_name: [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email
   };
 
@@ -1070,7 +1073,7 @@ app.post('/api/organizations/register', async (req, res) => {
         });
         console.log(sent
           ? `[REGISTER] Admin notification sent to ${notifyTo}`
-          : '[REGISTER] SMTP not configured — admin notification skipped (dev mode).');
+          : '[REGISTER] Admin notification failed — check the [MAIL] error or SMTP configuration.');
       }
     } catch (emailErr) {
       // Registration already stored; never fail the request on email errors.
@@ -1093,6 +1096,51 @@ app.post('/api/organizations/register', async (req, res) => {
     });
   }
 });
+
+/** Provision the approved company's owner with full POS Admin access.
+ * Retry-safe: existing authentication accounts and OrgUsers rows are reused.
+ * Mark approved only after both role stores have been saved successfully. */
+async function provisionOrganizationOwner(catalystApp, org) {
+  const email = String(org.owner_email || '').trim().toLowerCase();
+  const name = String(org.owner_name || email).trim();
+  const orgId = String(org.ROWID || '');
+  if (!email || !orgId) throw new Error('Organization owner and organization ID are required.');
+
+  let exists = false;
+  try {
+    const users = await catalystApp.userManagement().getAllUsers();
+    exists = Array.isArray(users) && users.some((user) =>
+      String(user.email_id || user.email || '').trim().toLowerCase() === email);
+  } catch (error) {
+    // A duplicate response from registerUser also makes retries safe.
+    console.warn('[APPROVE] Authentication lookup unavailable:', error.message);
+  }
+  if (!exists) {
+    const parts = name.split(/\s+/);
+    try {
+      await catalystApp.userManagement().registerUser(
+        { platform_type: 'web' },
+        { email_id: email, first_name: parts[0] || email, last_name: parts.slice(1).join(' ') || undefined }
+      );
+    } catch (error) {
+      if (!/already|exists|duplicate/i.test(extractSdkMessage(error))) throw error;
+    }
+  }
+
+  const mapped = await syncOrgUserRole(catalystApp, email, 'Admin', { orgId, displayName: name });
+  if (!mapped) throw new Error('Could not save the organization owner Admin role. Retry approval.');
+  const existing = await findRosterUser(catalystApp, email);
+  await saveRosterUser(catalystApp, email, {
+    ...(existing ? existing.data : {}),
+    email, name, org_id: orgId,
+    role: 'Admin', permissions: getRolePermissions('Admin'), status: 'active',
+    invited_at: existing && existing.data.invited_at ? existing.data.invited_at : Date.now(),
+    updated_at: Date.now(),
+  });
+  await catalystApp.datastore().table('Organizations').updateRow({
+    ROWID: org.ROWID, status: 'approved', approved_at: formatCatalystDateTime(new Date()),
+  });
+}
 
 /**
  * GET /api/admin/approve-org?id=ROWID
@@ -1129,48 +1177,8 @@ app.get('/api/admin/approve-org', async (req, res) => {
       }));
     }
 
-    await catalystApp.datastore().table('Organizations').updateRow({
-      ROWID: org.ROWID,
-      status: 'approved',
-      approved_at: formatCatalystDateTime(new Date())
-    });
-    console.log(`[APPROVE] Organization approved: ${org.organization_name} <${org.owner_email}>`);
-
-    // Catalyst Authentication is the single source of truth (single-owner
-    // model: 1 Organization = 1 Owner Account). No OrgUsers table, no local
-    // password storage. Create the Catalyst user (duplicate-safe) — the
-    // owner sets their password through Catalyst itself.
-    try {
-      let exists = false;
-      try {
-        const users = await catalystApp.userManagement().getAllUsers();
-        exists = Array.isArray(users) && users.some((u) =>
-          String(u.email_id || u.email || '').toLowerCase() === String(org.owner_email).toLowerCase());
-      } catch (listErr) {
-        console.error('[APPROVE] User lookup note:', listErr.message);
-      }
-      if (exists) {
-        console.log(`[APPROVE] Existing Catalyst user detected: ${org.owner_email} — skipping creation.`);
-      } else {
-        const nameParts = String(org.owner_name || org.owner_email).trim().split(/\s+/);
-        await catalystApp.userManagement().registerUser(
-          { platform_type: 'web' },
-          {
-            email_id: org.owner_email,
-            first_name: nameParts[0] || org.owner_email,
-            last_name: nameParts.slice(1).join(' ') || undefined
-          }
-        );
-        console.log(`[APPROVE] Catalyst user created: ${org.owner_email}`);
-      }
-    } catch (userErr) {
-      const msg = String(userErr.message || '');
-      if (/already|exists|duplicate/i.test(msg)) {
-        console.log(`[APPROVE] Existing Catalyst user detected: ${org.owner_email} — skipping creation.`);
-      } else {
-        console.error('[APPROVE] Catalyst user creation failed:', msg);
-      }
-    }
+    await provisionOrganizationOwner(catalystApp, org);
+    console.log(`[APPROVE] Organization approved with Admin access: ${org.organization_name} <${org.owner_email}>`);
 
     // No resetPassword() here: registerUser() above already sends Catalyst's
     // invitation/activation email. resetPassword() is password RECOVERY and
@@ -1350,25 +1358,22 @@ app.post('/api/auth/seed-credentials', async (req, res) => {
 
 /**
  * GET /api/auth/me
- * Catalyst-only session check. No local users, no OTP state, no OrgUsers
- * lookup — the Catalyst session is the single source of truth.
+ * Catalyst authenticates identity; the current POS roster supplies privileges.
  */
 app.get('/api/auth/me', async (req, res) => {
   try {
     const catalystApp = catalyst.initialize(req);
-    let cu = null;
-    try {
-      cu = await catalystApp.userManagement().getCurrentUser();
-    } catch (e) { cu = null; }
-    const email = cu ? String(cu.email_id || cu.email || '').trim() : '';
-    if (!cu || !email) {
-      return res.status(401).json({ success: false, authenticated: false });
-    }
-    const name = [cu.first_name, cu.last_name].filter(Boolean).join(' ') || email;
+    const context = await getCurrentOrgUser(req, catalystApp);
+    if (!context) return res.status(401).json({ success: false, authenticated: false });
+    const { user, orgUser } = context;
+    const email = user.email;
+    const role = callerRole(context);
+    const profile = roleCan(role, 'manage_profile') ? await readPersonalProfile(catalystApp, context) : null;
+    res.set('Cache-Control', 'no-store');
     return res.json({
-      success: true,
-      authenticated: true,
-      user: { email, name, user_id: String(cu.user_id || cu.zaid || '') }
+      success: true, authenticated: true, role,
+      permissions: getRolePermissions(role),
+      user: { email, name: (profile && profile.name) || orgUser.display_name || email, user_id: user.user_id, avatar_version: profile && profile.photo_ref ? String(profile.photo_updated_at) : '' }
     });
   } catch (err) {
     return res.status(401).json({ success: false, authenticated: false });
@@ -1867,7 +1872,8 @@ app.post('/api/users/update-role', async (req, res) => {
     // USR-02/03: Storekeeper was wrongly rejected here (400); Managers
     // cannot grant Admin or modify Admin accounts (prefer change-role API).
     if (!requirePermission(orgUserContext, res, 'manage_users', 'Changing roles requires Admin or Manager.')) return;
-    const { email, role } = req.body;
+    const { role } = req.body || {};
+    const email = String(req.body?.email || '').trim().toLowerCase();
     if (!email || !role) return res.status(400).json({ success: false, error: 'Email and role are required' });
 
     const validRoles = [...POS_ALL_ROLES];
@@ -1892,6 +1898,11 @@ app.post('/api/users/update-role', async (req, res) => {
       userData = adopted.data;
     } else {
       userData = JSON.parse(result[0].Configurations.config_value);
+    }
+    if (normWhRole(userData.role) === 'Admin' && role !== 'Admin' && String(userData.status || 'active') !== 'inactive') {
+      if (await countActiveAdmins(catalystApp, orgUserContext) <= 1) {
+        return res.status(400).json({ success: false, error: 'Assign another Admin before changing the last active Admin.' });
+      }
     }
     userData.role = role;
     userData.permissions = getRolePermissions(role);
@@ -1944,7 +1955,14 @@ function getRolePermissions(role) {
       zoho_books: 'none', zoho_invoice: 'none', zoho_inventory: 'none', zoho_mail: 'none'
     }
   };
-  return perms[role] || perms['Cashier'];
+  const r = normWhRole(role);
+  const result = perms[r] ? { ...perms[r] } : {};
+  for (const permission of ['sell', 'manage_products', 'adjust_stock', 'manage_inventory', 'view_reports', 'manage_users', 'manage_settings']) {
+    result[permission] = roleCan(r, permission);
+  }
+  result.system_settings = result.manage_settings;
+  result.adjust_inventory = result.adjust_stock;
+  return result;
 }
 
 /**
@@ -2853,21 +2871,15 @@ app.get('/api/orders', async (req, res) => {
       limit: Math.min(300, Math.max(1, parseInt((req.query && req.query.limit) || '100', 10) || 100)),
     };
     let history = await getOrderHistory(catalystApp, filters);
-    // ORD permissions: frontline roles see their own sales. Legacy rows
-    // without cashier attribution stay visible (backward compatibility).
+    // Frontline roles see only attributed sales belonging to their identity.
     const listRole = normWhRole(orgUserContext.orgUser && orgUserContext.orgUser.role);
-    if ((listRole === 'Cashier' || listRole === 'Waiter' || listRole === 'Chef') && !filters.cashier) {
+    if (listRole === 'Cashier' || listRole === 'Waiter' || listRole === 'Chef') {
       const me = orgUserContext.user
         ? String(orgUserContext.user.email || orgUserContext.user.email_id || '').toLowerCase()
         : '';
-      const myName = orgUserContext.orgUser && orgUserContext.orgUser.display_name
-        ? String(orgUserContext.orgUser.display_name).toLowerCase()
-        : '';
       history = history.filter((o) => {
         const by = String(o.created_by ?? '').toLowerCase();
-        const nm = String(o.cashier_name ?? '').toLowerCase();
-        if (by === '' && nm === '') return true;
-        return (me !== '' && by === me) || (myName !== '' && nm === myName);
+        return canReadOrder(listRole, me, by);
       });
     }
     res.status(200).json({ success: true, count: history.length, data: history });
@@ -2904,7 +2916,7 @@ app.get('/api/orders/:id', async (req, res) => {
     if (role === 'Cashier' || role === 'Waiter' || role === 'Chef') {
       const me = orgUserContext.user ? String(orgUserContext.user.email || orgUserContext.user.email_id || '').toLowerCase() : '';
       const mine = String(detail.cashier.email || '').toLowerCase();
-      if (me !== '' && mine !== '' && me !== mine) {
+      if (!canReadOrder(role, me, mine)) {
         return res.status(403).json({ success: false, error: 'You can only view your own orders.' });
       }
     }
@@ -4512,7 +4524,9 @@ app.get('/api/contacts', async (req, res) => {
         const url = `${domains.api}/contacts?organization_id=${tenantConfig.orgId}&status=active`;
         const response = await axios.get(url, { headers, timeout: 15000 });
         if (response.data && response.data.code === 0) {
-          return res.status(200).json({ success: true, contacts: response.data.contacts || [] });
+          const rows = response.data.contacts || [];
+          const contacts = roleCan(callerRole(orgUserContext), 'manage_customers') ? rows : rows.filter((c) => String(c.contact_type || 'customer').toLowerCase() === 'customer').map(customerLookup);
+          return res.status(200).json({ success: true, contacts });
         }
       } catch (booksErr) {
         console.warn('Failed to fetch contacts from Zoho Books, falling back to local:', booksErr.message);
@@ -4523,9 +4537,10 @@ app.get('/api/contacts', async (req, res) => {
     const localContacts = await safeZcql(catalystApp,
       `SELECT config_key, config_value FROM Configurations WHERE config_key LIKE 'crm_%'`
     );
-    const contacts = localContacts
+    let contacts = localContacts
       .map(row => { try { return JSON.parse(row.Configurations.config_value); } catch(e) { return null; } })
       .filter(Boolean);
+    if (!roleCan(callerRole(orgUserContext), 'manage_customers')) contacts = contacts.filter((c) => String(c.type || 'customer').toLowerCase() === 'customer').map(customerLookup);
     res.status(200).json({ success: true, contacts });
   } catch (error) {
     console.error('Error fetching contacts:', error.message);
@@ -4736,7 +4751,7 @@ app.post('/api/shifts/open', async (req, res) => {
     }
 
     const payload = {
-      cashier_name,
+      cashier_name: callerRole(orgUserContext) === 'Cashier' ? orgUserContext.user.email : cashier_name,
       opening_float: parseFloat(opening_float) || 0,
       cash_sales: 0.0,
       noncash_sales: 0.0,
@@ -4784,6 +4799,10 @@ app.post('/api/shifts/close', async (req, res) => {
     }
 
     const shift = existing[0].Shifts;
+    if (String(shift.org_id) !== String(orgUserContext.orgUser.org_id) ||
+        (callerRole(orgUserContext) === 'Cashier' && String(shift.cashier_name || '').toLowerCase() !== orgUserContext.user.email.toLowerCase())) {
+      return res.status(403).json({ success: false, error: 'You can only close your own shift.' });
+    }
     const opening = parseFloat(shift.opening_float) || 0;
     const cSales = parseFloat(cash_sales) || 0;
     const ncSales = parseFloat(noncash_sales) || 0;
@@ -4829,7 +4848,8 @@ app.get('/api/shifts', async (req, res) => {
     query += ' ORDER BY CREATEDTIME DESC LIMIT 100';
 
     const result = await catalystApp.zcql().executeZCQLQuery(query);
-    const shifts = result.map(row => row.Shifts);
+    let shifts = result.map(row => row.Shifts);
+    if (callerRole(orgUserContext) === 'Cashier') shifts = shifts.filter((shift) => String(shift.cashier_name || '').toLowerCase() === orgUserContext.user.email.toLowerCase());
     res.status(200).json({ success: true, shifts });
   } catch (error) {
     console.error('Error fetching shifts:', error.message);
@@ -7203,6 +7223,7 @@ app.get('/api/customers', async (req, res) => {
       data = data.filter((c) => String(c.tier).toLowerCase() === tierFilter);
     }
     data.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    if (!roleCan(callerRole(orgUserContext), 'manage_customers')) data = data.map(customerLookup);
     res.status(200).json({ success: true, count: data.length, data, loyalty: { enabled: cfg.enabled, points_per_currency: cfg.points_per_currency } });
   } catch (error) {
     console.error('Error listing customers:', error.message);
@@ -7226,6 +7247,9 @@ app.get('/api/customers/:id', async (req, res) => {
       return whMissingTable(res, 'Customers');
     }
     if (!c) return res.status(404).json({ success: false, error: 'Customer not found.' });
+    if (!roleCan(callerRole(orgUserContext), 'manage_customers')) {
+      return res.status(200).json({ success: true, customer: customerLookup(shapeCustomer(c)), recent_orders: [], loyalty_activity: [] });
+    }
     const cfg = await getLoyaltyConfig(catalystApp, orgId);
     const metrics = await recalculateCustomerMetrics(catalystApp, c.ROWID, cfg);
     let activity = [];
@@ -9236,6 +9260,19 @@ function callerRole(orgUserContext) {
 function roleCan(role, permission) {
   const r = String(role ?? '');
   switch (permission) {
+    case 'manage_profile':
+      return ['Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'].includes(r);
+    case 'signed_in':
+      return ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'].includes(r);
+    case 'read_products':
+      return ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter'].includes(r);
+    case 'lookup_customers':
+      return ['Admin', 'Manager', 'Cashier', 'Waiter'].includes(r);
+    case 'manage_customers':
+    case 'manage_operations':
+      return ['Admin', 'Manager'].includes(r);
+    case 'kitchen':
+      return ['Admin', 'Manager', 'Waiter', 'Chef'].includes(r);
     case 'sell':
       return ['Admin', 'Manager', 'Cashier', 'Waiter'].includes(r);
     case 'manage_products':
@@ -9254,6 +9291,74 @@ function roleCan(role, permission) {
     default:
       return false;
   }
+}
+
+/** Required capability for each API family; new routes default to Admin-only. */
+function apiPermission(method, path) {
+  const read = method === 'GET' || method === 'HEAD';
+  if (!path.startsWith('/api/')) return null;
+  if (['/api/health', '/api/auth/me', '/api/setup/status', '/api/auth/status', '/api/auth/callback', '/api/organizations/register', '/api/admin/approve-org', '/api/admin/reject-org'].includes(path)) return null;
+  if (path === '/api/profile/me' || path === '/api/profile/me/photo') return 'manage_profile';
+  if (/^\/api\/(admin\/users|users)(\/|$)/.test(path)) return 'manage_users';
+  if (path.startsWith('/api/admin/audit')) return 'manage_users';
+  if (path.startsWith('/api/reports/') || path === '/api/dashboard/summary') return 'view_reports';
+  if (path === '/api/items/stock-adjust') return 'adjust_stock';
+  if (/^\/api\/(items|categories)(\/|$)/.test(path)) return read ? 'read_products' : 'manage_products';
+  if (/^\/api\/(warehouses|warehouse-stock|stock-movements|transfers|purchases)(\/|$)/.test(path)) return 'manage_inventory';
+  if (/^\/api\/(customers|contacts)(\/|$)/.test(path)) {
+    if (read) return 'lookup_customers';
+    if (/\/redeem$/.test(path)) return 'sell';
+    return 'manage_customers';
+  }
+  if (path.startsWith('/api/loyalty/')) return read ? 'lookup_customers' : 'manage_operations';
+  if (/^\/api\/orders(\/|$)/.test(path)) {
+    if (/\/(void|return)$/.test(path)) return 'manage_operations';
+    return 'sell';
+  }
+  if (path.startsWith('/api/shifts')) return 'sell';
+  if (path.startsWith('/api/kot') || path === '/api/print-queue') return 'kitchen';
+  // These read-only configuration values are needed by checkout and the shell.
+  if (read && ['/api/config/settings', '/api/settings/company/logo', '/api/settings/tax', '/api/settings/payments', '/api/settings/printers', '/api/settings/print-routing'].includes(path)) return 'signed_in';
+  if (read && path === '/api/settings/company') return 'signed_in';
+  return 'manage_settings';
+}
+
+async function enforceApiPermissions(req, res, next) {
+  const permission = apiPermission(req.method, req.path);
+  if (!permission) return next();
+  try {
+    const catalystApp = catalyst.initialize(req);
+    const context = await getCurrentOrgUser(req, catalystApp);
+    if (!context) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePermission(context, res, permission)) return;
+    // Receipt, email, and print routes require the same ownership check as history.
+    if (/^\/api\/orders\/[^/]+\/(receipt|email-receipt|print)$/.test(req.path)) {
+      const id = req.path.split('/')[3];
+      if (!isDigitsId(id)) return res.status(400).json({ success: false, error: 'Invalid order ID.' });
+      const detail = await getOrderDetails(catalystApp, context.orgUser.org_id, id);
+      if (!detail) return res.status(404).json({ success: false, error: 'Order not found.' });
+      if (!canReadOrder(callerRole(context), context.user.email, detail.cashier.email)) {
+        return res.status(403).json({ success: false, error: 'You can only view your own orders.' });
+      }
+    }
+    return next();
+  } catch (error) {
+    return res.status(503).json({ success: false, error: 'Unable to verify access. Please try again.' });
+  }
+}
+
+function customerLookup(customer) {
+  const result = {};
+  for (const key of ['ROWID', 'id', 'contact_id', 'name', 'contact_name', 'email', 'phone', 'type', 'contact_type', 'tier', 'loyalty_points', 'lifetime_points', 'status']) {
+    if (customer[key] !== undefined) result[key] = customer[key];
+  }
+  return result;
+}
+
+function canReadOrder(role, email, ownerEmail) {
+  if (role === 'Admin' || role === 'Manager') return true;
+  return ['Cashier', 'Waiter'].includes(role) && !!email && !!ownerEmail &&
+    String(email).toLowerCase() === String(ownerEmail).toLowerCase();
 }
 
 /* ---------------- reusable route guards (USR-03 middleware) ---------------- */
@@ -9382,7 +9487,7 @@ async function findRosterUser(catalystApp, email) {
   try {
     return { ROWID: rows[0].Configurations.ROWID, data: JSON.parse(rows[0].Configurations.config_value) };
   } catch (e) {
-    return null;
+    throw new Error('Invalid POS role record.');
   }
 }
 
@@ -10286,7 +10391,6 @@ app.post('/api/admin/users/:id/change-role', async (req, res) => {
     if (!newRole || !POS_ALL_ROLES.includes(String(newRole))) {
       return res.status(400).json({ success: false, error: `Role must be one of: ${POS_ALL_ROLES.join(', ')}.` });
     }
-    const me = String(orgUserContext.user.email || orgUserContext.user.email_id || '').toLowerCase();
     let found = await findRosterUser(catalystApp, target);
     if (!found) found = await adoptRosterUser(catalystApp, target);
     if (!found) return res.status(404).json({ success: false, error: 'User not found.' });
@@ -10296,7 +10400,7 @@ app.post('/api/admin/users/:id/change-role', async (req, res) => {
         return res.status(403).json({ success: false, error: 'Only Admins can grant or modify the Admin role.' });
       }
     }
-    if (target.toLowerCase() === me && String(newRole) !== current && current === 'Admin') {
+    if (normWhRole(current) === 'Admin' && String(newRole) !== 'Admin' && String(found.data.status || 'active') !== 'inactive') {
       const remaining = await countActiveAdmins(catalystApp, orgUserContext);
       if (remaining <= 1) {
         return res.status(400).json({ success: false, error: 'You are the last active Admin — assign another Admin first.' });
@@ -11018,6 +11122,128 @@ async function getIntegrationHealth(catalystApp, orgUserContext) {
   return health;
 }
 
+/* ---------------- Personal staff profiles (self-service only) ---------------- */
+
+function personalProfileKey(context) {
+  const identity = JSON.stringify([String(context.orgUser.org_id), String(context.user.email).trim().toLowerCase()]);
+  return `personal_profile_${require('crypto').createHash('sha256').update(identity).digest('hex')}`;
+}
+
+async function readPersonalProfile(catalystApp, context) {
+  const key = personalProfileKey(context);
+  const rows = await safeZcql(catalystApp, `SELECT config_value FROM Configurations WHERE config_key = '${key}' LIMIT 1`);
+  if (!rows || !rows.length) return { name: context.orgUser.display_name || context.user.email, phone: '' };
+  return JSON.parse(rows[0].Configurations.config_value);
+}
+
+function publicPersonalProfile(context, profile) {
+  return {
+    name: String(profile.name || context.orgUser.display_name || context.user.email),
+    phone: String(profile.phone || ''),
+    email: context.user.email,
+    role: callerRole(context),
+    avatar_version: profile.photo_ref ? String(profile.photo_updated_at) : '',
+  };
+}
+
+function personalProfilePatch(body) {
+  const name = String(body && body.name || '').trim();
+  const phone = String(body && body.phone || '').trim();
+  if (!name || name.length > 80) return { error: 'Enter a display name of 1–80 characters.' };
+  if (phone.length > 32 || (phone && !/^[+0-9() .-]+$/.test(phone))) return { error: 'Enter a valid phone number (maximum 32 characters).' };
+  // Email, role, company, and photo storage keys cannot be changed through this form.
+  return { name, phone };
+}
+
+function parseProfilePhoto(body) {
+  const raw = String(body && body.imageData || '');
+  const match = raw.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!match) return { error: 'Choose a PNG, JPEG, or WebP photo.' };
+  if (match[2].length > Math.ceil(2 * 1024 * 1024 / 3) * 4) return { error: 'Photo must be 2 MB or smaller.' };
+  const buffer = Buffer.from(match[2], 'base64');
+  if (!buffer.length || buffer.length > 2 * 1024 * 1024) return { error: 'Photo must be 2 MB or smaller.' };
+  const mime = match[1];
+  const valid = mime === 'image/png' ? buffer.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
+    : mime === 'image/jpeg' ? buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255
+    : buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP';
+  if (!valid) return { error: 'The file contents do not match the selected image type.' };
+  return { buffer, mime, ext: mime === 'image/jpeg' ? 'jpg' : mime.split('/')[1] };
+}
+
+app.get('/api/profile/me', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req);
+    const context = await requireAuth(req, app);
+    if (!context) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'manage_profile')) return;
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, profile: publicPersonalProfile(context, await readPersonalProfile(app, context)) });
+  } catch (error) { res.status(500).json({ success: false, error: 'Could not load your profile.' }); }
+});
+
+app.put('/api/profile/me', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req);
+    const context = await requireAuth(req, app);
+    if (!context) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'manage_profile')) return;
+    const patch = personalProfilePatch(req.body);
+    if (patch.error) return res.status(400).json({ success: false, error: patch.error });
+    const profile = { ...await readPersonalProfile(app, context), ...patch, updated_at: Date.now() };
+    await safeUpsertConfig(app, personalProfileKey(context), JSON.stringify(profile));
+    res.json({ success: true, profile: publicPersonalProfile(context, profile) });
+  } catch (error) { res.status(500).json({ success: false, error: 'Could not save your profile.' }); }
+});
+
+app.post('/api/profile/me/photo', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req);
+    const context = await requireAuth(req, app);
+    if (!context) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'manage_profile')) return;
+    const photo = parseProfilePhoto(req.body);
+    if (photo.error) return res.status(400).json({ success: false, error: photo.error });
+    const profile = await readPersonalProfile(app, context);
+    const key = `profiles/${personalProfileKey(context)}/${require('crypto').randomUUID()}.${photo.ext}`;
+    await stratusUploadBuffer(app, key, photo.buffer, photo.mime);
+    const updated = { ...profile, photo_ref: key, photo_mime: photo.mime, photo_updated_at: Date.now() };
+    try { await safeUpsertConfig(app, personalProfileKey(context), JSON.stringify(updated)); }
+    catch (error) { await stratusDeleteKey(app, key); throw error; }
+    if (profile.photo_ref) await stratusDeleteKey(app, profile.photo_ref);
+    res.json({ success: true, profile: publicPersonalProfile(context, updated) });
+  } catch (error) { res.status(500).json({ success: false, error: 'Could not upload your photo. Please try again.' }); }
+});
+
+app.delete('/api/profile/me/photo', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req);
+    const context = await requireAuth(req, app);
+    if (!context) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'manage_profile')) return;
+    const profile = await readPersonalProfile(app, context);
+    const key = profile.photo_ref;
+    const updated = { ...profile, photo_ref: '', photo_mime: '', photo_updated_at: Date.now() };
+    await safeUpsertConfig(app, personalProfileKey(context), JSON.stringify(updated));
+    if (key) await stratusDeleteKey(app, key);
+    res.json({ success: true, profile: publicPersonalProfile(context, updated) });
+  } catch (error) { res.status(500).json({ success: false, error: 'Could not remove your photo.' }); }
+});
+
+app.get('/api/profile/me/photo', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req);
+    const context = await requireAuth(req, app);
+    if (!context) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'manage_profile')) return;
+    const profile = await readPersonalProfile(app, context);
+    if (!profile.photo_ref) return res.status(404).json({ success: false, error: 'No profile photo.' });
+    const bytes = await stratusDownloadBuffer(app, profile.photo_ref);
+    if (!bytes) return res.status(404).json({ success: false, error: 'Photo unavailable.' });
+    res.set({ 'Content-Type': profile.photo_mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' });
+    res.send(bytes);
+  } catch (error) { res.status(500).json({ success: false, error: 'Could not load your photo.' }); }
+});
+
 /* ---------------- company endpoints (SET-01) ---------------- */
 
 app.get('/api/settings/company', async (req, res) => {
@@ -11025,10 +11251,6 @@ app.get('/api/settings/company', async (req, res) => {
     const catalystApp = catalyst.initialize(req);
     const orgUserContext = await getCurrentOrgUser(req, catalystApp);
     if (!orgUserContext) return res.status(401).json({ success: false, error: 'Not authenticated' });
-    const role = callerRole(orgUserContext);
-    if (!['Admin', 'Manager'].includes(role)) {
-      return res.status(403).json({ success: false, error: 'Company settings require Admin or Manager.' });
-    }
     const orgId = String(orgUserContext.orgUser.org_id || '');
     res.status(200).json({ success: true, company: await getCompanyProfile(catalystApp, orgId) });
   } catch (error) {
@@ -11517,10 +11739,6 @@ app.get('/api/settings/tax', async (req, res) => {
     const catalystApp = catalyst.initialize(req);
     const orgUserContext = await getCurrentOrgUser(req, catalystApp);
     if (!orgUserContext) return res.status(401).json({ success: false, error: 'Not authenticated' });
-    const role = callerRole(orgUserContext);
-    if (!['Admin', 'Manager'].includes(role)) {
-      return res.status(403).json({ success: false, error: 'Tax settings require Admin or Manager.' });
-    }
     const orgId = String(orgUserContext.orgUser.org_id || '');
     res.status(200).json({ success: true, tax: await getTaxSettings(catalystApp, orgId) });
   } catch (error) {

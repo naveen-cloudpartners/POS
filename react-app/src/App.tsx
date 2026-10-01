@@ -12,11 +12,18 @@ import Orders from './pages/Orders';
 import Customers from './pages/Customers';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import ProfileSettings from './pages/ProfileSettings';
+import { useAuth } from './context/AuthContext';
 import Reports from './pages/Reports';
 import Purchases from './pages/Purchases';
 import WorkspaceView from './pages/WorkspaceView';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
+
+function SettingsPage() {
+  const { role } = useAuth();
+  return role === 'Admin' ? <Settings /> : <ProfileSettings />;
+}
 
 export default function App() {
   return (
@@ -82,7 +89,8 @@ export default function App() {
           <Route path="/users" element={<Users />} />
 
           {/* Settings workspace (section anchors inside the page) */}
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/profile" element={<ProfileSettings />} />
           <Route path="/settings/business" element={<WorkspaceView />} />
           <Route path="/settings/automation" element={<WorkspaceView />} />
         </Route>

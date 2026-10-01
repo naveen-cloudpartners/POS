@@ -87,12 +87,14 @@ export interface SessionUser {
   email: string;
   name: string;
   userId: string;
+  avatarVersion: string;
 }
 
 export interface BackendSession {
   authenticated: boolean;
   email: string;
   user: SessionUser | null;
+  role: string;
 }
 
 /**
@@ -100,13 +102,14 @@ export interface BackendSession {
  * user via the backend SDK. 401 / network failure => not authenticated.
  */
 export async function fetchBackendSession(): Promise<BackendSession> {
-  const empty: BackendSession = { authenticated: false, email: '', user: null };
+  const empty: BackendSession = { authenticated: false, email: '', user: null, role: '' };
   try {
-    const resp = await fetch(`${API_BASE}/auth/me`, { credentials: 'same-origin' });
+    const resp = await fetch(`${API_BASE}/auth/me`, { credentials: 'same-origin', cache: 'no-store' });
     if (!resp.ok) return empty;
     const data: {
       authenticated?: boolean;
-      user?: { email?: string; name?: string; user_id?: string };
+      role?: string;
+      user?: { email?: string; name?: string; user_id?: string; avatar_version?: string };
       email?: string;
     } = await resp.json().catch(() => ({}));
     if (data?.authenticated !== true) return empty;
@@ -114,11 +117,13 @@ export async function fetchBackendSession(): Promise<BackendSession> {
     if (!email) return empty;
     return {
       authenticated: true,
+      role: String(data.role || ''),
       email,
       user: {
         email,
         name: String(data.user?.name || email),
         userId: String(data.user?.user_id || ''),
+        avatarVersion: String(data.user?.avatar_version || ''),
       },
     };
   } catch {
