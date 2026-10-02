@@ -8,10 +8,10 @@ import {
   Users,
   AlertTriangle,
   TrendingUp,
-  TrendingDown,
+  ArrowUp,
+  ArrowDown,
+  Minus,
   ArrowRight,
-  ArrowUpRight,
-  Sparkles,
   Package,
   Zap,
   FileCheck,
@@ -26,7 +26,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Loader from '../components/ui/Loader';
 import ErrorState from '../components/ui/ErrorState';
 import EmptyState from '../components/ui/EmptyState';
-import { useCountUp } from '../hooks/useReveal';
+
 import { useAuth } from '../context/AuthContext';
 import { getOrders } from '../services/orderService';
 import { getProducts } from '../services/productService';
@@ -36,6 +36,9 @@ import { getTransfers, getWarehouses } from '../services/inventoryService';
 import { currency, formatDate, number, isLowStock, isOutOfStock } from '../utils/format';
 import type { Order, Product, StockTransfer, Warehouse } from '../types';
 import './Dashboard.css';
+import './DashboardRedesign.css';
+import DashboardChart from '../components/dashboard/DashboardChart';
+import { buildDashboardSeries } from '../utils/dashboardAnalytics';
 
 interface DashboardData {
   orders: Array<Order>;
@@ -46,23 +49,19 @@ interface DashboardData {
   transfers: Array<StockTransfer>;
 }
 
-function last7Days(): Array<string> {
-  const days: Array<string> = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
-  }
-  return days;
-}
-
-function AnimatedMoney({ value, active }: { value: number; active: boolean }) {
-  const v = useCountUp(value, active, 1100);
-  return <>{currency(v)}</>;
-}
-
 function statusOf(o: Order): string {
   return (o.status ?? '').trim().toLowerCase();
+}
+
+function DashboardMoney({ value }: { value: number }) {
+  const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+  return <strong title={currency(value)}><span className="dashboard-money-full">{currency(value)}</span><span className="dashboard-money-compact">LKR {compact}</span></strong>;
+}
+
+function MetricTrend({ change }: { change: number | null }) {
+  if (change === null) return <span className="dashboard-trend-unavailable" title="No previous-period data to calculate a trend"><Minus className="dashboard-trend-arrow flat" size={36} strokeWidth={2.2} aria-label="Trend unavailable: no previous-period data" /></span>;
+  const Icon = change > 0 ? ArrowUp : change < 0 ? ArrowDown : Minus;
+  return <Icon className={`dashboard-trend-arrow${change < 0 ? ' negative' : change === 0 ? ' flat' : ''}`} size={36} strokeWidth={2.2} aria-label={change > 0 ? 'Increase from previous period' : change < 0 ? 'Decrease from previous period' : 'Unchanged from previous period'} />;
 }
 
 function countsAsSale(o: Order): boolean {
@@ -86,12 +85,13 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState(7);
 
   const load = () => {
     setLoading(true);
     setError('');
     Promise.all([
-      getOrders(),
+      getOrders({ limit: 300 }),
       getProducts(),
       getCustomers().catch(() => []),
       getDashboardSummary(),
@@ -106,6 +106,14 @@ export default function Dashboard() {
   };
 
   useEffect(load, []);
+
+  const series = useMemo(() => buildDashboardSeries(data?.orders ?? [], period), [data, period]);
+  const periodRevenue = series.reduce((sum, point) => sum + point.revenue, 0);
+  const previousRevenue = series.reduce((sum, point) => sum + point.previousRevenue, 0);
+  const periodOrders = series.reduce((sum, point) => sum + point.orders, 0);
+  const previousOrders = series.reduce((sum, point) => sum + point.previousOrders, 0);
+  const orderGrowth = previousOrders > 0 ? (periodOrders - previousOrders) / previousOrders * 100 : null;
+  const periodGrowth = previousRevenue > 0 ? (periodRevenue - previousRevenue) / previousRevenue * 100 : null;
 
   const stats = useMemo(() => {
     if (data === null) return null;
@@ -122,16 +130,6 @@ export default function Dashboard() {
     const legacyRevenue = salesOrders.reduce((sum, o) => sum + orderValue(o), 0);
     const legacyTodayOrders = salesOrders.filter((o) => String(o.CREATEDTIME ?? '').slice(0, 10) === today);
     const legacyTodayRevenue = legacyTodayOrders.reduce((sum, o) => sum + orderValue(o), 0);
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const prevRevenue = salesOrders
-      .filter((o) => {
-        const d = String(o.CREATEDTIME ?? '').slice(0, 10);
-        return d !== '' && d < today && d >= weekAgo.toISOString().slice(0, 10);
-      })
-      .reduce((sum, o) => sum + orderValue(o), 0);
-    const growth = prevRevenue <= 0 ? (legacyRevenue > 0 ? 100 : 0) : ((legacyRevenue - prevRevenue) / prevRevenue) * 100;
-
     // DASH-01: server buckets when available, legacy lifetime fallback.
     const revenueToday = s?.revenue.today ?? legacyTodayRevenue;
     const revenueWeek = s?.revenue.week ?? legacyRevenue;
@@ -194,29 +192,9 @@ export default function Dashboard() {
       slowMovers: s?.slowMovers ?? [],
       movements: s?.movements ?? [],
       todayOrders: legacyTodayOrders, todayRevenue: revenueToday,
-      units, stockValue, avgOrder, growth, lowStock, outStock,
+      units, stockValue, avgOrder, lowStock, outStock,
     };
   }, [data]);
-
-  const salesBars = useMemo(() => {
-    if (data === null) return [];
-    const days = last7Days();
-    const totals = new Map<string, number>();
-    for (const o of data.orders.filter((row) => countsAsSale(row) && orderValue(row) > 0)) {
-      const day = String(o.CREATEDTIME ?? '').slice(0, 10);
-      totals.set(day, (totals.get(day) ?? 0) + orderValue(o));
-    }
-    const max = Math.max(1, ...days.map((d) => totals.get(d) ?? 0));
-    return days.map((d) => ({
-      day: d.slice(5),
-      full: d,
-      total: totals.get(d) ?? 0,
-      height: Math.max(6, Math.round(((totals.get(d) ?? 0) / max) * 96)),
-      peak: (totals.get(d) ?? 0) === max && max > 0,
-    }));
-  }, [data]);
-
-  const spark = useMemo(() => salesBars.map((b) => b.total), [salesBars]);
 
   const lowList = useMemo(() => {
     if (data === null) return [];
@@ -285,78 +263,44 @@ export default function Dashboard() {
     return <Navigate to="/sales/pos" replace />;
   }
 
-  const ready = data !== null;
+
   const recent = data.orders.slice(0, 6);
 
   return (
-    <div className="dash">
+    <div className="dash dashboard-redesign">
       {/* TOP — KPI row above the fold */}
       <div className="ch-page-head reveal"><PageIcon />
         <div>
-          <h1 className="ch-page-title">Business overview</h1>
+          <span className="dashboard-eyebrow">YOUR BUSINESS AT A GLANCE</span>
+          <h1 className="ch-page-title">Dashboard</h1>
           <p className="ch-page-sub">
-            {number(stats.orderTotal)} orders · {currency(stats.revenueTotal)} lifetime · {stats.todayOrderCount} sales today
+            Sales, stock and performance in one place.
           </p>
         </div>
         <div className="ch-page-actions">
           <Link to="/sales/pos" className="ch-btn ch-btn-primary"><Zap size={15} /> New sale</Link>
-          <Link to="/inventory/products" className="ch-btn ch-btn-secondary">Manage products</Link>
+          <button type="button" onClick={load} className="ch-btn ch-btn-secondary" aria-label="Refresh dashboard"><RefreshCw size={15} /> Refresh</button>
         </div>
       </div>
 
-      <div className="ch-grid-stats">
-        <StatCard label="Revenue" value={currency(stats.revenueTotal)} delta={`${currency(stats.revenueToday)} today`} deltaTone={stats.revenueToday > 0 ? 'up' : 'flat'} icon={<DollarSign size={20} />} spark={spark} delay={40} />
-        <StatCard label="Orders" value={number(stats.orderTotal)} delta={stats.todayOrderCount > 0 ? `${stats.todayOrderCount} today` : 'No sales today yet'} deltaTone={stats.todayOrderCount > 0 ? 'up' : 'flat'} icon={<ClipboardList size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={100} />
-        <StatCard
-          label="Customers"
-          value={number(stats.customers.total)}
-          delta={stats.customersKnown ? `${stats.customers.new} new · ${stats.customers.returning} returning` : 'Breakdown unavailable'}
-          deltaTone="flat"
-          icon={<Users size={20} />}
-          iconBg="#fef1e1"
-          iconColor="#b45309"
-          delay={160}
-        />
-        <StatCard
-          label={stats.profit === null ? 'Profit' : 'Actual profit'}
-          value={stats.profit === null ? '—' : currency(stats.profit.total)}
-          delta={stats.profit === null
-            ? 'Cost data unavailable'
-            : `${stats.profit.marginPct.toFixed(1)}% margin · ${stats.profitCoverage}% lines costed`}
-          deltaTone={stats.profit !== null && stats.profit.total > 0 ? 'up' : 'flat'}
-          icon={<Wallet size={20} />}
-          iconBg="#f3f4f6"
-          iconColor="#1f2937"
-          delay={220}
-        />
+      <div className="dashboard-section-bar">
+        <div><b>Performance overview</b><span>Live business data</span></div>
+        <label className="dashboard-period">Period <select value={period} onChange={event => setPeriod(Number(event.target.value))}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option></select></label>
       </div>
-
-      {/* COMPACT HERO — this week, with month context */}
-      <section className="dash-hero reveal" style={{ animationDelay: '120ms' }}>
-        <div className="dash-hero-main">
-          <span className="dash-hero-eyebrow"><Sparkles size={13} /> This week</span>
-          <p className="dash-hero-value"><AnimatedMoney value={stats.revenueWeek} active={ready} /></p>
-          <p className="dash-hero-meta">
-            <span className={stats.growth >= 0 ? 'dash-pill up' : 'dash-pill down'}>
-              {stats.growth >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-              {stats.growth >= 0 ? '+' : ''}{stats.growth.toFixed(1)}% WoW
-            </span>
-            <span className="dash-hero-sub">Today {currency(stats.revenueToday)} · Month {currency(stats.revenueMonth)}</span>
-          </p>
-          <div className="dash-hero-actions">
-            <Link to="/reports" className="dash-hero-btn">Analytics <ArrowUpRight size={14} /></Link>
-            <Link to="/sales/pos" className="dash-hero-btn ghost">Open POS <ArrowRight size={14} /></Link>
-          </div>
+      <div className="dashboard-overview-grid">
+        <div className="dashboard-metrics">
+          <article className="dashboard-metric"><div className="dashboard-metric-label">Collected revenue <DollarSign size={16} /></div><div className="dashboard-metric-value"><DashboardMoney value={periodRevenue} /><MetricTrend change={periodGrowth} /></div><span className={periodGrowth !== null && periodGrowth < 0 ? 'dashboard-change negative' : 'dashboard-change'}>{periodGrowth === null ? (periodRevenue > 0 ? 'No revenue in previous period' : 'No collected revenue yet') : `${periodGrowth >= 0 ? '+' : ''}${periodGrowth.toFixed(1)}% vs previous ${period} days`}</span><small>{currency(stats.revenueToday)} collected today</small></article>
+          <article className="dashboard-metric"><div className="dashboard-metric-label">Orders <ClipboardList size={16} /></div><div className="dashboard-metric-value"><strong>{number(periodOrders)}</strong><MetricTrend change={orderGrowth} /></div><span className={orderGrowth !== null && orderGrowth < 0 ? 'dashboard-change negative' : 'dashboard-change'}>{orderGrowth === null ? `Last ${period} days · no prior orders` : `${orderGrowth >= 0 ? '+' : ''}${orderGrowth.toFixed(1)}% vs previous ${period} days`}</span><small>{number(stats.todayOrderCount)} paid sales today</small></article>
+          <article className="dashboard-metric"><div className="dashboard-metric-label">Inventory value <Package size={16} /></div><DashboardMoney value={stats.stockValue} /><span className="dashboard-change neutral">At current selling prices</span><small>{number(stats.units)} units · {number(data.products.length)} products</small></article>
+          <article className="dashboard-metric"><div className="dashboard-metric-label">Actual profit <Wallet size={16} /></div>{stats.profit === null ? <strong>—</strong> : <DashboardMoney value={stats.profit.total} />}<span className="dashboard-change neutral">{stats.profit === null ? 'Cost data unavailable' : `${stats.profit.marginPct.toFixed(1)}% margin · recorded lines`}</span><small>{stats.profit === null ? 'Requires recorded product costs' : `${stats.profitCoverage}% of lines have recorded costs`}</small></article>
         </div>
-        <div className="dash-hero-chart" role="img" aria-label="Revenue last 7 days">
-          {salesBars.map((b) => (
-            <div key={b.full} className={b.peak ? 'dash-hero-bar peak' : 'dash-hero-bar'} title={`${b.full}: ${currency(b.total)}`}>
-              <span className="dash-hero-bar-track"><span className="dash-hero-bar-fill" style={{ height: b.height }} /></span>
-              <span className="dash-hero-bar-day">{b.day}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+        <Card title="Sales comparison" subtitle={`${series[0]?.label} – ${series.at(-1)?.label} · vs previous ${period} days`} className="dashboard-chart-card"><DashboardChart key={period} kind="sales" points={series} /></Card>
+      </div>
+      <div className="dashboard-trends-grid">
+        <Card title="Revenue growth" subtitle="Cumulative collections · equal-length periods" className="dashboard-chart-card"><DashboardChart key={period} kind="revenue" points={series} /></Card>
+        <Card title="Order trends" subtitle="Daily orders and outstanding payments" className="dashboard-chart-card"><DashboardChart key={period} kind="orders" points={series} /></Card>
+      </div>
+      <p className="dashboard-data-note">Charts use the latest {number(data.orders.length)} loaded orders (up to 300). Revenue is recorded collections; voided, cancelled and refunded orders are excluded. Inventory is current stock; profit covers available costed lines.{data.orders.length >= 300 && <strong> History limit reached: period totals and comparisons may be incomplete.</strong>}</p>
 
       {/* MIDDLE — sales activity pipeline */}
       <Card title="Sales Activity" subtitle="Live order pipeline" delay={160} className="dash-activity-card">
@@ -468,7 +412,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        <Card title="Top products" subtitle="Best sellers by units moved" delay={300} action={<Link to="/inventory/products" className="ch-btn ch-btn-ghost ch-btn-sm">All <ArrowRight size={14} /></Link>}>
+        <Card title={data.summary?.topProducts.length ? 'Top products' : 'Inventory value leaders'} subtitle={data.summary?.topProducts.length ? 'Best sellers by units moved' : 'Products ranked by current stock value'} delay={300} action={<Link to="/inventory/products" className="ch-btn ch-btn-ghost ch-btn-sm">All <ArrowRight size={14} /></Link>}>
           {stats.topProducts.length === 0 ? (
             <p className="ch-hint">No sales data yet.</p>
           ) : (

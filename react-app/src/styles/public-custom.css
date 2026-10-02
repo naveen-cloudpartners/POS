@@ -1,0 +1,95 @@
+/* Shared public-page proportions, matching the Muster login screen. */
+.muster-landing-page { --primary: #5d8ef9; --primary-hover: #3a76f8; --foreground: #14213d; --muted-foreground: #607398; --border: #e3e8f4; background: #f4f6fc; color: #14213d; }
+.muster-landing-page .container { max-width: 1120px; width: calc(100% - 48px); }
+.muster-landing-page .navbar { background: #fff; box-shadow: none; }
+.muster-landing-page .el-hero { padding: 64px 0; min-height: 600px; background: linear-gradient(150deg, #0b1226, #182c53); }
+.muster-landing-page .el-blobs { display: none; }
+.muster-landing-page .el-hero-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 48px; }
+.muster-landing-page .el-hero-copy .hero-title { color: #fff; font-size: clamp(34px, 3.4vw, 48px); line-height: 1.15; margin-bottom: 20px; }
+.muster-landing-page .el-hero-accent { color: #91b5ff; background: none; -webkit-text-fill-color: #91b5ff; font-size: inherit; margin-top: 10px; }
+.muster-landing-page .el-hero-copy .hero-subtitle { color: #b4c1dd; font-size: 15px; line-height: 1.7; margin-bottom: 28px; }
+.muster-landing-page .el-eyebrow { background: #5d8ef91f; color: #91b5ff; border-color: #ffffff1a; font-size: 10px; }
+.muster-landing-page .el-proof { color: #b4c1dd; font-size: 11px; gap: 16px; margin-top: 28px; }
+.muster-landing-page .el-visual { min-height: 360px; align-items: center; }
+.muster-landing-page .el-mock-window { transform: none; border-radius: 16px; box-shadow: 0 16px 48px #00000026; }
+.muster-landing-page .el-chip { border-radius: 10px; font-size: 11px; padding: 12px 16px; }
+.muster-landing-page .btn { min-height: 48px; border-radius: 10px; font-size: 13px; padding: 12px 20px; }
+.muster-landing-page .btn-primary { background: #5d8ef9; color: #fff; }
+.muster-landing-page .btn-primary:hover { background: #3a76f8; }
+.muster-landing-page .section { padding-top: 56px; padding-bottom: 56px; }
+.muster-landing-page main > section.container { padding-left: 0; padding-right: 0; }
+.muster-landing-page h2 { font-size: 26px; line-height: 1.3; }
+.muster-landing-page h3 { font-size: 18px; line-height: 1.4; }
+.muster-landing-page .text-muted { font-size: 13px; line-height: 1.7; }
+.muster-landing-page .surface, .muster-landing-page .integration-card { border: 1px solid #e3e8f4; border-radius: 16px; box-shadow: 0 12px 40px #14213d08; }
+.muster-landing-page .feature-card, .muster-landing-page .pricing-card { padding: 30px; }
+.muster-landing-page .features-grid, .muster-landing-page .pricing-grid { gap: 20px; }
+.muster-landing-page .feature-icon { width: 40px; height: 40px; border-radius: 10px; background: #edf3ff; color: #3977ff; }
+.muster-landing-page .footer { background: #0b1226; padding: 48px 0 24px; }
+.muster-landing-page .footer-link { color: #b4c1dd; font-size: 13px; }
+.muster-landing-page .footer-grid { gap: 32px; margin-bottom: 32px; }
+
+.org-page.muster-register-page { padding: 0; background: #f4f6fc; color: #14213d; }
+.muster-register-page .org-layout { max-width: none; min-height: 100svh; margin: 0; padding: 0; grid-template-columns: minmax(360px, .9fr) minmax(0, 1.1fr); gap: 0; align-items: stretch; }
+.muster-register-page .org-side { display: flex; align-items: center; padding: clamp(24px, 4vw, 64px); background: linear-gradient(150deg, #0b1226, #182c53); }
+.muster-register-page .org-side-card { width: 100%; max-width: 440px; position: static; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.muster-register-page .org-hero { padding: 0; text-align: left; margin: 0 0 36px; }
+.muster-register-page .org-logo { margin-bottom: 56px; }
+.muster-register-page .org-logo-mark { background: #5d8ef9; box-shadow: none; border-radius: 12px; }
+.muster-register-page .org-logo-text { color: #fff; }
+.muster-register-page .org-hero-title { color: #fff; font-size: clamp(34px, 3.4vw, 48px); line-height: 1.15; margin-bottom: 20px; }
+.muster-register-page .org-hero-title span { color: #91b5ff; }
+.muster-register-page .org-hero-sub { font-size: 15px; line-height: 1.7; color: #b4c1dd; font-weight: 400; max-width: 360px; margin: 0; }
+.muster-register-page .org-badges, .muster-register-page .org-graphic, .muster-register-page .org-side-title, .muster-register-page .org-side-sub { display: none; }
+.muster-register-page .org-benefits { gap: 22px; }
+.muster-register-page .org-benefit { padding: 0; gap: 14px; background: transparent; border: 0; }
+.muster-register-page .org-benefit-icon { width: 40px; height: 40px; border-radius: 10px; background: #5d8ef91f; color: #91b5ff; }
+.muster-register-page .org-benefit-text strong { color: #fff; font-size: 14px; }
+.muster-register-page .org-benefit-text > span { color: #b4c1dd; font-size: 12px; line-height: 1.6; }
+.muster-register-page .org-main { padding: 32px 24px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 24px; }
+.muster-register-page .org-card { width: 100%; max-width: 480px; padding: 24px 30px; border: 1px solid #e3e8f4; border-top: 4px solid #5d8ef9; border-radius: 16px; box-shadow: 0 12px 40px #14213d08; }
+.register-card-header { margin-bottom: 18px; }
+.register-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .1em; color: #3269e6; }
+.register-card-header h2 { font-size: 26px; line-height: 1.3; color: #14213d; margin: 10px 0; }
+.register-card-header p { font-size: 13px; line-height: 1.6; color: #607398; margin: 0; }
+.muster-register-page .org-grid, .muster-register-page .org-grid-2 { grid-template-columns: 1fr; gap: 0; }
+.muster-register-page .org-section { margin-bottom: 12px; }
+.muster-register-page .org-section-title { font-size: 14px; margin-bottom: 14px; color: #14213d; border-color: #eef1f8; }
+.muster-register-page .org-field { margin-bottom: 14px; }
+.muster-register-page .org-label { font-size: 13px; color: #14213d; }
+.muster-register-page .org-input { height: 48px; min-height: 48px; border-radius: 10px; font-size: 13px; color: #14213d; background: #fff; border-color: #e3e8f4; }
+.muster-register-page .org-input:focus { border-color: #5d8ef9; box-shadow: 0 0 0 3px #5d8ef91f; }
+.muster-register-page .org-input-icon { top: 15px; color: #8795ad; }
+.muster-register-page .org-step-dot { width: 28px; height: 28px; border-radius: 8px; box-shadow: none; }
+.muster-register-page .org-step.active .org-step-dot { background: #5d8ef9; border-color: #5d8ef9; }
+.muster-register-page .org-step-label { font-size: 11px; }
+.muster-register-page .org-step-count { font-size: 11px; color: #607398; }
+.muster-register-page .org-progress { height: 4px; background: #edf1fa; }
+.muster-register-page .org-progress-fill { background: #5d8ef9; box-shadow: none; }
+.muster-register-page .org-submit, .muster-register-page .org-back { min-height: 48px; border-radius: 10px; font-size: 13px; box-shadow: none; }
+.muster-register-page .org-submit { background: #3977ff; color: #fff; }
+.muster-register-page .org-submit:hover { background: #3269e6; }
+.muster-register-page .org-login { font-size: 12px; border-top: 1px solid #eef1f8; padding-top: 18px; margin-top: 20px; color: #607398; }
+.muster-register-page .org-login a { color: #3269e6; }
+.register-mobile-brand { display: none; align-items: center; gap: 10px; color: #14213d; font-size: 18px; font-weight: 700; text-decoration: none; }
+.register-mobile-brand svg { color: #5d8ef9; }
+@media (max-width: 960px) {
+  .muster-register-page .org-layout { grid-template-columns: 1fr; }
+  .muster-register-page .org-side { display: none; }
+  .muster-register-page .org-main { min-height: 100svh; }
+  .register-mobile-brand { display: inline-flex; }
+  .muster-landing-page .el-hero-grid { grid-template-columns: 1fr; gap: 36px; }
+  .muster-landing-page .el-hero-copy { max-width: 580px; margin: 0 auto; text-align: center; }
+  .muster-landing-page .el-hero-copy .hero-actions { justify-content: center; }
+}
+@media (max-width: 480px) {
+  .muster-register-page .org-main { padding: 24px 16px; gap: 20px; }
+  .muster-register-page .org-card { padding: 22px; }
+  .register-card-header h2 { font-size: 24px; }
+  .muster-landing-page .container { width: calc(100% - 32px); }
+  .muster-landing-page .el-hero { padding: 40px 0; }
+  .muster-landing-page .el-visual { min-height: 300px; }
+  .muster-landing-page .el-chip { display: none; }
+  .muster-landing-page .section { padding-top: 40px; padding-bottom: 40px; }
+  .muster-landing-page .feature-card, .muster-landing-page .pricing-card { padding: 26px 22px; }
+}

@@ -1,7 +1,7 @@
 /* Reference theme is limited to inventory routes and their dialogs. */
 .ch-app .ch-content.workspace-design {
-  --ch-primary: #374151;
-  --ch-primary-dark: #1f2937;
+  --ch-primary: #5D8EF9;
+  --ch-primary-dark: #3A76F8;
   --ch-primary-soft: #f3f4f6;
   --ch-ink: #20252b;
   --ch-muted: #7b8185;
@@ -16,7 +16,7 @@
   padding: 24px 24px 24px 90px; gap: 20px; align-items: center;
   border: 1px solid var(--ch-border); border-radius: 18px;
   background: linear-gradient(115deg, #fff 65%, #f8fafb);
-  box-shadow: 0 1px 3px #1f293708;
+  box-shadow: 0 1px 3px #00020b08;
 }
 .ch-app .ch-content.workspace-design .ch-page-head::before {
   content: ''; position: absolute; left: 24px; top: 50%; transform: translateY(-50%);
@@ -30,14 +30,14 @@
 .ch-app .ch-content.workspace-design .ch-page-title { font-size: clamp(24px, 2.3vw, 32px); letter-spacing: -.035em; line-height: 1.2; }
 .ch-app .ch-content.workspace-design .ch-page-sub { margin-top: 7px; font-size: 13px; color: var(--ch-muted); }
 .ch-app .ch-content.workspace-design .ch-card, .ch-app .ch-content.workspace-design .ch-stat {
-  border: 1px solid var(--ch-border); background: #fff; border-radius: 13px; box-shadow: 0 1px 3px #1f293708;
+  border: 1px solid var(--ch-border); background: #fff; border-radius: 13px; box-shadow: 0 1px 3px #00020b08;
 }
 .ch-app .ch-content.workspace-design .ch-card-head { padding: 18px 20px; background: #fff; border-color: var(--ch-border-soft); }
 .ch-app .ch-content.workspace-design .ch-grid-stats { gap: 14px; margin-bottom: 18px; }
-.ch-app .ch-content.workspace-design .ch-stat { --inventory-tint: #f3f4f6; --inventory-icon: #374151; min-height: 152px; padding: 24px 18px 18px; display: block; }
-.ch-app .ch-content.workspace-design .ch-stat:nth-child(2) { --inventory-tint: #fcf1df; --inventory-icon: #b76b17; }
-.ch-app .ch-content.workspace-design .ch-stat:nth-child(3) { --inventory-tint: #e6f6ee; --inventory-icon: #337b50; }
-.ch-app .ch-content.workspace-design .ch-stat:nth-child(4) { --inventory-tint: #f8fafb; --inventory-icon: #ec942b; }
+.ch-app .ch-content.workspace-design .ch-stat { --inventory-tint: #E9F0FE; --inventory-icon: #374151; min-height: 152px; padding: 24px 18px 18px; display: block; }
+.ch-app .ch-content.workspace-design .ch-stat:nth-child(2) { --inventory-tint: #E9F0FE; --inventory-icon: #3A76F8; }
+.ch-app .ch-content.workspace-design .ch-stat:nth-child(3) { --inventory-tint: #E9F0FE; --inventory-icon: #3A76F8; }
+.ch-app .ch-content.workspace-design .ch-stat:nth-child(4) { --inventory-tint: #E9F0FE; --inventory-icon: #3A76F8; }
 .ch-app .ch-content.workspace-design .ch-stat::after { top: auto; bottom: -48px; right: -30px; width: 116px; height: 116px; background: var(--inventory-tint); opacity: .55; }
 .ch-app .ch-content.workspace-design .ch-stat-icon {
   position: absolute; top: 18px; right: 18px; width: 32px; height: 32px; border-radius: 10px;
@@ -47,11 +47,11 @@
 .ch-app .ch-content.workspace-design .ch-stat-label { padding-right: 42px; min-height: 28px; font-size: 11px; letter-spacing: .025em; }
 .ch-app .ch-content.workspace-design .ch-stat-value { position: relative; z-index: 1; margin-top: 12px; font-size: 30px; }
 .ch-app .ch-content.workspace-design .ch-stat-delta { padding: 0; margin-top: 8px; background: transparent; color: var(--ch-muted); font-size: 12px; font-weight: 400; }
-.ch-app .ch-content.workspace-design .ch-btn-primary { background: linear-gradient(135deg, #1f2937, #374151); border: 1px solid #374151; border-radius: 10px; color: #fff; box-shadow: 0 7px 18px #ec942b40; }
-.ch-app .ch-content.workspace-design .ch-btn-primary:hover:not(:disabled) { background: #1f2937; }
+.ch-app .ch-content.workspace-design .ch-btn-primary { background: linear-gradient(135deg, #0B1226, #0B1226); border: 1px solid #3A76F8; border-radius: 10px; color: #e0f2ff; box-shadow: 0 7px 18px #00020b40; }
+.ch-app .ch-content.workspace-design .ch-btn-primary:hover:not(:disabled) { background: #0B1226; }
 .ch-app .ch-content.workspace-design .ch-btn-secondary { background: #fff; border-color: var(--ch-border); color: var(--ch-muted); }
 .ch-app .ch-content.workspace-design .ch-search, .ch-app .ch-content.workspace-design .ch-input, .ch-app .ch-content.workspace-design .ch-select { border-color: var(--ch-border); border-radius: 10px; background-color: #f8fafb; }
-.ch-app .ch-content.workspace-design :is(button, input, select, a):focus-visible { outline: 2px solid #374151; outline-offset: 3px; }
+.ch-app .ch-content.workspace-design :is(button, input, select, a):focus-visible { outline: 2px solid #3A76F8; outline-offset: 3px; }
 .ch-app .ch-content.workspace-design .ch-toolbar { gap: 12px; }
 .ch-app .ch-content.workspace-design .ch-state { padding: 74px 24px; }
 .ch-app .ch-content.workspace-design .ch-state-icon { width: 64px; height: 64px; border-radius: 16px; background: #f3f4f6; border: 1px solid #e5e7eb; color: #374151; box-shadow: none; }
@@ -110,18 +110,18 @@
 .ch-app .ch-content.workspace-design .ch-search.purchase-search { position: relative; width: min(330px, 100%); min-height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 11px; background: #f8fafb; border: 1px solid var(--ch-border); border-radius: 10px; }
 .ch-app .ch-content.workspace-design .ch-search.purchase-search svg { position: static; transform: none; flex-shrink: 0; color: var(--ch-muted); }
 .ch-app .ch-content.workspace-design .ch-search.purchase-search input { width: 100%; min-width: 0; min-height: 36px; padding: 0; border: 0; border-radius: 0; outline: 0; box-shadow: none; background: transparent; color: var(--ch-ink); font: inherit; font-size: 12px; }
-.ch-app .ch-content.workspace-design .ch-search.purchase-search:focus-within { border-color: var(--ch-primary); box-shadow: 0 0 0 3px #ec942b21; background: #fff; }
+.ch-app .ch-content.workspace-design .ch-search.purchase-search:focus-within { border-color: var(--ch-primary); box-shadow: 0 0 0 3px #00020b21; background: #fff; }
 .ch-app .ch-content.workspace-design .prod-stat { position: relative; overflow: hidden; align-items: flex-start; text-align: left; min-height: 152px; padding: 24px 18px 18px; gap: 16px; }
 .ch-app .ch-content.workspace-design .prod-stat > span { padding-right: 40px; }
 .ch-app .ch-content.workspace-design .prod-stat > .summary-icon { position: absolute; top: 18px; right: 18px; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border-radius: 9px; color: #374151; background: #f3f4f6; }
-.ch-app .ch-content.workspace-design .prod-stat.ok > .summary-icon { color: #337b50; background: #e6f6ee; }
-.ch-app .ch-content.workspace-design .prod-stat.warn > .summary-icon { color: #b76b17; background: #fcf1df; }
-.ch-app .ch-content.workspace-design .prod-stat.bad > .summary-icon { color: #ec942b; background: #f8fafb; }
-.ch-app .ch-content.workspace-design .prod-stat::after { content: ''; position: absolute; right: -32px; bottom: -50px; width: 118px; height: 118px; border-radius: 50%; background: #ec942b09; pointer-events: none; }
+.ch-app .ch-content.workspace-design .prod-stat.ok > .summary-icon { color: #3A76F8; background: #e6f6ee; }
+.ch-app .ch-content.workspace-design .prod-stat.warn > .summary-icon { color: #3A76F8; background: #fcf1df; }
+.ch-app .ch-content.workspace-design .prod-stat.bad > .summary-icon { color: #3A76F8; background: #f8fafb; }
+.ch-app .ch-content.workspace-design .prod-stat::after { content: ''; position: absolute; right: -32px; bottom: -50px; width: 118px; height: 118px; border-radius: 50%; background: #5D8EF909; pointer-events: none; }
 .ch-app .ch-content.workspace-design .cust-widget { position: relative; overflow: hidden; min-height: 152px; padding: 24px 18px 18px; }
 .ch-app .ch-content.workspace-design .cust-widget-ic { position: absolute; top: 18px; right: 18px; }
 .ch-app .ch-content.workspace-design .cust-widget > span:last-child { width: 100%; padding-right: 40px; }
-.ch-app .ch-content.workspace-design .cust-widget::after { content: ''; position: absolute; right: -32px; bottom: -50px; width: 118px; height: 118px; border-radius: 50%; background: #ec942b09; pointer-events: none; }
+.ch-app .ch-content.workspace-design .cust-widget::after { content: ''; position: absolute; right: -32px; bottom: -50px; width: 118px; height: 118px; border-radius: 50%; background: #5D8EF909; pointer-events: none; }
 @media (max-width: 760px) {
   .ch-app .ch-content.workspace-design .ch-card-head > .ch-toolbar { justify-content: flex-start; flex-basis: 100%; flex-wrap: wrap; }
   .ch-app .ch-content.workspace-design .ch-search.purchase-search { flex-basis: 100%; max-width: none; width: 100%; }

@@ -12,6 +12,7 @@ import Footer from '../components/Footer';
 
 import '../styles/design-system.css';
 import '../styles/landing.css';
+import '../styles/public-custom.css';
 
 /**
  * Muster POS — Landing (pure marketing page).
@@ -20,7 +21,7 @@ import '../styles/landing.css';
  */
 const Landing: React.FC = () => {
   return (
-    <div className="landing-page">
+    <div className="landing-page muster-landing-page">
       <Navbar />
       <main>
         <HeroSection />

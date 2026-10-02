@@ -28,7 +28,7 @@
 
 .ws-feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .ws-feed li { display: flex; gap: 12px; align-items: flex-start; padding: 10px; border-radius: 12px; transition: background 0.15s ease; }
-.ws-feed li:hover { background: rgba(55, 65, 81,0.05); }
+.ws-feed li:hover { background: #0B12260d; }
 .ws-feed b { display: block; font-size: 13.5px; }
 
 .ws-steps { margin: 0; padding: 0 0 0 4px; list-style: none; display: flex; flex-direction: column; gap: 12px; counter-reset: step; }
@@ -38,7 +38,7 @@
   position: absolute; left: 0; top: 0;
   width: 24px; height: 24px; border-radius: 8px;
   background: linear-gradient(135deg, var(--ch-primary), var(--ch-primary-dark));
-  color: #fff; font-size: 12px; font-weight: 700;
+  color: #e0f2ff; font-size: 12px; font-weight: 700;
   display: inline-flex; align-items: center; justify-content: center;
 }
 .ws-steps b { font-size: 13.5px; }

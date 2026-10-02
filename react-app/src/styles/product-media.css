@@ -8,14 +8,14 @@
 
   .ch-app .prod-grid { gap: 20px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
   .ch-app .prod-card { border-radius: 16px; border-color: #f8fafb; gap: 10px; box-shadow: var(--ch-shadow-sm); }
-  .ch-app .prod-card:hover { transform: none; box-shadow: 0 6px 20px rgba(24, 24, 27, .08); }
+  .ch-app .prod-card:hover { transform: none; box-shadow: 0 6px 20px #00020b14; }
   .ch-app .prod-card-top { position: relative; margin: -16px -16px 4px; width: calc(100% + 32px); min-height: 180px; }
   .ch-app .prod-card-top .prod-grid-img, .ch-app .prod-card-top .prod-big {
     width: 100%; height: 180px; border: 0; border-bottom: 1px solid #f8fafb; border-radius: 0;
     background: linear-gradient(135deg, #f3f4f6, #f8fafb); font-size: 44px; color: var(--ch-primary);
     object-fit: contain;
   }
-  .ch-app .prod-card-top .ch-badge { position: absolute; left: 12px; bottom: 12px; margin: 0; box-shadow: 0 1px 5px rgba(24, 24, 27, .08); }
+  .ch-app .prod-card-top .ch-badge { position: absolute; left: 12px; bottom: 12px; margin: 0; box-shadow: 0 1px 5px #00020b14; }
   .ch-app .prod-check { opacity: 1; top: 12px; right: 12px; z-index: 1; border: 1px solid var(--ch-border); }
   .ch-app .prod-card-name { font-size: 15px; line-height: 1.4; margin-top: 0; }
   .ch-app .prod-card-sub { font-weight: 400; }
@@ -29,7 +29,7 @@
   .ch-app .pos-card { overflow: hidden; border-radius: 14px; gap: 8px; }
   .ch-app .pos-card-name { line-height: 1.4; min-height: 36px; }
 
-  .ch-app #integrations { border-radius: 16px; border-color: #f8fafb; box-shadow: 0 3px 12px rgba(24, 24, 27, .04); }
+  .ch-app #integrations { border-radius: 16px; border-color: #f8fafb; box-shadow: 0 3px 12px #00020b0a; }
   .ch-app #integrations .ch-card-head { background: #f8fafb; padding: 20px 24px; border-bottom-color: #f8fafb; }
   .ch-app #integrations .ch-card-body { padding: 24px; gap: 24px; }
   .ch-app #integrations .settings-zoho { background: #f8fafb; border: 1px solid #f8fafb; border-radius: 12px; padding: 4px 20px; }

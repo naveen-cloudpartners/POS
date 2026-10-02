@@ -1,31 +1,31 @@
 :root {
   /* CloudHub enterprise palette — shared with the app workspace */
-  --primary: #374151;
-  --primary-hover: #1f2937;
-  --secondary: #7b8185;
+  --primary: #5D8EF9;
+  --primary-hover: #3A76F8;
+  --secondary: #0B1226;
   --background: #f8fafb;
   --foreground: #20252b;
 
   --muted: #f8fafb;
   --muted-foreground: #4b5563;
 
-  --accent: #ececee;
+  --accent: #E9F0FE;
   --accent-foreground: #1f2937;
 
   --border: #e5e7eb;
   --input: #ececee;
-  --ring: rgba(55, 65, 81, 0.22);
+  --ring: #3A76F838;
 
-  --success: #287c52;
-  --warning: #b45309;
-  --destructive: #9f454b;
+  --success: #5D8EF9;
+  --warning: #5D8EF9;
+  --destructive: #5D8EF9;
 
   /* Elevation - Layered Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-  --shadow-premium: 0 0 0 1px rgba(24, 24, 27,0.04), 0 8px 30px rgba(24, 24, 27,0.08);
+  --shadow-sm: 0 1px 2px 0 #00020b0d;
+  --shadow-md: 0 4px 6px -1px #00020b1a, 0 2px 4px -2px #00020b1a;
+  --shadow-lg: 0 10px 15px -3px #00020b1a, 0 4px 6px -4px #00020b1a;
+  --shadow-xl: 0 25px 50px -12px #00020b26;
+  --shadow-premium: 0 0 0 1px #00020b0a, 0 8px 30px #00020b14;
 
   /* Modern Radii */
   --radius-sm: 0.625rem;
@@ -53,13 +53,13 @@
 }
 
 .dark {
-  --background: #1f2937;
-  --foreground: #f8fafb;
-  --muted: #1f2937;
+  --background: #0B1226;
+  --foreground: #e0f2ff;
+  --muted: #E9F0FE;
   --muted-foreground: #a1a1aa;
-  --accent: #20252b;
-  --border: #20252b;
-  --shadow-premium: 0 0 0 1px rgba(255,255,255,0.1), 0 12px 24px rgba(0,0,0,0.3);
+  --accent: #5D8EF9;
+  --border: #3A76F8;
+  --shadow-premium: 0 0 0 1px #00020b1a, 0 12px 24px #00020b4d;
 }
 
 * {
@@ -117,7 +117,7 @@ a {
 .surface:hover {
   transform: translateY(-3px);
   border-color: var(--primary);
-  box-shadow: 0 8px 30px rgba(24, 24, 27, 0.1);
+  box-shadow: 0 8px 30px #00020b1a;
 }
 
 /* Buttons System */
@@ -135,15 +135,15 @@ a {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #374151, var(--primary-hover));
-  color: white;
-  box-shadow: 0 6px 18px rgba(55, 65, 81, 0.32), inset 0 1px 0 rgba(255,255,255,0.25);
+  background: linear-gradient(135deg, #0B1226, var(--primary-hover));
+  color: #e0f2ff;
+  box-shadow: 0 6px 18px #00020b52, inset 0 1px 0 #00020b40;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #ec942b, var(--primary-hover));
+  background: linear-gradient(135deg, #5D8EF9, var(--primary-hover));
   transform: translateY(-1px);
-  box-shadow: 0 10px 26px rgba(55, 65, 81, 0.42), 0 0 0 4px var(--ring);
+  box-shadow: 0 10px 26px #00020b6b, 0 0 0 4px var(--ring);
 }
 
 .btn-secondary {

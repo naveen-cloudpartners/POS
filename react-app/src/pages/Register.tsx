@@ -27,6 +27,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import '../styles/register.css';
+import '../styles/public-custom.css';
 import API_BASE from '../services/api';
 
 /* ==========================================================================
@@ -361,14 +362,19 @@ const Register: React.FC = () => {
   const closeModal = () => setShowSuccess(false);
 
   return (
-    <div className="org-page">
+    <div className="org-page muster-register-page">
+      {/* ---------- Main two-column ---------- */}
+      <div className="org-layout">
+        {/* Left: benefits illustration panel */}
+        <aside className="org-side" aria-label="Why Muster POS">
+          <div className="org-side-card">
       {/* ---------- Hero ---------- */}
       <header className="org-hero">
         <Link to="/" className="org-logo" aria-label="Muster POS home">
           <span className="org-logo-mark" aria-hidden="true"><Cloud /></span>
           <span className="org-logo-text">Muster POS</span>
         </Link>
-        <h1 className="org-hero-title">Register Your Organization</h1>
+        <h1 className="org-hero-title">Your business.<br /><span>Ready to grow.</span></h1>
         <p className="org-hero-sub">
           Create your organization account and start managing sales,
           inventory, customers and reporting with Muster POS.
@@ -383,11 +389,7 @@ const Register: React.FC = () => {
         </ul>
       </header>
 
-      {/* ---------- Main two-column ---------- */}
-      <div className="org-layout">
-        {/* Left: benefits illustration panel */}
-        <aside className="org-side" aria-label="Why Muster POS">
-          <div className="org-side-card">
+
             <div className="org-graphic" aria-hidden="true">
               <div className="org-graphic-orb orb-a" />
               <div className="org-graphic-orb orb-b" />
@@ -426,7 +428,13 @@ const Register: React.FC = () => {
 
         {/* Right: registration form card */}
         <main className="org-main">
+          <Link to="/" className="register-mobile-brand"><Cloud size={28} aria-hidden="true" /> Muster POS</Link>
           <form className="org-card" onSubmit={handleSubmit} noValidate>
+            <div className="register-card-header">
+              <span className="register-eyebrow">GET STARTED</span>
+              <h2>Create your workspace</h2>
+              <p>Tell us about your business to request an organization account.</p>
+            </div>
             {/* Step indicator + progress */}
             <div className="org-steps" aria-label="Registration progress">
               <ol className="org-steps-list">
@@ -439,7 +447,7 @@ const Register: React.FC = () => {
                     <span className="org-step-dot" aria-hidden="true">
                       {i < step ? <Check /> : i + 1}
                     </span>
-                    <span className="org-step-label">{label}</span>
+                    <span className="org-step-label">{['Company', 'Owner', 'Address'][i]}</span>
                   </li>
                 ))}
               </ol>

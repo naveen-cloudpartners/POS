@@ -1,0 +1,95 @@
+/* Scoped dashboard layout: operational cards with generous chart space. */
+.ch-app.muster-reference-app .ch-content .dashboard-redesign { max-width: 1600px; margin: 0 auto; color: #14213d; }
+.dashboard-redesign .dashboard-eyebrow { display: block; font-size: 10px; letter-spacing: .12em; color: #8793a9; font-weight: 700; margin-bottom: 7px; }
+.ch-app.muster-reference-app .ch-content .dashboard-redesign .ch-page-head { margin-bottom: 24px; align-items: center; }
+.ch-app.muster-reference-app .ch-content .dashboard-redesign .ch-page-title { font-size: 27px; }
+.dashboard-section-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.dashboard-section-bar > div { display: flex; align-items: center; gap: 12px; }
+.dashboard-section-bar b { font-size: 14px; }
+.dashboard-section-bar > div > span { color: #8090a8; font-size: 11px; border-left: 1px solid #dde4ef; padding-left: 12px; }
+.dashboard-period { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #607398; }
+.dashboard-period select { height: 36px; border: 1px solid #dfe5ee; background: #fff; border-radius: 8px; padding: 0 10px; color: #14213d; font: inherit; cursor: pointer; }
+.dashboard-overview-grid { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.25fr); gap: 20px; margin-bottom: 20px; }
+.dashboard-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.dashboard-metric { padding: 22px; border: 1px solid #e4e9f1; border-radius: 12px; background: #fff; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.dashboard-metric-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #607398; font-size: 12px; font-weight: 500; }
+.dashboard-metric-label svg { color: #879ab9; flex-shrink: 0; }
+.dashboard-metric strong { font-size: clamp(23px, 2vw, 32px); font-weight: 700; line-height: 1.25; margin: 14px 0 8px; letter-spacing: -.04em; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.dashboard-change { color: #169a64; font-size: 11px; line-height: 1.5; }
+.dashboard-change.negative { color: #c44956; }
+.dashboard-change.neutral { color: #607398; }
+.dashboard-metric small { font-size: 10px; line-height: 1.5; color: #8b97ac; margin-top: 6px; }
+.dashboard-money-compact { display: none; }
+.dashboard-metric { container-type: inline-size; }
+.dashboard-metric-value { display: flex; align-items: center; gap: 12px; }
+@container (max-width: 250px) {
+  .dashboard-metric-value .dashboard-money-full { display: none; }
+  .dashboard-metric-value .dashboard-money-compact { display: inline; }
+}
+.dashboard-metric-value > strong { min-width: 0; flex: 1; }
+.dashboard-trend-unavailable { display: inline-flex; flex-shrink: 0; }
+.dashboard-metric-value .dashboard-trend-arrow { display: block; flex-shrink: 0; width: 36px; height: 36px; color: #19a56d; opacity: 1; visibility: visible; }
+.dashboard-metric-value .dashboard-trend-arrow.negative { color: #d35b69; }
+.dashboard-metric-value .dashboard-trend-arrow.flat { color: #8b97ac; }
+.dashboard-chart { position: relative; }
+.dashboard-chart-topline { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.dashboard-chart-topline .dashboard-chart-unit { margin: 0; }
+.dashboard-line-key { display: inline-flex; align-items: center; gap: 6px; color: #607398; font-size: 9px; }
+.dashboard-line-key i { width: 18px; height: 2px; background: #ef6a72; }
+.dashboard-chart-legend .legend-line { width: 16px; height: 2px; border-radius: 0; }
+.dashboard-chart-tooltip { position: absolute; top: 32px; transform: translateX(-50%); pointer-events: none; z-index: 2; min-width: 190px; max-width: 240px; padding: 12px; background: #fff; border: 1px solid #dfe6f1; border-radius: 10px; box-shadow: 0 6px 24px #14213d1a; font-size: 10px; }
+.dashboard-chart-tooltip > b { display: block; margin-bottom: 10px; color: #14213d; }
+.dashboard-chart-tooltip > span { display: flex; align-items: center; gap: 6px; color: #607398; margin-top: 6px; }
+.dashboard-chart-tooltip i { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dashboard-chart-tooltip strong { margin-left: auto; font-size: 10px; color: #14213d; }
+.dashboard-trends-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-bottom: 10px; }
+.ch-app.muster-reference-app .ch-content .dashboard-redesign .ch-card { border: 1px solid #e4e9f1; border-radius: 12px; box-shadow: 0 3px 12px #14213d03; background: #fff; }
+.ch-app.muster-reference-app .ch-content .dashboard-redesign .ch-card-head { padding: 18px 22px 12px; border-bottom: 0; }
+.ch-app.muster-reference-app .ch-content .dashboard-redesign .ch-card-title { font-size: 14px; font-weight: 650; }
+.ch-app.muster-reference-app .ch-content .dashboard-redesign .ch-card-sub { font-size: 11px; color: #8b97ac; margin-top: 5px; }
+.ch-app.muster-reference-app .ch-content .dashboard-redesign .ch-card-body { padding: 12px 22px 20px; }
+.dashboard-chart-unit { font-size: 10px; color: #8895aa; margin-bottom: 6px; }
+.dashboard-chart svg { display: block; width: 100%; height: 180px; overflow: visible; }
+.dashboard-chart-axis { font-family: inherit; font-size: 10px; fill: #8b97ac; }
+.dashboard-chart-legend { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; font-size: 10px; color: #607398; margin-top: 4px; }
+.dashboard-chart-legend span { display: inline-flex; gap: 6px; align-items: center; }
+.dashboard-chart-legend i { width: 8px; height: 8px; border-radius: 2px; }
+.dashboard-chart-readout { min-height: 26px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 10px; color: #607398; padding: 4px 0; }
+.dashboard-chart-readout b { color: #14213d; }
+.dashboard-chart-details { font-size: 10px; color: #607398; margin-top: 6px; }
+.dashboard-chart-details summary { cursor: pointer; width: fit-content; }
+.dashboard-chart-date-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dashboard-chart-date-buttons button { background: #f4f7fc; color: #42608b; border: 1px solid #e3e8f4; border-radius: 6px; padding: 6px 8px; font: inherit; cursor: pointer; }
+.dashboard-redesign :is(button, select, summary):focus-visible { outline: 2px solid #5d8ef9; outline-offset: 3px; }
+.dashboard-data-note { margin: 0 0 24px; font-size: 10px; color: #8895aa; line-height: 1.6; }
+.ch-app.muster-reference-app .dashboard-redesign .sales-activity .sa-cell { padding: 14px 10px; }
+.ch-app.muster-reference-app .dashboard-redesign .sales-activity .sa-cell b { font-size: 24px; }
+.dashboard-redesign .sa-cap { display: none; }
+.ch-app.muster-reference-app .dashboard-redesign .dash-grid { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
+.ch-app.muster-reference-app .dashboard-redesign .dash-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) {
+  .dashboard-overview-grid { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dashboard-metric { padding: 18px; }
+  .dashboard-metric strong { font-size: 24px; }
+  .dashboard-money-full { display: none; }
+  .dashboard-money-compact { display: inline; }
+  .ch-app.muster-reference-app .dashboard-redesign .dash-grid-3 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+  .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .dashboard-metric { padding: 16px; }
+  .dashboard-metric-value { gap: 4px; }
+  .dashboard-metric-value .dashboard-trend-arrow { width: 24px; height: 24px; }
+  .dashboard-metric-value strong { font-size: 21px; }
+  .dashboard-trends-grid, .ch-app.muster-reference-app .dashboard-redesign .dash-grid { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-section-bar > div > span { display: none; }
+  .dashboard-section-bar b { font-size: 12px; }
+  .dashboard-period { gap: 6px; font-size: 11px; }
+  .ch-app.muster-reference-app .ch-content .dashboard-redesign .ch-card-head { padding: 16px 16px 8px; }
+  .ch-app.muster-reference-app .ch-content .dashboard-redesign .ch-card-body { padding: 8px 16px 16px; }
+  .dashboard-redesign .sales-activity { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .dashboard-redesign .sa-lbl { font-size: 9px; }
+  .dashboard-chart-legend { gap: 10px; }
+  .dashboard-chart svg { height: auto; min-height: 150px; }
+}

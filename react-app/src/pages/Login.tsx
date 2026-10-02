@@ -1,41 +1,31 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Cloud,
   ShoppingCart,
   Boxes,
   BarChart3,
-  Users,
   ShieldCheck,
-  CheckCircle2,
   ArrowRight,
   Loader2,
   Sparkles,
   Zap,
 } from 'lucide-react';
 import '../styles/login.css';
-import { login, fetchBackendSession, CATALYST_LOGIN_URL } from '../services/catalystAuth';
+import { login, fetchBackendSession, renderEmbeddedLogin } from '../services/catalystAuth';
+import '../styles/login-custom.css';
 
 /* ==========================================================================
    Muster POS — Modern SaaS Login Page
-   Authentication & Session logic kept 100% unchanged.
+   Native Embedded Authentication with a Muster CSS theme.
    ========================================================================== */
 
 type CatalystState = 'checking' | 'signedin' | 'signedout';
 
 const FEATURES = [
-  { icon: ShoppingCart, title: 'POS Billing', desc: 'Lightning-fast checkout with offline protection' },
-  { icon: Boxes, title: 'Inventory Tracking', desc: 'Real-time stock sync across all stores & warehouses' },
-  { icon: BarChart3, title: 'Sales Analytics', desc: 'Shift tracking, margins, and best-sellers at a glance' },
-  { icon: Users, title: 'Multi User Access', desc: 'Role-based access control for cashiers, managers & admins' },
-  { icon: ShieldCheck, title: 'Secure Cloud Hosting', desc: 'Enterprise safety & SLA powered by Zoho Catalyst' },
-];
-
-const STATS = [
-  { value: '10,000+', label: '10,000+ Orders', sub: 'Monthly sales volume' },
-  { value: '99.9%', label: '99.9% Uptime', sub: 'Enterprise reliability' },
-  { value: 'Real-Time', label: 'Real-Time Inventory', sub: 'Multi-location sync' },
-  { value: 'Zoho Books', label: 'Zoho Books Connected', sub: 'Auto-reconciliation' },
+  { icon: ShoppingCart, title: 'Fast, simple checkout', desc: 'Keep billing and orders moving.' },
+  { icon: Boxes, title: 'Inventory in one place', desc: 'Manage products, stock and purchasing.' },
+  { icon: BarChart3, title: 'A clear view of your sales', desc: 'See the reports that matter to your store.' },
 ];
 
 const Login: React.FC = () => {
@@ -45,7 +35,8 @@ const Login: React.FC = () => {
   const showEmbeddedLogin = true;
   const [frameBlocked, setFrameBlocked] = useState(false);
   const [embedNote, setEmbedNote] = useState('');
-  const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const authRef = useRef<HTMLDivElement | null>(null);
+  const [formHeight, setFormHeight] = useState(280);
 
   useEffect(() => {
     let live = true;
@@ -90,8 +81,8 @@ const Login: React.FC = () => {
     return () => { cancelled = true; clearInterval(id); };
   }, [showEmbeddedLogin, catalystState]);
 
-  const handleFrameLoad = async () => {
-    const frame = frameRef.current;
+  const handleFrameLoad = useCallback(async () => {
+    const frame = authRef.current?.querySelector('iframe');
     if (!frame) return;
     let nested = false;
     let detectedUrl = '';
@@ -112,14 +103,59 @@ const Login: React.FC = () => {
     } else {
       setEmbedNote('Embedded sign-in is unavailable — please use full-page sign-in below.');
     }
-  };
+  }, []);
 
   const useHostedSignIn = () => {
     void login();
   };
 
+  useEffect(() => {
+    if (catalystState !== 'signedout') return;
+    let mounted = true;
+    const container = authRef.current;
+    const frames = new Set<HTMLIFrameElement>();
+    const resizeObservers: ResizeObserver[] = [];
+    const onLoad = (event: Event) => {
+      if (!mounted) return;
+      void handleFrameLoad();
+      const frame = event.currentTarget as HTMLIFrameElement;
+      try {
+        const form = frame.contentDocument?.querySelector('.signin_container, .recovery_container');
+        if (!form) return;
+        const resize = () => {
+          if (mounted) setFormHeight(Math.max(260, Math.ceil(form.getBoundingClientRect().height) + 12));
+        };
+        resize();
+        const resizeObserver = new ResizeObserver(resize);
+        resizeObserver.observe(form);
+        resizeObservers.push(resizeObserver);
+      } catch { /* Cross-origin provider screens retain the initial frame height. */ }
+    };
+    const observeFrame = () => {
+      const frame = container?.querySelector('iframe');
+      if (!frame || frames.has(frame)) return;
+      frames.add(frame);
+      frame.title = 'Sign in to Muster';
+      frame.addEventListener('load', onLoad);
+    };
+    const observer = new MutationObserver(observeFrame);
+    if (container) observer.observe(container, { childList: true });
+    void renderEmbeddedLogin('muster-login-form', () => mounted).catch(() => {
+      if (mounted) {
+        setFrameBlocked(true);
+        setEmbedNote('We couldn’t load the sign-in form. Please use full-page sign-in below.');
+      }
+    });
+    return () => {
+      mounted = false;
+      observer.disconnect();
+      resizeObservers.forEach(resizeObserver => resizeObserver.disconnect());
+      frames.forEach(frame => frame.removeEventListener('load', onLoad));
+    };
+  }, [catalystState, handleFrameLoad]);
+
   return (
-    <div className="login-page">
+    <div className="login-page muster-login-page">
       {/* Background Ambient Glow Effects */}
       <div className="login-bg-glow glow-1" aria-hidden="true" />
       <div className="login-bg-glow glow-2" aria-hidden="true" />
@@ -145,11 +181,11 @@ const Login: React.FC = () => {
           {/* Hero Section */}
           <div className="brand-hero">
             <h1 className="login-headline">
-              Manage Your Store <br />
-              <span className="headline-gradient">From Anywhere</span>
+              Your store.<br />
+              <span className="headline-gradient">One workspace.</span>
             </h1>
             <p className="login-sub">
-              Muster POS combines billing, sales, inventory, reporting and Zoho Books integration in one cloud platform.
+              Everything your team needs to sell, manage stock and keep the business moving.
             </p>
           </div>
 
@@ -171,41 +207,28 @@ const Login: React.FC = () => {
             </ul>
           </div>
 
-          {/* Statistics Grid */}
-          <div className="login-stats-grid">
-            {STATS.map((s) => (
-              <div key={s.label} className="glass-stat-card">
-                <div className="stat-header">
-                  <span className="stat-value-text">{s.value}</span>
-                  <CheckCircle2 className="stat-check" aria-hidden="true" />
-                </div>
-                <span className="stat-label-text">{s.label}</span>
-                <span className="stat-sub-text">{s.sub}</span>
-              </div>
-            ))}
-          </div>
-
           {/* Bottom Trust Badge */}
           <div className="login-trust-footer">
             <div className="trust-pulse" aria-hidden="true" />
-            <span>Official Zoho Books &amp; Zoho Catalyst Cloud Partner</span>
+            <span>Connected with Zoho Books · Powered by Catalyst</span>
           </div>
         </div>
       </aside>
 
       {/* ---------- Right: Glassmorphism Sign-In Panel ---------- */}
       <main className="login-main">
+        <Link to="/landing" className="login-mobile-brand" aria-label="Muster POS home"><Cloud size={24} aria-hidden="true" /><span>Muster POS</span></Link>
         <div className="glass-login-card" role="region" aria-labelledby="login-title">
           <div className="card-top-accent" aria-hidden="true" />
           
           <div className="login-card-header">
             <div className="secure-badge">
               <Zap className="badge-zap-icon" aria-hidden="true" />
-              <span>Secure Single Sign-On</span>
+              <span>Welcome back</span>
             </div>
             <h2 id="login-title">Sign in to Muster</h2>
             <p className="login-card-desc">
-              Access your point-of-sale, inventory controls &amp; sales reports.
+              Welcome back. Let’s get your day started.
             </p>
           </div>
 
@@ -220,22 +243,11 @@ const Login: React.FC = () => {
           {/* Embedded Iframe State */}
           {catalystState === 'signedout' && !frameBlocked && (
             <div className="login-frame-container">
-              <div className="login-auth-frame">
-                <iframe
-                  ref={frameRef}
-                  src={CATALYST_LOGIN_URL}
-                  title="Catalyst sign-in"
-                  onLoad={() => { void handleFrameLoad(); }}
-                  onError={() => {
-                    setFrameBlocked(true);
-                    setEmbedNote('Embedded sign-in is unavailable — please use full-page sign-in below.');
-                  }}
-                />
-              </div>
+              <div ref={authRef} id="muster-login-form" className="login-auth-frame" style={{ '--auth-form-height': `${formHeight}px` } as React.CSSProperties} />
               <p className="login-hint">
-                Prefer full screen?{' '}
+                Having trouble?{' '}
                 <button type="button" className="login-link-btn" onClick={useHostedSignIn}>
-                  Open Catalyst Sign In
+                  Use full-page sign in
                 </button>
               </p>
             </div>
@@ -270,6 +282,7 @@ const Login: React.FC = () => {
           )}
 
           {/* Card Footer Link */}
+          <p className="login-security-note"><ShieldCheck size={15} aria-hidden="true" />Secure sign in powered by Catalyst</p>
           <div className="login-card-footer">
             <p className="login-signup">
               Need access? <Link to="/register">Create Account</Link>

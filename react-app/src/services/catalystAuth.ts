@@ -1,7 +1,7 @@
 // CloudHub POS — Catalyst Authentication ONLY (frontend).
 // Package: @zcatalyst/auth v0.0.4 (Apache-2.0), browser entry
-// `@zcatalyst/auth/web`. Passwords are typed ONLY on Catalyst's hosted
-// login page — our code never sees, sends, or stores them. There is no
+// `@zcatalyst/auth/web`. Passwords are typed ONLY in Catalyst's native
+// login form — our code never sees, sends, or stores them. There is no
 // OTP, no local user record, no localStorage session. The Catalyst
 // session (verified server-side via GET /api/auth/me) is the single
 // source of truth.
@@ -56,6 +56,19 @@ export async function login(): Promise<void> {
       e instanceof Error ? e.message : e);
     window.location.href = CATALYST_LOGIN_URL;
   }
+}
+
+/** Render the native embedded login and password reset with Muster CSS. */
+export async function renderEmbeddedLogin(elementId: string, isMounted: () => boolean): Promise<void> {
+  // Initialize credentials before the SDK constructor captures project IDs.
+  if (!ConfigStore.get('INITIALIZED') || !ConfigStore.get('ZAID')) await getCredentials();
+  const m = await web();
+  if (!isMounted()) return;
+  await m.zcAuth.signIn(elementId, {
+    cssUrl: `${window.location.origin}/app/css/muster-auth.css?v=muster-2`,
+    forgotPasswordCssUrl: `${window.location.origin}/app/css/muster-password.css?v=muster-2`,
+    redirectUrl: '/app/dashboard',
+  });
 }
 
 /**
