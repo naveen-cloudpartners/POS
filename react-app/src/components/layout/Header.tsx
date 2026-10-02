@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Bell, Search, Zap, ShoppingCart, Package, Users, FileBarChart } from 'lucide-react';
+import { Menu, Search, Zap, ShoppingCart, Package, Users, FileBarChart } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 import { useAuth } from '../../context/AuthContext';
 import { logout } from '../../services/catalystAuth';
 import { companyLogoUrl, getCompanyProfile } from '../../services/settingsService';
@@ -26,11 +27,9 @@ export default function Header({ title, module, subtitle, onMenu }: HeaderProps)
   const { user, role } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [notifOpen, setNotifOpen] = useState(false);
   const [qaOpen, setQaOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [logoSrc, setLogoSrc] = useState('');
-  const notifRef = useRef<HTMLDivElement | null>(null);
   const qaRef = useRef<HTMLDivElement | null>(null);
   const userRef = useRef<HTMLDivElement | null>(null);
 
@@ -47,7 +46,6 @@ export default function Header({ title, module, subtitle, onMenu }: HeaderProps)
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (notifRef.current !== null && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
       if (qaRef.current !== null && !qaRef.current.contains(e.target as Node)) setQaOpen(false);
       if (userRef.current !== null && !userRef.current.contains(e.target as Node)) setUserOpen(false);
     };
@@ -57,7 +55,6 @@ export default function Header({ title, module, subtitle, onMenu }: HeaderProps)
         document.getElementById('ch-global-search')?.focus();
       }
       if (e.key === 'Escape') {
-        setNotifOpen(false);
         setQaOpen(false);
         setUserOpen(false);
       }
@@ -71,7 +68,6 @@ export default function Header({ title, module, subtitle, onMenu }: HeaderProps)
   }, []);
 
   useEffect(() => {
-    setNotifOpen(false);
     setQaOpen(false);
     setUserOpen(false);
   }, [location.pathname, location.hash]);
@@ -113,7 +109,7 @@ export default function Header({ title, module, subtitle, onMenu }: HeaderProps)
             className="ch-btn ch-btn-primary ch-btn-sm"
             aria-label="Quick add"
             aria-expanded={qaOpen}
-            onClick={() => { setQaOpen((v) => !v); setNotifOpen(false); setUserOpen(false); }}
+            onClick={() => { setQaOpen((v) => !v); setUserOpen(false); }}
           >
             <Zap size={14} /> Quick add
           </button>
@@ -127,29 +123,10 @@ export default function Header({ title, module, subtitle, onMenu }: HeaderProps)
           )}
         </div>
 
-        <div className="ch-notif-wrap" ref={notifRef}>
-          <button
-            type="button"
-            className="ch-icon-btn"
-            aria-label="Notifications"
-            aria-expanded={notifOpen}
-            onClick={() => { setNotifOpen((v) => !v); setQaOpen(false); setUserOpen(false); }}
-          >
-            <Bell size={17} />
-            <span className="ch-dot" aria-hidden="true" />
-          </button>
-          {notifOpen && (
-            <div className="ch-notif-pop" role="menu" aria-label="Notifications">
-              <div className="ch-notif-head">Notifications <span className="ch-badge ch-badge-info">3 new</span></div>
-              <div className="ch-notif-item"><span className="ch-thumb" style={{ width: 36, height: 36 }}>◈</span><span><b>Sales sync complete</b><span>Orders and inventory are up to date.</span></span></div>
-              <div className="ch-notif-item"><span className="ch-thumb" style={{ width: 36, height: 36, background: 'var(--ch-warning-bg)', color: 'var(--ch-warning-ink)' }}>!</span><span><b>Low-stock review</b><span>Check Inventory for items under 10 units.</span></span></div>
-              <div className="ch-notif-item"><span className="ch-thumb" style={{ width: 36, height: 36, background: 'var(--ch-success-bg)', color: 'var(--ch-success-ink)' }}>✓</span><span><b>Store is live</b><span>POS is ready to take sales.</span></span></div>
-            </div>
-          )}
-        </div>
+        <NotificationBell />
 
         <div className="ch-notif-wrap" ref={userRef}>
-          <button type="button" className="ch-profile" onClick={() => { setUserOpen((v) => !v); setNotifOpen(false); setQaOpen(false); }} aria-label="User menu" aria-expanded={userOpen} title="Account">
+          <button type="button" className="ch-profile" onClick={() => { setUserOpen((v) => !v); setQaOpen(false); }} aria-label="User menu" aria-expanded={userOpen} title="Account">
             <span className="ch-avatar" aria-hidden="true">
               <span className={logoSrc ? 'ch-profile-initial has-logo' : 'ch-profile-initial'}>{initial}</span>
               {logoSrc && <img className="ch-profile-logo" src={logoSrc} alt="" onError={() => setLogoSrc('')} />}

@@ -1,34 +1,40 @@
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Bell } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 import { useAuth } from '../../context/AuthContext';
 import { logout } from '../../services/catalystAuth';
 import { profilePhotoUrl } from '../../services/profileService';
+import { companyLogoUrl, getCompanyProfile } from '../../services/settingsService';
 
 export default function SidebarActions({ settingsControl }: { settingsControl?: ReactNode }) {
   const { user, role } = useAuth();
   const location = useLocation();
-  const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [logoSrc, setLogoSrc] = useState('');
-  const notifRef = useRef<HTMLDivElement | null>(null);
   const userRef = useRef<HTMLDivElement | null>(null);
 
   const initial = (user?.name ?? user?.email ?? 'U').trim().charAt(0).toUpperCase() || 'U';
 
   useEffect(() => {
-    setLogoSrc(user?.avatarVersion ? profilePhotoUrl(user.avatarVersion) : '');
+    let live = true;
+    setLogoSrc('');
+    if (role === 'Admin') {
+      void getCompanyProfile().then(company => {
+        if (live && company.logo_file_id) setLogoSrc(`${companyLogoUrl()}?v=${encodeURIComponent(company.logo_file_id)}`);
+      }).catch(() => undefined);
+    } else {
+      setLogoSrc(user?.avatarVersion ? profilePhotoUrl(user.avatarVersion) : '');
+    }
+    return () => { live = false; };
   }, [location.pathname, location.hash, role, user?.avatarVersion]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (notifRef.current !== null && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
       if (userRef.current !== null && !userRef.current.contains(e.target as Node)) setUserOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setNotifOpen(false);
         setUserOpen(false);
       }
     };
@@ -41,36 +47,19 @@ export default function SidebarActions({ settingsControl }: { settingsControl?: 
   }, []);
 
   useEffect(() => {
-    setNotifOpen(false);
     setUserOpen(false);
   }, [location.pathname, location.hash]);
 
   return (
     <div className="ch-sidebar-actions">
-        <div className="ch-notif-wrap" ref={notifRef}>
-          <button
-            type="button"
-            className="ch-icon-btn"
-            aria-label="Notifications"
-            aria-expanded={notifOpen}
-            onClick={() => { setNotifOpen((v) => !v);  setUserOpen(false); }}
-          >
-            <Bell size={17} />
-          </button>
-          {notifOpen && (
-            <div className="ch-notif-pop" role="menu" aria-label="Notifications">
-              <div className="ch-notif-head">Notifications</div>
-              <div className="ch-notif-item"><span><b>No notifications</b><span>You have no new notifications to review.</span></span></div>
-            </div>
-          )}
-        </div>
+        <NotificationBell />
 
         {settingsControl}
         <div className="ch-notif-wrap" ref={userRef}>
-          <button type="button" className="ch-profile" onClick={() => { setUserOpen((v) => !v); setNotifOpen(false);  }} aria-label="User menu" aria-expanded={userOpen} title="Account">
+          <button type="button" className="ch-profile" onClick={() => { setUserOpen((v) => !v); }} aria-label="User menu" aria-expanded={userOpen} title="Account">
             <span className="ch-avatar" aria-hidden="true">
               <span className={logoSrc ? 'ch-profile-initial has-logo' : 'ch-profile-initial'}>{initial}</span>
-              {logoSrc && <img className="ch-profile-logo" src={logoSrc} alt="" onError={() => setLogoSrc('')} />}
+              {logoSrc && <img className={`ch-profile-logo ${role === 'Admin' ? 'company-avatar' : 'personal-avatar'}`} src={logoSrc} alt="" onError={() => setLogoSrc('')} />}
             </span>
           </button>
           {userOpen && (

@@ -8,6 +8,7 @@ import {
   BarChart3,
   ShieldCheck,
   Settings,
+  ChefHat,
 } from 'lucide-react';
 
 /* CloudHub POS — Enterprise workspace navigation model.
@@ -65,14 +66,18 @@ export const WORKSPACES: Array<Workspace> = [
     label: 'POS',
     tagline: 'Counter terminal & payments',
     icon: ShoppingCart,
-    roles: [...SELLERS, 'Chef'],
+    roles: SELLERS,
     children: [
       { id: 'pos-terminal', label: 'POS Terminal', to: '/sales/pos', aliases: ['/pos'], roles: SELLERS },
-      { id: 'pos-kitchen', label: 'Kitchen', to: '/sales/kitchen', roles: ['Admin', 'Manager', 'Waiter', 'Chef'] },
       { id: 'pos-payments', label: 'Payments', to: '/sales/payments', roles: FRONT },
       { id: 'pos-invoices', label: 'Invoices', to: '/sales/invoices', roles: FRONT },
       { id: 'pos-returns', label: 'Returns', to: '/sales/returns', roles: FRONT },
     ],
+  },
+  {
+    id: 'kitchen', label: 'Kitchen', tagline: 'Live preparation queue', icon: ChefHat,
+    roles: ['Admin', 'Kitchen', 'Chef'],
+    children: [{ id: 'kitchen-board', label: 'Kitchen board', to: '/sales/kitchen', roles: ['Admin', 'Kitchen', 'Chef'] }],
   },
   {
     id: 'inventory',
@@ -161,9 +166,9 @@ export const WORKSPACES: Array<Workspace> = [
     label: 'Settings',
     tagline: 'Settings & personal profile',
     icon: Settings,
-    roles: ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'],
+    roles: ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef', 'Kitchen'],
     children: [
-      { id: 'set-profile', label: 'My profile', to: '/settings/profile', aliases: ['/settings'], roles: ['Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'] },
+      { id: 'set-profile', label: 'My profile', to: '/settings/profile', aliases: ['/settings'], roles: ['Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef', 'Kitchen'] },
       { id: 'set-general', label: 'General', to: '/settings#general', aliases: ['/settings'], roles: ['Admin'] },
       { id: 'set-inventory', label: 'Inventory', to: '/settings#inventory', roles: ['Admin'] },
       { id: 'set-loyalty', label: 'Loyalty', to: '/settings#loyalty', roles: ['Admin'] },

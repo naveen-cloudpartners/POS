@@ -146,7 +146,7 @@ export interface OrderItem {
   rate?: number;
 }
 
-export type UserRole = 'Admin' | 'Manager' | 'Cashier' | 'Storekeeper' | 'Waiter' | 'Chef';
+export type UserRole = 'Admin' | 'Manager' | 'Cashier' | 'Storekeeper' | 'Waiter' | 'Chef' | 'Kitchen';
 
 export interface PosUser {
   email: string;

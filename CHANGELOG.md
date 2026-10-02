@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### 2026-10-02 - Operational notifications and sounds
+
+- Replaced empty/static notification dropdowns with real role-based kitchen and stock alerts, unread badges, individual/all read actions and visible retry errors.
+- Saved read state and mute preferences per authenticated user/company in Configurations. Reused the live catalog's user-scope permissions for stock reads, keeping kitchen alerts available if catalog access fails.
+- Added generated sounds for POS item entry, successful actions, ready orders, new tickets, warnings and failed actions, plus browser audio unlock/test and kitchen sound controls.
+- Kept refreshes quiet and deduplicated incoming alerts across polling, reloads and shared tabs. Preserved READY history through fast SERVED transitions.
+- Added backend/frontend regression tests and desktop/mobile loopback browser verification. See [implementation and verification boundaries](docs/notifications-and-sounds.md).
+
+Validation: 104 backend and 21 frontend tests passed across suite/targeted checks; TypeScript, backend syntax, scoped ESLint (no errors), production build and diff checks passed. Both backend and client deployed successfully to Catalyst Development. Desktop/mobile browser checks used local fixtures; live speaker output and staff sessions remain device-level checks.
+
+### 2026-10-02 - Kitchen board and checkout routing
+
+- Added the Kitchen role, protected preparation APIs, and a compact board with three horizontal status rows and protected product previews.
+- Saved preparation status in company-scoped daily KOT JSON documents in Configurations, independently of order payment and printer status.
+- Fixed missing tickets by configuring the Development company's default station to Kitchen through Catalyst MCP; no previous routing record or ticket logs existed.
+- Used authenticated server-scope routing reads/writes and added a visible checkout warning when kitchen ticket delivery fails.
+- Documented data flow, existing-order behavior, seven-day visibility, display limits and cross-instance write limitations.
+
+Validation: 96 backend and 17 frontend tests passed; TypeScript, scoped ESLint, production build and diff checks passed. Backend and client deployment to Catalyst Development completed successfully, and the saved routing was read back through MCP. A real signed-in checkout-to-kitchen run remains unverified; historical sales were not replayed.
+
 ### 2026-10-01 - Purchasing access and error handling
 
 - Switched purchasing table operations to server SDK scope after authentication and existing role checks, addressing Catalyst table privilege failures for authorized POS staff.

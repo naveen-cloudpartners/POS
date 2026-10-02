@@ -31,7 +31,7 @@ import { formatDate, initials, number } from '../utils/format';
 import type { PosUser } from '../types';
 import './Users.css';
 
-const ROLES = ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'];
+const ROLES = ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef', 'Kitchen'];
 
 function displayRole(role: string): string {
   return role === 'master_admin' ? 'Admin' : role;

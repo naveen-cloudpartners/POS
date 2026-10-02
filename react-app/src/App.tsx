@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import RootEntry from './pages/RootEntry';
 import Dashboard from './pages/Dashboard';
+import KitchenBoard from './pages/KitchenBoard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Products from './pages/Products';
@@ -66,7 +67,7 @@ export default function App() {
           <Route path="/sales/payments" element={<WorkspaceView />} />
           <Route path="/sales/invoices" element={<WorkspaceView />} />
           <Route path="/sales/returns" element={<WorkspaceView />} />
-          <Route path="/sales/kitchen" element={<WorkspaceView />} />
+          <Route path="/sales/kitchen" element={<KitchenBoard />} />
           {/* Legacy aliases */}
           <Route path="/pos" element={<Pos />} />
           <Route path="/orders" element={<Orders />} />

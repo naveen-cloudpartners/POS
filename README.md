@@ -37,6 +37,10 @@ The 30 Sep 2026 styling update passed TypeScript and the Vite production build. 
 
 ## Data model (Catalyst Data Store)
 
+- The navigation bell shows real role-based kitchen/stock alerts, with per-user read states and sound preferences saved in **Configurations**. See [Notifications and sounds](docs/notifications-and-sounds.md).
+
+- Kitchen preparation uses company-scoped daily JSON ticket records in **Configurations**, with `prepStatus` independent of the sales/payment state in **Orders**. Admin, Kitchen and legacy Chef can access the board. See [Kitchen data flow, status storage and capacity limits](docs/kitchen-board.md).
+
 - Catalog table is **`Products`** (renamed from `Items`). All ZCQL + `table()` calls use `Products`. API routes stay `/api/items*` for backward compatibility.
 - `StockMovements` ledger keeps `item_rowid` / `item_name` column names (history-safe), plus `warehouse_id` / `from_warehouse_id` / `to_warehouse_id` for transfer audit.
 - Inventory Phase 2: `Warehouses`, `WarehouseStock` (per-product-per-warehouse), `StockTransfers` + `TransferItems`. `Products.stock` = `SUM(WarehouseStock.quantity)`; legacy writes mirror into the default warehouse.

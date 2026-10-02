@@ -71,6 +71,7 @@ interface CheckoutResponse {
   /** KOT/print routing plan (backend-planned, terminal-executed). */
   print_jobs?: Array<PrintJob>;
   kot_numbers?: Array<string>;
+  kitchen_warning?: string | null;
   stock_deducted?: boolean;
   movements_logged?: number;
   email_sent?: boolean;

@@ -5,6 +5,8 @@ import { Menu } from 'lucide-react';
 import Breadcrumbs from '../components/layout/Breadcrumbs';
 import { resolveRoute, setStoredWorkspace, trailForPath, visibleWorkspaces, homeOf, hasPanel, getStoredPanelCollapsed, setStoredPanelCollapsed } from '../components/layout/navigation';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { NotificationProvider } from '../context/NotificationContext';
+import { NotificationToast } from '../components/layout/NotificationBell';
 import { getCompanyProfile } from '../services/settingsService';
 import { setCurrencyCode } from '../utils/format';
 import '../styles/purchasing-design.css';
@@ -32,10 +34,11 @@ function Shell() {
   return <div className={`ch-app muster-reference-app muster-previous-nav${panelCollapsed ? " panel-collapsed" : ""}${hasPanel(resolved.workspace, role) && !panelCollapsed ? "" : " no-panel"}`}>
     <a className="muster-skip-link" href="#workspace-content" onClick={(event) => { event.preventDefault(); document.getElementById("workspace-content")?.focus(); }}>Skip to main content</a>
     <Sidebar workspaces={workspaces} activeWorkspace={resolved.workspace} activeKey={`${location.pathname}${location.hash}`} role={role} panelCollapsed={panelCollapsed} onTogglePanel={togglePanel} onSelectWorkspace={() => { setPanelCollapsed(false); setStoredPanelCollapsed(false); }} drawerOpen={drawerOpen} onOpenDrawer={() => setDrawerOpen(true)} onCloseDrawer={() => setDrawerOpen(false)} />
+    <NotificationToast />
     <div className="ch-main" inert={drawerOpen}>
       <button type="button" className="muster-mobile-nav-toggle" aria-label="Open navigation" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><Menu size={22} /></button>
       <main id="workspace-content" tabIndex={-1} className="ch-content workspace-design" key={`${location.pathname}:${role}`}><Breadcrumbs items={crumbs} /><Outlet /></main>
     </div>
   </div>;
 }
-export default function MainLayout() { return <AuthProvider><Shell /></AuthProvider>; }
+export default function MainLayout() { return <AuthProvider><NotificationProvider><Shell /></NotificationProvider></AuthProvider>; }

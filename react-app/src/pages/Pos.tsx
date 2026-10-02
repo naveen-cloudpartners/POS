@@ -13,6 +13,7 @@ import { getCustomers } from '../services/customerService';
 import { getPaymentMethods, getSettings, getSmtpStatus, getTaxSettings, type TaxSettings } from '../services/settingsService';
 import { sendCompanyPrintJob, type KotJobPayload, type PrintJob } from '../services/printService';
 import { useAuth } from '../context/AuthContext';
+import { playSound } from '../services/soundService';
 import { currency, number, isLowStock, isOutOfStock } from '../utils/format';
 import { calcTotals, type TaxOpts } from '../utils/tax';
 import type { Customer, Product } from '../types';
@@ -55,6 +56,8 @@ export default function Pos() {
   const [cart, setCart] = useState<Array<CartLine>>([]);
   const [customerName, setCustomerName] = useState('Walk-in Guest');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [tableNumber, setTableNumber] = useState('');
+  const [kitchenNotes, setKitchenNotes] = useState('');
   const [discountPct, setDiscountPct] = useState('0');
   const [payMode, setPayMode] = useState<PayMode>('Cash');
   const [split, setSplit] = useState(false);
@@ -141,18 +144,23 @@ export default function Pos() {
 
   const stockOf = (p: Product): number => Number(p.stock) || 0;
 
+  useEffect(() => { if (message?.kind === 'err') playSound('error'); }, [message]);
+
   const addToCart = (p: Product) => {
     setReceipt(null);
     setPrintJobs([]);
     const key = String(p.ROWID ?? p.sku);
+    const current = cart.find(line => String(line.product.ROWID ?? line.product.sku) === key)?.qty ?? 0;
+    if (current + 1 > stockOf(p)) {
+      setMessage({ kind: 'err', text: `Only ${number(stockOf(p))} × ${p.name} in stock.` });
+      return;
+    }
+    playSound('scan');
+    setMessage(null);
     setCart((prev) => {
       const found = prev.find((l) => String(l.product.ROWID ?? l.product.sku) === key);
       const cur = found?.qty ?? 0;
-      if (cur + 1 > stockOf(p)) {
-        setMessage({ kind: 'err', text: `Only ${number(stockOf(p))} × ${p.name} in stock.` });
-        return prev;
-      }
-      setMessage(null);
+      if (cur + 1 > stockOf(p)) return prev;
       if (found) {
         return prev.map((l) => (l === found ? { ...l, qty: l.qty + 1 } : l));
       }
@@ -259,6 +267,8 @@ export default function Pos() {
     setPrintMessage('');
     const mailTo = (receiptEmail.trim() === '' ? customerEmail.trim() : receiptEmail.trim());
     checkout({
+      room_number: tableNumber.trim() || undefined,
+      kitchen_notes: kitchenNotes.trim() || undefined,
       customer_name: customerName.trim() === '' ? 'Walk-in Guest' : customerName.trim(),
       customer_email: customerEmail.trim() === '' ? undefined : customerEmail.trim(),
       payment_mode: payMode,
@@ -298,8 +308,10 @@ export default function Pos() {
             setPrintMessage(result.ok ? (result.transport === 'qz' ? 'Receipt sent to printer.' : 'Use Print to print this receipt.') : `Sale completed. Receipt was not printed: ${result.error} Use Print to retry.`);
           }).finally(() => setReceiptPrinting(false));
         }
-        setMessage({ kind: 'ok', text: res.zoho_books?.warning || res.message || 'Sale completed.' });
+        setMessage({ kind: res.kitchen_warning ? 'err' : 'ok', text: res.kitchen_warning || res.zoho_books?.warning || res.message || 'Sale completed.' });
         setCart([]);
+        setTableNumber('');
+        setKitchenNotes('');
         setSplits([{ mode: 'Cash', amount: '' }]);
         // Silent refresh: stock changed server-side, but a full load()
         // would flash the skeleton and disturb the cashier's context.
@@ -537,6 +549,13 @@ export default function Pos() {
               />
             </div>
 
+            <details className="pos-kitchen-details">
+              <summary>Table & kitchen notes</summary>
+              <label className="ch-label" htmlFor="pos-table">Table / room</label>
+              <input id="pos-table" className="ch-input" maxLength={40} value={tableNumber} onChange={event => setTableNumber(event.target.value)} placeholder="e.g. Table 4 (optional)" />
+              <label className="ch-label" htmlFor="pos-kitchen-notes">Kitchen notes</label>
+              <textarea id="pos-kitchen-notes" className="ch-input" rows={2} maxLength={500} value={kitchenNotes} onChange={event => setKitchenNotes(event.target.value)} placeholder="Allergies or preparation instructions (optional)" />
+            </details>
             <div className="pos-lines-wrap">
               {cart.length === 0 ? (
                 <div className="pos-empty">

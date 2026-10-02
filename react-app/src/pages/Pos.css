@@ -453,3 +453,7 @@
 .pos-rc-totals dt { color: var(--ch-muted); font-weight: 600; }
 .pos-rc-totals dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 
+.pos-kitchen-details { margin: 0 12px 8px; padding: 8px 10px; border: 1px solid var(--ch-border, #e1e7f0); border-radius: 8px; }
+.pos-kitchen-details summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.pos-kitchen-details .ch-label { margin-top: 8px; }
+.pos-kitchen-details textarea { resize: vertical; }

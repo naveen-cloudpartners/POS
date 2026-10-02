@@ -3,7 +3,7 @@ import { fetchBackendSession } from './catalystAuth';
 /* CloudHub POS — session + role helpers for the frontend shell.
    Catalyst session remains the single source of truth (no local auth). */
 
-export type AppRole = 'Admin' | 'Manager' | 'Cashier' | 'Storekeeper' | 'Waiter' | 'Chef' | '';
+export type AppRole = 'Admin' | 'Manager' | 'Cashier' | 'Storekeeper' | 'Waiter' | 'Chef' | 'Kitchen' | '';
 
 /** Resolve the signed-in user's POS role from the backend roster. */
 export async function getCurrentRole(): Promise<AppRole> {
@@ -18,11 +18,13 @@ export async function getCurrentRole(): Promise<AppRole> {
 
 export function normalizeRole(raw: string): AppRole {
   const role = raw === 'master_admin' ? 'Admin' : raw;
-  return ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'].includes(role) ? role as AppRole : '';
+  return ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef', 'Kitchen'].includes(role) ? role as AppRole : '';
 }
 
-export function can(permission: 'manage_products' | 'adjust_stock' | 'view_reports' | 'manage_users' | 'manage_settings' | 'sell', role: string): boolean {
+export function can(permission: 'manage_products' | 'adjust_stock' | 'view_reports' | 'manage_users' | 'manage_settings' | 'sell' | 'kitchen_board', role: string): boolean {
   switch (permission) {
+    case 'kitchen_board':
+      return ['Admin', 'Kitchen', 'Chef'].includes(role);
     case 'sell':
       return ['Admin', 'Manager', 'Cashier', 'Waiter'].includes(role);
     case 'manage_products':

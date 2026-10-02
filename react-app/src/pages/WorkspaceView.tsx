@@ -4,8 +4,6 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   ArrowRight,
   Building2,
-  CheckCircle2,
-  ChefHat,
   ClipboardCheck,
   CreditCard,
   Download,
@@ -42,7 +40,7 @@ import { getOrders } from '../services/orderService';
 import { getCampaigns, createCampaign, updateCampaign, redeemReward, getCustomers, type RewardCampaign } from '../services/customerService';
 import { exportAuditCsv, exportAuditPdf, getAuditLogs, getUsers, type AuditMetrics, type AuditRecord } from '../services/userService';
 import { getTransfers } from '../services/inventoryService';
-import { ackKot, doneKot, getKotLog, type KotEntry } from '../services/printService';
+import KitchenBoard from './KitchenBoard';
 import {
   companyLogoUrl,
   getCompanyProfile,
@@ -468,173 +466,6 @@ function CategoriesView() {
             : `Delete "${deleteTarget.cat.name}" permanently? This cannot be undone. Categories with products can only be deactivated.`}
         </p>
       </Modal>
-    </div>
-  );
-}
-
-/* ---------------- Kitchen board (KOT execution) ----------------
-   Pending station chits with Ack/Done transitions. Polls quietly so the
-   board stays live without flashing skeletons. */
-
-function kotAge(firedAt: string): string {
-  const t = new Date(String(firedAt ?? '')).getTime();
-  if (!Number.isFinite(t)) return '—';
-  const mins = Math.max(0, Math.floor((Date.now() - t) / 60000));
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min`;
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
-}
-
-function KitchenView() {
-  const [entries, setEntries] = useState<Array<KotEntry>>([]);
-  const [station, setStation] = useState('all');
-  const [status, setStatus] = useState<'active' | 'DONE' | 'all'>('active');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState('');
-
-  const load = (quiet?: boolean) => {
-    if (!quiet) {
-      setLoading(true);
-      setError('');
-    }
-    getKotLog(undefined, 100, station)
-      .then(setEntries)
-      .catch((e: unknown) => {
-        if (!quiet) setError(e instanceof Error ? e.message : 'Failed to load KOTs');
-      })
-      .finally(() => {
-        if (!quiet) setLoading(false);
-      });
-  };
-
-  useEffect(() => {
-    load();
-    // Fetch-light: 20s cadence, skipped while the tab is hidden (the
-    // Refresh button covers on-demand updates).
-    const t = window.setInterval(() => {
-      if (document.hidden) return;
-      load(true);
-    }, 20000);
-    return () => window.clearInterval(t);
-  }, [station]);
-
-  const transition = (number: string, to: 'ack' | 'done') => {
-    setBusy(number);
-    setNotice('');
-    (to === 'ack' ? ackKot(number) : doneKot(number))
-      .then(() => {
-        setNotice(`KOT ${number} ${to === 'ack' ? 'acknowledged' : 'completed'}.`);
-        load(true);
-      })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Transition failed'))
-      .finally(() => setBusy(''));
-  };
-
-  const filtered = useMemo(() => {
-    return entries.filter((e) => {
-      if (station !== 'all' && e.station !== station) return false;
-      if (status === 'active' && e.status === 'DONE') return false;
-      if (status === 'DONE' && e.status !== 'DONE') return false;
-      return true;
-    });
-  }, [entries, station, status]);
-
-  const counts = useMemo(() => ({
-    fired: entries.filter((e) => e.status === 'FIRED').length,
-    acked: entries.filter((e) => e.status === 'ACKED').length,
-    done: entries.filter((e) => e.status === 'DONE').length,
-  }), [entries]);
-
-  if (loading) return <Loader message="Loading kitchen…" skeleton="page" />;
-  if (error !== '' && entries.length === 0) return <ErrorState message={error} onRetry={() => load()} />;
-
-  return (
-    <div>
-      <ViewHead
-        title="Kitchen"
-        sub="Live station tickets — acknowledge and complete as dishes fire."
-        actions={
-          <button type="button" className="ch-btn ch-btn-secondary ch-btn-sm" onClick={() => load()}>
-            <RefreshCw size={14} /> Refresh
-          </button>
-        }
-      />
-      {notice !== '' && <div className="ch-alert ch-alert-success">{notice}</div>}
-      {error !== '' && <div className="ch-alert ch-alert-error">{error}</div>}
-      <div className="ch-grid-stats">
-        <StatCard label="Fired" value={number(counts.fired)} icon={<ChefHat size={20} />} iconBg="#fef1e1" iconColor="#b45309" delay={40} />
-        <StatCard label="In progress" value={number(counts.acked)} icon={<ClipboardCheck size={20} />} iconBg="#f3f4f6" iconColor="#1f2937" delay={100} />
-        <StatCard label="Done" value={number(counts.done)} icon={<CheckCircle2 size={20} />} iconBg="#e3f6ec" iconColor="#287c52" delay={160} />
-      </div>
-      <Card delay={200}>
-        <div className="ch-toolbar">
-          <FilterBar
-            filters={[
-              {
-                key: 'station',
-                value: station,
-                onChange: setStation,
-                options: [
-                  { value: 'all', label: 'All stations' },
-                  { value: 'kitchen', label: 'Kitchen' },
-                  { value: 'bar', label: 'Bar' },
-                  { value: 'counter', label: 'Counter' },
-                ],
-                ariaLabel: 'Filter by station',
-              },
-              {
-                key: 'status',
-                value: status,
-                onChange: (v: string) => setStatus(v as 'active' | 'DONE' | 'all'),
-                options: [
-                  { value: 'active', label: 'Active' },
-                  { value: 'DONE', label: 'Done' },
-                  { value: 'all', label: 'All' },
-                ],
-                ariaLabel: 'Filter by status',
-              },
-            ]}
-          />
-          <span className="ch-cell-sub" style={{ marginLeft: 'auto', fontWeight: 700 }}>{filtered.length} tickets</span>
-        </div>
-        {filtered.length === 0 ? (
-          <EmptyState title="No tickets" message="Fired KOTs appear here as POS sales complete." icon={<ChefHat size={26} />} />
-        ) : (
-          <Table
-            columns={[
-              {
-                key: 'k', header: 'Ticket', render: (e: KotEntry) => (
-                  <span><span className="ch-cell-main">{e.number}</span><br /><span className="ch-cell-sub">Order {e.orderId}</span></span>
-                ),
-              },
-              { key: 's', header: 'Station', render: (e: KotEntry) => <StatusBadge status={e.station} /> },
-              { key: 'l', header: 'Lines', numeric: true, render: (e: KotEntry) => <b>{number(e.lines ?? 0)}</b> },
-              { key: 'a', header: 'Waiting', render: (e: KotEntry) => kotAge(e.firedAt ?? '') },
-              { key: 'st', header: 'Status', render: (e: KotEntry) => <StatusBadge status={e.status} /> },
-              {
-                key: 'x', header: 'Actions', render: (e: KotEntry) => (
-                  <span className="ch-row" style={{ gap: 4 }}>
-                    {e.status === 'FIRED' && (
-                      <button type="button" className="ch-btn ch-btn-secondary ch-btn-sm" disabled={busy === e.number} onClick={() => transition(e.number, 'ack')}>
-                        {busy === e.number ? '…' : 'Ack'}
-                      </button>
-                    )}
-                    {e.status === 'ACKED' && (
-                      <button type="button" className="ch-btn ch-btn-primary ch-btn-sm" disabled={busy === e.number} onClick={() => transition(e.number, 'done')}>
-                        {busy === e.number ? '…' : 'Done'}
-                      </button>
-                    )}
-                  </span>
-                ),
-              },
-            ]}
-            rows={filtered}
-            rowKey={(e) => e.number}
-          />
-        )}
-      </Card>
     </div>
   );
 }
@@ -1168,6 +999,7 @@ function MembershipView() {
 /* ---------------- Roles / Activity / Audit ---------------- */
 
 const PERMISSIONS = [
+  { key: 'kitchen_board', label: 'Kitchen preparation board' },
   { key: 'sell', label: 'Sell (POS)' },
   { key: 'manage_products', label: 'Manage products' },
   { key: 'adjust_stock', label: 'Adjust stock' },
@@ -1185,6 +1017,7 @@ const ROLE_SCOPES: Record<string, string> = {
   Storekeeper: 'Warehouse: stock, adjustments, transfers. Products read-only. No sales or customers.',
   Waiter: 'Floor sales like Cashier. No back-office access.',
   Chef: 'Kitchen visibility only. No sales, stock or admin access.',
+  Kitchen: 'Preparation queue and cooking statuses. No sales, stock or admin access.',
 };
 
 function RolesView() {
@@ -1210,7 +1043,7 @@ function RolesView() {
   if (loading) return <Loader message="Loading roles…" skeleton="page" />;
   if (error !== '') return <ErrorState message={error} onRetry={() => window.location.reload()} />;
 
-  const matrixRoles = [...new Set([...byRole.map((r) => r.role), 'Admin', 'Manager', 'Cashier', 'Storekeeper'])];
+  const matrixRoles = [...new Set([...byRole.map((r) => r.role), 'Admin', 'Manager', 'Cashier', 'Storekeeper', 'Kitchen'])];
 
   return (
     <div>
@@ -1244,7 +1077,7 @@ function RolesView() {
           minWidth={520}
         />
         <p className="ch-hint" style={{ marginBottom: 0 }}>
-          Built-in roles are Admin, Manager, Cashier and Storekeeper. Waiter and Chef remain for
+          Built-in roles are Admin, Manager, Cashier, Storekeeper and Kitchen. Waiter and Chef remain for
           compatibility. Enforcement runs server-side on every protected endpoint.
         </p>
       </Card>
@@ -1874,7 +1707,7 @@ export default function WorkspaceView() {
     case '/sales/returns':
       return <Returns />;
     case '/sales/kitchen':
-      return <KitchenView />;
+      return <KitchenBoard />;
     case '/customers/loyalty':
       return <LoyaltyView />;
     case '/customers/rewards':

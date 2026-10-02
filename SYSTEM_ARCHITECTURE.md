@@ -35,6 +35,10 @@ Checkout posts contacts, invoices and supported payments to Books while retainin
 
 ## 3. Data Store tables
 
+The operational notification feed derives kitchen events from KOT records, including bounded preparation history, and stock alerts from caller-accessible catalog rows. Per-user read IDs and `soundEnabled` are saved in company/session-bound Configurations keys. `GET /api/notifications` polls every 15 seconds while visible; `PUT /api/notifications/state` updates read state/preferences. The frontend notification provider deduplicates arrivals and coordinates generated audio across the authenticated shell. See [notifications and sounds](docs/notifications-and-sounds.md) for role recipients, delivery limits and browser behavior.
+
+Kitchen preparation reuses `Configurations`: routing is stored under `org_<orgId>_setting_print_routing`, and daily ticket arrays under `org_<orgId>_setting_kot_log_YYYY-MM-DD`. Successful checkout routes items to Kitchen/Bar/Counter; only Kitchen and Bar create tickets. Authorized staff advance `prepStatus` through `QUEUED → PREPARING → READY → SERVED`, independently of `Orders` financial status and printer delivery status. The board polls every 15 seconds while visible. Updates use session-company keys and server credentials after authentication/role checks. See [Kitchen board data flow and concurrency limits](docs/kitchen-board.md); daily JSON writes serialize only within one function instance and have no distributed compare-and-swap guarantee.
+
 | Table | Purpose | Key columns |
 |---|---|---|
 | `Products` | Catalog + aggregate stock | sku (unique), rate, cost_price, stock, reorder_level, category links, image refs |

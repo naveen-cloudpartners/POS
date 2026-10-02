@@ -20,6 +20,8 @@ const axios = require('axios');
 const catalyst = require('zcatalyst-sdk-node');
 const ZohoBooksService = require('./zohoBooksService');
 const booksIntegration = require('./booksIntegration');
+const { kitchenState, kitchenTicket, transitionKitchen, cancelKitchenItems, withKitchenLock } = require('./kitchenWorkflow');
+const { notificationFeed, notificationState, updateNotificationState, STOCK: STOCK_NOTIFICATION_ROLES } = require('./notificationFeed');
 const nodemailer = require('nodemailer');
 const zlib = require('zlib'); // core module: PNG inflate for PDF logo embedding
 
@@ -1457,9 +1459,10 @@ function getRolePermissions(role) {
       zoho_books: 'none', zoho_invoice: 'none', zoho_inventory: 'none', zoho_mail: 'none'
     }
   };
+  perms.Kitchen = { ...perms.Chef };
   const r = normWhRole(role);
   const result = perms[r] ? { ...perms[r] } : {};
-  for (const permission of ['sell', 'manage_products', 'adjust_stock', 'manage_inventory', 'view_reports', 'manage_users', 'manage_settings']) {
+  for (const permission of ['sell', 'manage_products', 'adjust_stock', 'manage_inventory', 'view_reports', 'manage_users', 'manage_settings', 'kitchen_board']) {
     result[permission] = roleCan(r, permission);
   }
   result.system_settings = result.manage_settings;
@@ -2189,9 +2192,11 @@ app.post('/api/orders', async (req, res) => {
     // 6c. Print jobs (KOT/print routing): station split + KOT numbers + log.
     // Best-effort: checkout never fails because printing cannot be planned.
     let checkoutKots = [];
+    let kitchenWarning = null;
     try {
-      const routing = await getPrintRouting(catalystApp, posOrgId);
-      const stationMap = await productStationMap(catalystApp, resolvedLines.map((x) => x.live && x.live.ROWID));
+      const kitchenApp = catalyst.initialize(req, { scope: 'admin' });
+      const routing = await getPrintRouting(kitchenApp, posOrgId, true);
+      const stationMap = await productStationMap(kitchenApp, resolvedLines.map((x) => x.live && x.live.ROWID));
       const groups = new Map();
       for (const { line, live } of resolvedLines) {
         const st = stationForLine(live, routing, stationMap);
@@ -2199,13 +2204,14 @@ app.post('/api/orders', async (req, res) => {
         groups.get(st).push({
           name: line.name || (live && live.name) || 'Item',
           sku: line.sku || (live && live.sku) || '',
+          productId: live ? String(live.ROWID || '') : '',
           qty: line.qty,
         });
       }
       for (const [station, items] of groups.entries()) {
         if (station === 'counter') continue;
         checkoutKots.push({
-          kotNumber: await allocKotNumber(catalystApp, posOrgId),
+          kotNumber: await allocKotNumber(kitchenApp, posOrgId),
           station,
           items,
           orderId: String(localOrderId),
@@ -2218,14 +2224,17 @@ app.post('/api/orders', async (req, res) => {
         });
       }
       if (checkoutKots.length > 0) {
-        await appendKotLog(catalystApp, posOrgId, checkoutKots.map((k) => ({
+        await appendKotLog(kitchenApp, posOrgId, checkoutKots.map((k) => ({
           number: k.kotNumber, orderId: k.orderId, station: k.station,
           status: 'FIRED', lines: k.items.length, firedAt: k.firedAt,
+          items: k.items, roomNumber: k.roomNumber, kitchenNotes: k.kitchenNotes,
+          prepStatus: 'QUEUED', prepUpdatedAt: k.firedAt,
         })));
       }
     } catch (e) {
       console.warn('[KOT] Print planning skipped:', e.message);
       checkoutKots = [];
+      kitchenWarning = 'Sale completed, but the order could not be sent to the kitchen. Contact your administrator before preparing it.';
     }
 
     // 7. Receipt payload (POS-09) + optional email.
@@ -2304,6 +2313,7 @@ app.post('/api/orders', async (req, res) => {
       receipt,
       print_jobs: printJobs,
       kot_numbers: checkoutKots.map((k) => k.kotNumber),
+      kitchen_warning: kitchenWarning,
       stock_deducted: true,
       movements_logged: movementsLogged,
       loyalty_awarded: loyaltyAwarded,
@@ -2635,6 +2645,8 @@ app.post('/api/orders/:id/void', async (req, res) => {
     let cancelChit = null;
     try {
       const voidOrgId = orgUserContext.orgUser ? String(orgUserContext.orgUser.org_id || '') : '';
+      try { await cancelKitchenOrder(catalyst.initialize(req, { scope: 'admin' }), voidOrgId, orderId, [], reason, true); }
+      catch (e) { console.error('[Kitchen] void update failed:', e.message); }
       const cancelLines = [];
       for (const row of lineRows || []) {
         const l = row.OrderItems;
@@ -2878,6 +2890,8 @@ app.post('/api/orders/:id/return', async (req, res) => {
     let returnCancelChit = null;
     try {
       const returnOrgId = orgUserContext.orgUser ? String(orgUserContext.orgUser.org_id || '') : '';
+      try { await cancelKitchenOrder(catalyst.initialize(req, { scope: 'admin' }), returnOrgId, orderId, plan.map(p => ({ name: p.name, sku: p.sku, qty: p.qty })), cleanReason, full); }
+      catch (e) { console.error('[Kitchen] return update failed:', e.message); }
       returnCancelChit = await buildCancelChit(catalystApp, returnOrgId, plan.map((p) => ({
         name: p.name, sku: p.sku, qty: p.qty, ref: p.live ? String(p.live.ROWID) : '',
       })), { orderId, reason: cleanReason, actor: performedBy });
@@ -8736,7 +8750,7 @@ app.get('/api/reports/export/csv', async (req, res) => {
    (active/inactive/invited) and the actor-based UserAuditLog trail.
    ========================================================================== */
 
-const POS_BUILT_IN_ROLES = ['Admin', 'Manager', 'Cashier', 'Storekeeper'];
+const POS_BUILT_IN_ROLES = ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Kitchen'];
 const POS_COMPAT_ROLES = ['Waiter', 'Chef'];
 const POS_ALL_ROLES = [...POS_BUILT_IN_ROLES, ...POS_COMPAT_ROLES];
 
@@ -8750,9 +8764,9 @@ function roleCan(role, permission) {
   const r = String(role ?? '');
   switch (permission) {
     case 'manage_profile':
-      return ['Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'].includes(r);
+      return ['Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef', 'Kitchen'].includes(r);
     case 'signed_in':
-      return ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef'].includes(r);
+      return ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter', 'Chef', 'Kitchen'].includes(r);
     case 'read_products':
       return ['Admin', 'Manager', 'Cashier', 'Storekeeper', 'Waiter'].includes(r);
     case 'lookup_customers':
@@ -8762,6 +8776,8 @@ function roleCan(role, permission) {
       return ['Admin', 'Manager'].includes(r);
     case 'kitchen':
       return ['Admin', 'Manager', 'Waiter', 'Chef'].includes(r);
+    case 'kitchen_board':
+      return ['Admin', 'Kitchen', 'Chef'].includes(r);
     case 'sell':
       return ['Admin', 'Manager', 'Cashier', 'Waiter'].includes(r);
     case 'manage_products':
@@ -8788,6 +8804,8 @@ function apiPermission(method, path) {
   if (!path.startsWith('/api/')) return null;
   if (['/api/health', '/api/auth/me', '/api/setup/status', '/api/auth/status', '/api/auth/callback', '/api/organizations/register', '/api/admin/approve-org', '/api/admin/reject-org'].includes(path)) return null;
   if (path === '/api/profile/me' || path === '/api/profile/me/photo') return 'manage_profile';
+  if (path === '/api/notifications' || path === '/api/notifications/state') return 'signed_in';
+  if (/^\/api\/kitchen(\/|$)/.test(path)) return 'kitchen_board';
   if (path === '/api/printing/qz/certificate' || path === '/api/printing/qz/sign') return 'signed_in';
   if (/^\/api\/(admin\/users|users)(\/|$)/.test(path)) return 'manage_users';
   if (path.startsWith('/api/admin/audit')) return 'manage_users';
@@ -11790,13 +11808,17 @@ async function savePrinters(catalystApp, orgId, list) {
   return { printers: clean.map((p) => ({ ...p, enabled: p.active })) };
 }
 
-async function getPrintRouting(catalystApp, orgId) {
+async function getPrintRouting(catalystApp, orgId, strict = false) {
   const dflt = { byCategoryId: {}, byCategoryName: {}, defaultStation: 'counter' };
   try {
-    const raw = await new ZohoBooksService(catalystApp, null).getConfig(`org_${orgId}_setting_print_routing`);
+    const key = `org_${orgId}_setting_print_routing`;
+    const raw = strict ? await readKitchenConfig(catalystApp, key) : await new ZohoBooksService(catalystApp, null).getConfig(key);
     if (raw === undefined || raw === null || String(raw) === '') return dflt;
     const parsed = JSON.parse(String(raw));
-    if (!parsed || typeof parsed !== 'object') return dflt;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      if (strict) throw new Error('Invalid kitchen routing configuration');
+      return dflt;
+    }
     const byCategoryId = {};
     for (const [k, v] of Object.entries(parsed.byCategoryId || {})) {
       if (/^[0-9]+$/.test(String(k).trim())) byCategoryId[String(k).trim()] = normPrintStation(v, 'counter');
@@ -11807,6 +11829,7 @@ async function getPrintRouting(catalystApp, orgId) {
     }
     return { byCategoryId, byCategoryName, defaultStation: normPrintStation(parsed.defaultStation, 'counter') };
   } catch (e) {
+    if (strict) throw e;
     return dflt;
   }
 }
@@ -11915,18 +11938,27 @@ async function allocKotNumber(catalystApp, orgId) {
   }
 }
 
-async function readKotDay(catalystApp, orgId, day) {
+/** Kitchen reads must distinguish an empty queue from a datastore failure. */
+async function readKitchenConfig(catalystApp, key) {
+  const safeKey = String(key).replace(/'/g, "''");
+  const rows = await catalystApp.zcql().executeZCQLQuery(`SELECT config_value FROM Configurations WHERE config_key = '${safeKey}'`);
+  return rows.length ? rows[0].Configurations.config_value : null;
+}
+
+async function readKotDay(catalystApp, orgId, day, strict = false) {
   try {
-    const raw = await new ZohoBooksService(catalystApp, null).getConfig(kotLogKey(orgId, day));
+    const raw = strict ? await readKitchenConfig(catalystApp, kotLogKey(orgId, day)) : await new ZohoBooksService(catalystApp, null).getConfig(kotLogKey(orgId, day));
     const arr = JSON.parse(String(raw || '[]'));
+    if (strict && !Array.isArray(arr)) throw new Error('Invalid kitchen log');
     return Array.isArray(arr) ? arr : [];
   } catch (e) {
+    if (strict) throw e;
     return [];
   }
 }
 
 /** Merged log, oldest-first: today + legacy single doc + previous 6 days. */
-async function readKotLog(catalystApp, orgId) {
+async function readKotLog(catalystApp, orgId, strict = false) {
   const merged = [];
   const seen = new Set();
   const pushAll = (arr) => {
@@ -11937,29 +11969,38 @@ async function readKotLog(catalystApp, orgId) {
     }
   };
   const days = kotRecentDays();
-  pushAll(await readKotDay(catalystApp, orgId, days[0]));
+  pushAll(await readKotDay(catalystApp, orgId, days[0], strict));
   try {
-    const raw = await new ZohoBooksService(catalystApp, null).getConfig(`org_${orgId}_setting_kot_log`);
+    const raw = strict ? await readKitchenConfig(catalystApp, `org_${orgId}_setting_kot_log`) : await new ZohoBooksService(catalystApp, null).getConfig(`org_${orgId}_setting_kot_log`);
     const arr = JSON.parse(String(raw || '[]'));
+    if (strict && !Array.isArray(arr)) throw new Error('Invalid legacy kitchen log');
     if (Array.isArray(arr)) pushAll(arr);
-  } catch (e) { /* legacy key optional */ }
-  for (const d of days.slice(1)) pushAll(await readKotDay(catalystApp, orgId, d));
+  } catch (e) { if (strict) throw e; /* legacy key optional */ }
+  for (const d of days.slice(1)) pushAll(await readKotDay(catalystApp, orgId, d, strict));
   merged.sort((a, b) => (String(a.firedAt || '') < String(b.firedAt || '') ? -1 : 1));
   return merged;
 }
 
 async function writeKotDay(catalystApp, orgId, day, log) {
-  await safeUpsertConfig(catalystApp, kotLogKey(orgId, day), JSON.stringify(log.slice(-200)));
+  const active = log.filter(entry => !['SERVED', 'CANCELLED'].includes(kitchenState(entry)));
+  const finished = log.filter(entry => ['SERVED', 'CANCELLED'].includes(kitchenState(entry))).slice(-200);
+  await safeUpsertConfig(catalystApp, kotLogKey(orgId, day), JSON.stringify([...active, ...finished]));
 }
 
 async function appendKotLog(catalystApp, orgId, entries) {
+  return withKitchenLock(orgId, () => appendKotLogUnlocked(catalystApp, orgId, entries));
+}
+async function appendKotLogUnlocked(catalystApp, orgId, entries) {
   const today = new Date().toISOString().slice(0, 10);
-  const log = await readKotDay(catalystApp, orgId, today);
+  const log = await readKotDay(catalystApp, orgId, today, true);
   for (const e of entries) log.push(e);
   await writeKotDay(catalystApp, orgId, today, log);
 }
 
 async function setKotStatus(catalystApp, orgId, number, to, actor) {
+  return withKitchenLock(orgId, () => setKotStatusUnlocked(catalystApp, orgId, number, to, actor));
+}
+async function setKotStatusUnlocked(catalystApp, orgId, number, to, actor) {
   // Search today, then the legacy doc, then previous days (KOTs acked
   // across midnight); the entry is written back to the key it came from.
   const days = kotRecentDays();
@@ -12076,7 +12117,7 @@ app.get('/api/settings/print-routing', async (req, res) => {
     const orgUserContext = await getCurrentOrgUser(req, catalystApp);
     if (!orgUserContext) return res.status(401).json({ success: false, error: 'Not authenticated' });
     const orgId = String(orgUserContext.orgUser.org_id || '');
-    res.status(200).json({ success: true, routing: await getPrintRouting(catalystApp, orgId) });
+    res.status(200).json({ success: true, routing: await getPrintRouting(catalyst.initialize(req, { scope: 'admin' }), orgId, true) });
   } catch (error) {
     console.error('Error reading print routing:', error.message);
     res.status(500).json({ success: false, error: error.message });
@@ -12090,7 +12131,7 @@ app.put('/api/settings/print-routing', async (req, res) => {
     if (!orgUserContext) return res.status(401).json({ success: false, error: 'Not authenticated' });
     if (!requirePermission(orgUserContext, res, 'manage_settings', 'Print routing requires Admin.')) return;
     const orgId = String(orgUserContext.orgUser.org_id || '');
-    const result = await savePrintRouting(catalystApp, orgId, req.body || {});
+    const result = await savePrintRouting(catalyst.initialize(req, { scope: 'admin' }), orgId, req.body || {});
     if (result.error) return res.status(400).json({ success: false, error: result.error });
     try {
       await logAuditLog(catalystApp, kotAuditPayload(orgUserContext, 'SETTINGS_CHANGED', '', 'print-routing'));
@@ -12103,6 +12144,174 @@ app.put('/api/settings/print-routing', async (req, res) => {
 });
 
 /* ---------------- KOT log, transitions, queue, reprint ---------------- */
+
+/** Kitchen prep states are independent of printer FIRED/ACKED/DONE states. */
+async function modifyKitchenLog(catalystApp, orgId, predicate, update) {
+  return withKitchenLock(orgId, async () => {
+    const changed = [];
+    const seen = new Set();
+    const candidates = [...kotRecentDays().map(day => ({ day })), { legacy: true }];
+    for (const candidate of candidates) {
+      const key = candidate.legacy ? `org_${orgId}_setting_kot_log` : kotLogKey(orgId, candidate.day);
+      const raw = await readKitchenConfig(catalystApp, key);
+      const entries = JSON.parse(String(raw || '[]'));
+      if (!Array.isArray(entries)) throw new Error('Invalid kitchen log');
+      let dirty = false;
+      for (let i = 0; i < entries.length; i++) {
+        if (!entries[i] || seen.has(entries[i].number) || !predicate(entries[i])) continue;
+        seen.add(entries[i].number);
+        const result = update(entries[i]);
+        if (result.error) return result;
+        entries[i] = result.entry;
+        changed.push(entries[i]); dirty = true;
+      }
+      if (dirty) await safeUpsertConfig(catalystApp, key, JSON.stringify(entries));
+    }
+    return { changed };
+  });
+}
+
+async function cancelKitchenOrder(catalystApp, orgId, orderId, lines, reason, full) {
+  return modifyKitchenLog(catalystApp, orgId,
+    entry => String(entry.orderId) === String(orderId) && !['SERVED', 'CANCELLED'].includes(kitchenState(entry)),
+    entry => ({ entry: cancelKitchenItems(entry, lines, reason, full) }));
+}
+
+app.get('/api/kitchen/tickets/:number/items/:index/image', async (req, res) => {
+  try {
+    const app = catalyst.initialize(req);
+    const context = await getCurrentOrgUser(req, app);
+    if (!context) return res.status(401).json({ error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'kitchen_board')) return;
+    const number = String(req.params.number || '');
+    const index = String(req.params.index || '');
+    if (!/^KOT-[A-Z0-9-]{1,80}$/.test(number) || !/^\d{1,3}$/.test(index)) return res.status(400).json({ error: 'Invalid ticket item.' });
+    const orgId = String(context.orgUser.org_id || '');
+    const dataApp = catalyst.initialize(req, { scope: 'admin' });
+    const tickets = await readKotLog(dataApp, orgId, true);
+    const ticket = tickets.find(row => row.number === number && ['kitchen', 'bar'].includes(row.station));
+    const item = ticket && Array.isArray(ticket.items) ? ticket.items[Number(index)] : null;
+    if (!item || !(Number(item.qty) > 0)) return res.status(404).json({ error: 'Ticket item not found.' });
+    const productId = String(item.productId || '');
+    // A stored product reference was resolved server-side during checkout.
+    // Older tickets can resolve by SKU only inside the current company.
+    const where = /^\d+$/.test(productId) ? `ROWID = ${productId}` : item.sku ? `org_id = '${sanitizeZcql(orgId)}' AND sku = '${sanitizeZcql(item.sku)}'` : '';
+    if (!where) return res.status(404).json({ error: 'No product image.' });
+    const rows = await safeZcql(dataApp, `SELECT image_id, image_mime FROM Products WHERE ${where} LIMIT 1`);
+    const product = rows[0] && rows[0].Products;
+    if (!product || !product.image_id) return res.status(404).json({ error: 'No product image.' });
+    const bytes = await getProductImageBytes(dataApp, product.image_id);
+    if (!bytes) return res.status(404).json({ error: 'Image unavailable.' });
+    const mime = String(product.image_mime || 'image/png');
+    res.set({ 'Content-Type': Object.keys(PRODUCT_IMAGE_MIME).includes(mime) ? mime : 'application/octet-stream', 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff' });
+    res.send(bytes);
+  } catch (error) {
+    res.status(503).json({ error: 'Image unavailable.' });
+  }
+});
+
+async function notificationContext(req) {
+  const userApp = catalyst.initialize(req);
+  const context = await getCurrentOrgUser(req, userApp);
+  if (!context || !roleCan(callerRole(context), 'signed_in')) return null;
+  const orgId = String(context.orgUser.org_id || '');
+  const userId = String(context.user && (context.user.user_id || context.user.email || context.user.email_id) || '');
+  if (!orgId || !userId) return null;
+  const role = callerRole(context);
+  const dataApp = catalyst.initialize(req, { scope: 'admin' });
+  const key = `org_${orgId}_setting_notifications_user_${Buffer.from(userId).toString('hex')}`;
+  return { orgId, userId, role, userApp, dataApp, key, warnings: [] };
+}
+async function loadNotificationFeed(context) {
+  const { dataApp, orgId, role } = context;
+  const tickets = role === 'Storekeeper' ? [] : await readKotLog(dataApp, orgId, true);
+  let products = [];
+  if (STOCK_NOTIFICATION_ROLES.includes(role)) {
+    // Existing Products has no org_id column. Match the catalog's user-scope
+    // access instead of elevating stock reads to a project-wide admin scan.
+    try {
+      const rows = await context.userApp.zcql().executeZCQLQuery('SELECT ROWID, name, sku, stock, reorder_level, status FROM Products WHERE stock <= reorder_level OR stock <= 0 OR reorder_level IS NULL LIMIT 30');
+      products = rows.map(row => row.Products);
+    } catch (error) { context.warnings.push('Stock alerts are unavailable. Check catalog access.'); }
+  }
+  return notificationFeed(role, tickets, products);
+}
+function notificationResponse(context, state, feed) {
+  return { success: true, audience: `${context.orgId}:${context.userId}:${context.role}`, soundEnabled: state.soundEnabled, warnings: context.warnings,
+    data: feed.map(event => ({ ...event, read: !!state.read[event.id] })), generatedAt: new Date().toISOString() };
+}
+app.get('/api/notifications', async (req, res) => {
+  try {
+    const context = await notificationContext(req);
+    if (!context) return res.status(401).json({ success: false, error: 'Not authenticated or no POS role.' });
+    const [feed, raw] = await Promise.all([loadNotificationFeed(context), readKitchenConfig(context.dataApp, context.key)]);
+    res.set({ 'Cache-Control': 'no-store' });
+    res.json(notificationResponse(context, notificationState(raw), feed));
+  } catch (error) {
+    console.error('[Notifications] read:', error.message);
+    res.status(503).json({ success: false, error: 'Unable to load notifications. Retry to reconnect.' });
+  }
+});
+app.put('/api/notifications/state', async (req, res) => {
+  try {
+    const context = await notificationContext(req);
+    if (!context) return res.status(401).json({ success: false, error: 'Not authenticated or no POS role.' });
+    const feed = await loadNotificationFeed(context);
+    let state;
+    await withKitchenLock(context.key, async () => {
+      const current = notificationState(await readKitchenConfig(context.dataApp, context.key));
+      try { state = updateNotificationState(current, req.body, feed); }
+      catch (error) { error.status = 400; throw error; }
+      await safeUpsertConfig(context.dataApp, context.key, JSON.stringify(state));
+    });
+    res.json(notificationResponse(context, state, feed));
+  } catch (error) {
+    res.status(error.status || 503).json({ success: false, error: error.status === 400 ? error.message : 'Unable to save notification preferences. Please retry.' });
+  }
+});
+
+app.get('/api/kitchen/tickets', async (req, res) => {
+  try {
+    const catalystApp = catalyst.initialize(req);
+    const context = await getCurrentOrgUser(req, catalystApp);
+    if (!context) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'kitchen_board', 'Kitchen access requires Admin or Kitchen staff.')) return;
+    const orgId = String(context.orgUser.org_id || '');
+    const dataApp = catalyst.initialize(req, { scope: 'admin' });
+    const tickets = (await readKotLog(dataApp, orgId, true)).filter(entry => ['kitchen', 'bar'].includes(entry.station)).map(kitchenTicket);
+    const active = tickets.filter(ticket => !['SERVED', 'CANCELLED'].includes(ticket.status)).sort((a, b) => a.firedAt.localeCompare(b.firedAt));
+    const history = tickets.filter(ticket => ['SERVED', 'CANCELLED'].includes(ticket.status)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 50);
+    res.json({ success: true, data: [...active.slice(0, 200), ...history], hasMore: active.length > 200, generatedAt: new Date().toISOString() });
+  } catch (error) {
+    console.error('[Kitchen] queue:', error.message);
+    res.status(503).json({ success: false, error: 'Unable to load kitchen tickets. Please retry.' });
+  }
+});
+
+app.post('/api/kitchen/tickets/:number/status', async (req, res) => {
+  try {
+    const catalystApp = catalyst.initialize(req);
+    const context = await getCurrentOrgUser(req, catalystApp);
+    if (!context) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!requirePermission(context, res, 'kitchen_board', 'Kitchen access requires Admin or Kitchen staff.')) return;
+    const number = String(req.params.number || '');
+    if (!/^KOT-[A-Z0-9-]{1,80}$/.test(number)) return res.status(400).json({ success: false, error: 'Invalid ticket number.' });
+    const orgId = String(context.orgUser.org_id || '');
+    const actor = await whActorEmail(req, catalystApp, context);
+    const dataApp = catalyst.initialize(req, { scope: 'admin' });
+    const result = await modifyKitchenLog(dataApp, orgId,
+      entry => entry.number === number && ['kitchen', 'bar'].includes(entry.station),
+      entry => transitionKitchen(entry, req.body.expected, req.body.status, actor, new Date().toISOString(), callerRole(context) === 'Admin'));
+    if (result.error) return res.status(result.code || 400).json({ success: false, error: result.error });
+    if (!result.changed.length) return res.status(404).json({ success: false, error: 'Kitchen ticket not found in this organization.' });
+    const ticket = kitchenTicket(result.changed[0]);
+    try { await logAuditLog(catalystApp, kotAuditPayload(context, `KITCHEN_${ticket.status}`, number, `${number} → ${ticket.status}`)); } catch { /* audit best effort */ }
+    res.json({ success: true, ticket });
+  } catch (error) {
+    console.error('[Kitchen] transition:', error.message);
+    res.status(503).json({ success: false, error: 'Unable to update the ticket. Refresh before retrying.' });
+  }
+});
 
 app.get('/api/kot', async (req, res) => {
   try {

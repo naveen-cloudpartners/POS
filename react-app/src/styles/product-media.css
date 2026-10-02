@@ -1,10 +1,13 @@
 /* Retained session changes only: product cards, profile logo and Integrations.
    All other workspace styling comes from the original stylesheets. */
 .desktop-product-media, .ch-profile-logo { display: none; }
+.ch-app .ch-profile-initial.has-logo { display: none; }
+.ch-app .ch-profile-logo { display: block; width: 34px; height: 34px; border-radius: 50%; background: #fff; }
+.ch-app .ch-profile-logo.company-avatar { object-fit: contain; padding: 2px; }
+.ch-app .ch-profile-logo.personal-avatar { object-fit: cover; padding: 0; }
 
 @media screen and (min-width: 1025px) and (hover: hover) and (pointer: fine) {
   .ch-app .ch-profile-initial.has-logo { display: none; }
-  .ch-app .ch-profile-logo { display: block; width: 34px; height: 34px; object-fit: contain; padding: 2px; border-radius: 50%; background: #fff; }
 
   .ch-app .prod-grid { gap: 20px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
   .ch-app .prod-card { border-radius: 16px; border-color: #f8fafb; gap: 10px; box-shadow: var(--ch-shadow-sm); }
